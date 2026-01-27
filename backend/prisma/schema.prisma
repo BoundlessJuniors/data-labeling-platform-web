@@ -1,0 +1,452 @@
+// ============================================================================
+// Data Labeling Platform - Prisma Schema
+// PostgreSQL Database Schema for Visual Labeling Marketplace
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  client
+  labeler
+  admin
+}
+
+enum DatasetStatus {
+  draft
+  uploading
+  ready
+  archived
+}
+
+enum ListingStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum QcMode {
+  none
+  client_approval
+  internal_reviewer
+}
+
+enum ContractStatus {
+  active
+  submitted
+  approved
+  rejected
+  cancelled
+}
+
+enum TaskStatus {
+  ready
+  leased
+  submitted
+  accepted
+  rejected
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum EscrowType {
+  hold
+  release_to_labeler
+  refund_to_client
+  platform_fee
+}
+
+enum ReviewDecision {
+  accept
+  reject
+}
+
+// ============================================================================
+// 1. USERS
+// Hem müşteri hem etiketleyici tek tabloda. Rol alanıyla ayrılır.
+// ============================================================================
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  displayName  String?  @map("display_name")
+  ratingAvg    Decimal? @map("rating_avg") @db.Decimal(3, 2)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  datasets               Dataset[]
+  labelSets              LabelSet[]
+  listingsOwned          Listing[]              @relation("ListingOwner")
+  contractsAsClient      Contract[]             @relation("ContractClient")
+  contractsAsLabeler     Contract[]             @relation("ContractLabeler")
+  taskLeases             TaskLease[]
+  annotationsRaw         AnnotationRaw[]
+  annotationsNormalized  AnnotationNormalized[]
+  payments               Payment[]
+  auditLogs              AuditLog[]
+  reviews                Review[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// 2. DATASETS
+// Müşterinin dataset metadata'sı.
+// ============================================================================
+
+model Dataset {
+  id          String        @id @default(uuid()) @db.Uuid
+  ownerUserId String        @map("owner_user_id") @db.Uuid
+  name        String
+  description String?
+  status      DatasetStatus @default(draft)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  owner    User      @relation(fields: [ownerUserId], references: [id])
+  assets   Asset[]
+  listings Listing[]
+
+  @@index([ownerUserId])
+  @@index([status])
+  @@map("datasets")
+}
+
+// ============================================================================
+// 3. ASSETS
+// Dataset içindeki tek görselin metadata'sı. Dosya storage'da.
+// ============================================================================
+
+model Asset {
+  id        String   @id @default(uuid()) @db.Uuid
+  datasetId String   @map("dataset_id") @db.Uuid
+  objectKey String   @map("object_key")
+  mimeType  String   @map("mime_type")
+  width     Int?
+  height    Int?
+  sizeBytes BigInt?  @map("size_bytes")
+  checksum  String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  dataset Dataset @relation(fields: [datasetId], references: [id])
+  tasks   Task[]
+
+  @@unique([datasetId, objectKey])
+  @@index([datasetId])
+  @@map("assets")
+}
+
+// ============================================================================
+// 4. LABEL SETS
+// Etiket sınıfları seti (person, car...). Versiyonlanabilir.
+// ============================================================================
+
+model LabelSet {
+  id          String   @id @default(uuid()) @db.Uuid
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  name        String
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  owner    User      @relation(fields: [ownerUserId], references: [id])
+  labels   Label[]
+  listings Listing[]
+
+  @@unique([ownerUserId, name, version])
+  @@index([ownerUserId])
+  @@map("label_sets")
+}
+
+// ============================================================================
+// 5. LABELS
+// LabelSet içindeki tek label.
+// ============================================================================
+
+model Label {
+  id                   String   @id @default(uuid()) @db.Uuid
+  labelSetId           String   @map("label_set_id") @db.Uuid
+  name                 String
+  color                String?
+  attributesSchemaJson Json?    @map("attributes_schema_json") @db.JsonB
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  labelSet LabelSet @relation(fields: [labelSetId], references: [id])
+
+  @@unique([labelSetId, name])
+  @@index([labelSetId])
+  @@map("labels")
+}
+
+// ============================================================================
+// 6. LISTINGS
+// Müşterinin dataset'i etiketletmek için açtığı ilan.
+// ============================================================================
+
+model Listing {
+  id              String        @id @default(uuid()) @db.Uuid
+  datasetId       String        @map("dataset_id") @db.Uuid
+  ownerUserId     String        @map("owner_user_id") @db.Uuid
+  title           String
+  description     String?
+  labelSetId      String        @map("label_set_id") @db.Uuid
+  labelSetVersion Int           @map("label_set_version")
+  labelingSpecJson Json         @map("labeling_spec_json") @db.JsonB
+  qcMode          QcMode        @default(none) @map("qc_mode")
+  priceTotal      Decimal       @map("price_total") @db.Decimal(12, 2)
+  currency        String        @db.VarChar(3)
+  deadlineAt      DateTime?     @map("deadline_at") @db.Timestamptz
+  status          ListingStatus @default(open)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  dataset  Dataset   @relation(fields: [datasetId], references: [id])
+  owner    User      @relation("ListingOwner", fields: [ownerUserId], references: [id])
+  labelSet LabelSet  @relation(fields: [labelSetId], references: [id])
+  contract Contract?
+
+  @@index([datasetId])
+  @@index([ownerUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("listings")
+}
+
+// ============================================================================
+// 7. CONTRACTS
+// Listing'i bir labeler aldığında oluşan iş/sözleşme.
+// MVP: 1 listing = 1 contract
+// ============================================================================
+
+model Contract {
+  id               String         @id @default(uuid()) @db.Uuid
+  listingId        String         @unique @map("listing_id") @db.Uuid
+  clientUserId     String         @map("client_user_id") @db.Uuid
+  labelerUserId    String         @map("labeler_user_id") @db.Uuid
+  agreedPriceTotal Decimal        @map("agreed_price_total") @db.Decimal(12, 2)
+  currency         String         @db.VarChar(3)
+  platformFeeTotal Decimal        @default(0) @map("platform_fee_total") @db.Decimal(12, 2)
+  status           ContractStatus @default(active)
+  startedAt        DateTime       @default(now()) @map("started_at") @db.Timestamptz
+  completedAt      DateTime?      @map("completed_at") @db.Timestamptz
+
+  // Relations
+  listing       Listing        @relation(fields: [listingId], references: [id])
+  client        User           @relation("ContractClient", fields: [clientUserId], references: [id])
+  labeler       User           @relation("ContractLabeler", fields: [labelerUserId], references: [id])
+  tasks         Task[]
+  payments      Payment[]
+  escrowLedgers EscrowLedger[]
+
+  @@index([clientUserId])
+  @@index([labelerUserId])
+  @@index([status])
+  @@map("contracts")
+}
+
+// ============================================================================
+// 8. TASKS
+// En küçük birim. 1 task = 1 asset. Contract altındaki her asset için task.
+// ============================================================================
+
+model Task {
+  id           String     @id @default(uuid()) @db.Uuid
+  contractId   String     @map("contract_id") @db.Uuid
+  assetId      String     @map("asset_id") @db.Uuid
+  status       TaskStatus @default(ready)
+  attemptCount Int        @default(0) @map("attempt_count")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  contract              Contract               @relation(fields: [contractId], references: [id])
+  asset                 Asset                  @relation(fields: [assetId], references: [id])
+  taskLease             TaskLease?
+  annotationsRaw        AnnotationRaw[]
+  annotationNormalized  AnnotationNormalized?
+  reviews               Review[]
+
+  @@unique([contractId, assetId])
+  @@index([contractId, status])
+  @@index([assetId])
+  @@map("tasks")
+}
+
+// ============================================================================
+// 9. TASK LEASES
+// Task'ı süreli kilitler. Aynı task aynı anda tek kişide.
+// 1 task = 0/1 aktif lease (task_id is PK)
+// ============================================================================
+
+model TaskLease {
+  taskId        String   @id @map("task_id") @db.Uuid
+  labelerUserId String   @map("labeler_user_id") @db.Uuid
+  leaseToken    String   @map("lease_token")
+  leasedUntil   DateTime @map("leased_until") @db.Timestamptz
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  task    Task @relation(fields: [taskId], references: [id])
+  labeler User @relation(fields: [labelerUserId], references: [id])
+
+  @@index([labelerUserId])
+  @@index([leasedUntil])
+  @@map("task_leases")
+}
+
+// ============================================================================
+// 10. ANNOTATIONS RAW
+// Desktop'un gönderdiği ham custom JSON.
+// ============================================================================
+
+model AnnotationRaw {
+  id            String   @id @default(uuid()) @db.Uuid
+  taskId        String   @map("task_id") @db.Uuid
+  labelerUserId String   @map("labeler_user_id") @db.Uuid
+  payloadJson   Json     @map("payload_json") @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  task    Task @relation(fields: [taskId], references: [id])
+  labeler User @relation(fields: [labelerUserId], references: [id])
+
+  @@index([taskId])
+  @@index([labelerUserId])
+  @@map("annotations_raw")
+}
+
+// ============================================================================
+// 11. ANNOTATIONS NORMALIZED
+// Normalize edilmiş annotation. İleride COCO/YOLO export bunun üzerinden yapılacak.
+// MVP: task başına son normalize kayıt tek (1:1)
+// ============================================================================
+
+model AnnotationNormalized {
+  id             String   @id @default(uuid()) @db.Uuid
+  taskId         String   @unique @map("task_id") @db.Uuid
+  labelerUserId  String   @map("labeler_user_id") @db.Uuid
+  normalizedJson Json     @map("normalized_json") @db.JsonB
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  task    Task @relation(fields: [taskId], references: [id])
+  labeler User @relation(fields: [labelerUserId], references: [id])
+
+  @@index([labelerUserId])
+  @@map("annotations_normalized")
+}
+
+// ============================================================================
+// 12. PAYMENTS
+// Ödeme sağlayıcısı bazlı payment kaydı (MVP'de mock da olabilir).
+// ============================================================================
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  contractId  String        @map("contract_id") @db.Uuid
+  payerUserId String        @map("payer_user_id") @db.Uuid
+  amount      Decimal       @db.Decimal(12, 2)
+  currency    String        @db.VarChar(3)
+  provider    String
+  providerRef String?       @map("provider_ref")
+  status      PaymentStatus @default(pending)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  contract Contract @relation(fields: [contractId], references: [id])
+  payer    User     @relation(fields: [payerUserId], references: [id])
+
+  @@index([contractId])
+  @@index([status])
+  @@map("payments")
+}
+
+// ============================================================================
+// 13. ESCROW LEDGER
+// Para hareketlerini muhasebe gibi tutar.
+// ============================================================================
+
+model EscrowLedger {
+  id         String     @id @default(uuid()) @db.Uuid
+  contractId String     @map("contract_id") @db.Uuid
+  type       EscrowType
+  amount     Decimal    @db.Decimal(12, 2)
+  currency   String     @db.VarChar(3)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@index([type])
+  @@map("escrow_ledger")
+}
+
+// ============================================================================
+// 14. AUDIT LOGS
+// Denetim ve güvenlik log'u.
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id") @db.Uuid
+  metaJson    Json?    @map("meta_json") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  actor User @relation(fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// 15. REVIEWS
+// QC ileride açılabilir. MVP'de kullanılmasa da tablo eklendi.
+// ============================================================================
+
+model Review {
+  id             String         @id @default(uuid()) @db.Uuid
+  taskId         String         @map("task_id") @db.Uuid
+  reviewerUserId String         @map("reviewer_user_id") @db.Uuid
+  decision       ReviewDecision
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  task     Task @relation(fields: [taskId], references: [id])
+  reviewer User @relation(fields: [reviewerUserId], references: [id])
+
+  @@index([taskId])
+  @@index([reviewerUserId])
+  @@map("reviews")
+}
