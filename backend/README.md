@@ -108,6 +108,43 @@ API: `http://localhost:3000`
 | GET | `/api/listings/:id` | 🔶 | İlan detayı |
 | PUT | `/api/listings/:id` | ✅ | İlan güncelle |
 | DELETE | `/api/listings/:id` | ✅ | İlan sil |
+| POST | `/api/listings/:id/generate-tasks` | ✅ | Task üret |
+
+### Contracts
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/contracts` | ✅ | Sözleşmeleri listele |
+| POST | `/api/contracts` | ✅ | Labeler başvurusu |
+| GET | `/api/contracts/:id` | ✅ | Sözleşme detayı |
+| PATCH | `/api/contracts/:id/submit` | ✅ | Labeler teslim |
+| PATCH | `/api/contracts/:id/approve` | ✅ | Client onay |
+| PATCH | `/api/contracts/:id/reject` | ✅ | Client red |
+| PATCH | `/api/contracts/:id/cancel` | ✅ | İptal |
+
+### Tasks
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/tasks` | ✅ | Task listesi |
+| GET | `/api/tasks/:id` | ✅ | Task detayı |
+| POST | `/api/tasks/:id/lease` | ✅ | Task kilitle |
+| POST | `/api/tasks/:id/submit` | ✅ | Annotation teslim |
+| PATCH | `/api/tasks/:id/accept` | ✅ | QC onay |
+| PATCH | `/api/tasks/:id/reject` | ✅ | QC red |
+| GET | `/api/tasks/:id/annotations` | ✅ | Annotation'lar |
+
+### Annotations
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| POST | `/api/annotations/raw` | ✅ | Ham annotation |
+| POST | `/api/annotations/normalize` | ✅ | Normalize et |
+
+### Reviews
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/reviews` | ✅ | Review listesi |
+| POST | `/api/reviews` | ✅ | Review oluştur |
+| GET | `/api/reviews/:id` | ✅ | Review detayı |
+| PATCH | `/api/reviews/:id/resolve` | ✅ | Sonuçlandır |
 
 > ✅ = JWT gerekli | 🔶 = Opsiyonel auth | ❌ = Public
 

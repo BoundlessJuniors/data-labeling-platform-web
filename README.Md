@@ -7,7 +7,7 @@ Görsel veri etiketleme işlerini yöneten bir pazar yeri platformu.
 ```
 data-labeling-platform-web/
 ├── backend/          # Node.js + Express + Prisma API
-├── frontend/         # (Coming soon) React/Next.js web app
+├── frontend/         # (Coming soon) Vue 3 web app
 └── README.md
 ```
 

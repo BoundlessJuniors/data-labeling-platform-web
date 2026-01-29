@@ -159,3 +159,84 @@ export const updateListingSchema = Joi.object({
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
 });
+
+// ============================================================================
+// Contract Schemas
+// ============================================================================
+
+export const createContractSchema = Joi.object({
+  listingId: uuidSchema.messages({
+    'any.required': 'Listing ID is required',
+  }),
+});
+
+export const rejectContractSchema = Joi.object({
+  reason: Joi.string().max(1000).optional().allow(''),
+});
+
+// ============================================================================
+// Task Schemas
+// ============================================================================
+
+export const leaseTaskSchema = Joi.object({
+  leaseDurationMinutes: Joi.number().integer().min(5).max(120).optional().default(30),
+});
+
+export const submitTaskSchema = Joi.object({
+  leaseToken: Joi.string().uuid().required().messages({
+    'any.required': 'Lease token is required',
+  }),
+  annotationData: Joi.object().required().messages({
+    'any.required': 'Annotation data is required',
+  }),
+});
+
+export const rejectTaskSchema = Joi.object({
+  reason: Joi.string().max(1000).optional().allow(''),
+});
+
+// ============================================================================
+// Annotation Schemas
+// ============================================================================
+
+export const createAnnotationRawSchema = Joi.object({
+  taskId: uuidSchema.messages({
+    'any.required': 'Task ID is required',
+  }),
+  payloadJson: Joi.object().required().messages({
+    'any.required': 'Payload JSON is required',
+  }),
+});
+
+export const normalizeAnnotationSchema = Joi.object({
+  taskId: uuidSchema.messages({
+    'any.required': 'Task ID is required',
+  }),
+  normalizedJson: Joi.object().required().messages({
+    'any.required': 'Normalized JSON is required',
+  }),
+});
+
+// ============================================================================
+// Review Schemas
+// ============================================================================
+
+export const createReviewSchema = Joi.object({
+  taskId: uuidSchema.messages({
+    'any.required': 'Task ID is required',
+  }),
+  decision: Joi.string().valid('accept', 'reject').required().messages({
+    'any.only': 'Decision must be either accept or reject',
+    'any.required': 'Decision is required',
+  }),
+  notes: Joi.string().max(2000).optional().allow(''),
+});
+
+export const resolveReviewSchema = Joi.object({
+  decision: Joi.string().valid('accept', 'reject').required().messages({
+    'any.only': 'Decision must be either accept or reject',
+    'any.required': 'Decision is required',
+  }),
+  notes: Joi.string().max(2000).optional().allow(''),
+});
+
