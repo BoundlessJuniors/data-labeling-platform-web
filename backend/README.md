@@ -146,7 +146,15 @@ API: `http://localhost:3000`
 | GET | `/api/reviews/:id` | ✅ | Review detayı |
 | PATCH | `/api/reviews/:id/resolve` | ✅ | Sonuçlandır |
 
-> ✅ = JWT gerekli | 🔶 = Opsiyonel auth | ❌ = Public
+### Admin (Sadece Admin Rolü)
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/admin/users` | 🔐 | Tüm kullanıcıları listele |
+| GET | `/api/admin/users/:id` | 🔐 | Kullanıcı detayı |
+| PATCH | `/api/admin/users/:id` | 🔐 | Kullanıcı rol/bilgi güncelle |
+| DELETE | `/api/admin/users/:id` | 🔐 | Kullanıcı sil |
+
+> ✅ = JWT gerekli | 🔶 = Opsiyonel auth | ❌ = Public | 🔐 = Admin only
 
 ## 🗄️ Veritabanı Şeması
 

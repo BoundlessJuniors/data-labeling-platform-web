@@ -240,3 +240,15 @@ export const resolveReviewSchema = Joi.object({
   notes: Joi.string().max(2000).optional().allow(''),
 });
 
+// ============================================================================
+// Admin Schemas
+// ============================================================================
+
+export const updateUserSchema = Joi.object({
+  role: Joi.string().valid('client', 'labeler', 'admin').optional().messages({
+    'any.only': 'Role must be client, labeler, or admin',
+  }),
+  displayName: Joi.string().max(100).optional().allow(''),
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update',
+});

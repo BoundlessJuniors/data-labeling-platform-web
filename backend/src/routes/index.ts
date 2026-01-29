@@ -8,6 +8,7 @@ import contractRoutes from './contract.routes';
 import taskRoutes from './task.routes';
 import annotationRoutes from './annotation.routes';
 import reviewRoutes from './review.routes';
+import adminRoutes from './admin.routes';
 import * as taskController from '../controllers/task.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
@@ -25,6 +26,7 @@ router.use('/contracts', contractRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/annotations', annotationRoutes);
 router.use('/reviews', reviewRoutes);
+router.use('/admin', adminRoutes);
 
 // Special routes
 // POST /api/listings/:id/generate-tasks
