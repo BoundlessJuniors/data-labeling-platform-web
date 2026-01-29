@@ -1,12 +1,23 @@
-# Data Labeling Platform - Backend
+# Data Labeling Platform - Backend API
 
-## Gereksinimler
+RESTful API for the Data Labeling Marketplace Platform.
 
-- Node.js 18+ 
+## 🛠️ Tech Stack
+
+- **Runtime:** Node.js + TypeScript
+- **Framework:** Express.js
+- **ORM:** Prisma
+- **Database:** PostgreSQL
+- **Cache:** Redis
+- **Auth:** JWT + bcrypt
+
+## 📋 Gereksinimler
+
+- Node.js 18+
 - Docker & Docker Compose
-- npm veya yarn
+- npm
 
-## Kurulum
+## 🚀 Kurulum
 
 ### 1. Bağımlılıkları Yükle
 
@@ -15,84 +26,158 @@ cd backend
 npm install
 ```
 
-### 2. Docker PostgreSQL'i Başlat
+### 2. Environment Variables
 
-Proje root dizininde:
+`.env.example` dosyasını `.env` olarak kopyala:
+
+```bash
+cp .env.example .env
+```
+
+### 3. Docker Servislerini Başlat
 
 ```bash
 docker-compose up -d
 ```
 
-PostgreSQL şu ayarlarla başlayacak:
-- **Host:** localhost
-- **Port:** 5432
-- **User:** postgres
-- **Password:** postgres
-- **Database:** datalabeling
+Bu komut şunları başlatır:
+- **PostgreSQL:** `localhost:5433`
+- **Redis:** `localhost:6379`
 
-### 3. Migration Çalıştır
+### 4. Prisma Setup
 
 ```bash
-cd backend
-npx prisma migrate dev --name init
-```
+# Client oluştur
+npx prisma generate
 
-### 4. Seed Data (Opsiyonel)
+# Migration çalıştır (ilk kurulumda)
+npx prisma migrate dev
 
-```bash
+# Seed data ekle (opsiyonel)
 npx prisma db seed
 ```
 
-Bu komut şunları oluşturur:
-- 1 Admin user (`admin@datalabeling.com`)
-- 1 Client user (`client@example.com`)
-- 1 Labeler user (`labeler@example.com`)
-- 1 Label Set ("Object Detection - Vehicles & Pedestrians")
-- 3 Label (person, car, truck)
-
-### 5. Prisma Studio (Görsel DB Yönetimi)
+### 5. Sunucuyu Başlat
 
 ```bash
-npx prisma studio
+npm run dev
 ```
 
-Tarayıcıda `http://localhost:5555` adresinde açılır.
+API: `http://localhost:3000`
 
-## Veritabanı Şeması
+## 🔌 API Endpoints
+
+### Authentication
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| POST | `/api/auth/register` | ❌ | Kullanıcı kaydı |
+| POST | `/api/auth/login` | ❌ | JWT token al |
+| GET | `/api/auth/profile` | ✅ | Profil bilgisi |
+
+### Datasets
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/datasets` | 🔶 | Tüm datasetleri listele |
+| POST | `/api/datasets` | ✅ | Yeni dataset oluştur |
+| GET | `/api/datasets/:id` | 🔶 | Dataset detayı |
+| PUT | `/api/datasets/:id` | ✅ | Dataset güncelle |
+| DELETE | `/api/datasets/:id` | ✅ | Dataset sil |
+
+### Assets
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/assets` | ✅ | Varlıkları listele |
+| POST | `/api/assets` | ✅ | Yeni varlık ekle |
+| GET | `/api/assets/:id` | ✅ | Varlık detayı |
+| PUT | `/api/assets/:id` | ✅ | Varlık güncelle |
+| DELETE | `/api/assets/:id` | ✅ | Varlık sil |
+
+### LabelSets
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/labelsets` | ✅ | Etiket setlerini listele |
+| POST | `/api/labelsets` | ✅ | Etiket seti oluştur |
+| GET | `/api/labelsets/:id` | ✅ | Etiket seti detayı |
+| DELETE | `/api/labelsets/:id` | ✅ | Etiket seti sil |
+
+### Listings
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| GET | `/api/listings` | 🔶 | İlanları listele |
+| POST | `/api/listings` | ✅ | Yeni ilan oluştur |
+| GET | `/api/listings/:id` | 🔶 | İlan detayı |
+| PUT | `/api/listings/:id` | ✅ | İlan güncelle |
+| DELETE | `/api/listings/:id` | ✅ | İlan sil |
+
+> ✅ = JWT gerekli | 🔶 = Opsiyonel auth | ❌ = Public
+
+## 🗄️ Veritabanı Şeması
 
 15 tablo içerir:
 
 | Tablo | Amaç |
 |-------|------|
-| `users` | Müşteri, etiketleyici veya admin |
-| `datasets` | Müşterinin dataset metadata'sı |
-| `assets` | Dataset içindeki tek görsel |
-| `label_sets` | Etiket sınıfları seti (versiyonlanabilir) |
-| `labels` | LabelSet içindeki tek label |
-| `listings` | Etiketleme ilanı |
-| `contracts` | Labeler ilanı aldığında oluşan sözleşme |
-| `tasks` | 1 task = 1 asset, en küçük iş birimi |
-| `task_leases` | Task'ı süreli kilitleme |
-| `annotations_raw` | Desktop'un gönderdiği ham JSON |
-| `annotations_normalized` | Normalize edilmiş annotation (COCO/YOLO export için) |
-| `payments` | Ödeme kaydı |
-| `escrow_ledger` | Para hareketleri muhasebesi |
-| `audit_logs` | Denetim log'u |
-| `reviews` | QC review kaydı |
+| `users` | Kullanıcılar (client, labeler, admin) |
+| `datasets` | Dataset metadata |
+| `assets` | Dataset içindeki görseller |
+| `label_sets` | Etiket sınıfları seti |
+| `labels` | Tekil etiketler |
+| `listings` | Etiketleme ilanları |
+| `contracts` | Labeler-Client sözleşmeleri |
+| `tasks` | En küçük iş birimi (1 task = 1 asset) |
+| `task_leases` | Task kilitleme |
+| `annotations_raw` | Ham annotation JSON |
+| `annotations_normalized` | Normalize annotation |
+| `payments` | Ödeme kayıtları |
+| `escrow_ledger` | Para hareketleri |
+| `audit_logs` | Denetim logları |
+| `reviews` | QC review kayıtları |
 
-## Ortam Değişkenleri
+## 🛡️ Middleware Stack
 
-`.env` dosyası:
+| Middleware | Açıklama |
+|------------|----------|
+| **Helmet** | HTTP security headers |
+| **CORS** | Cross-origin resource sharing |
+| **Rate Limiting** | 100 req/min (auth: 10 req/min) |
+| **JWT Auth** | Token doğrulama |
+| **RBAC** | Role-based access control |
+| **Joi Validation** | Request body/params doğrulama |
+| **Redis Cache** | GET istekleri cache'leme |
+| **Winston Logger** | Request/response logging |
+| **Error Handler** | Merkezi hata yönetimi |
 
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/datalabeling?schema=public"
+## 📁 Proje Yapısı
+
+```
+src/
+├── controllers/     # API endpoint handlers
+├── routes/          # Express route definitions
+├── middlewares/     # Express middlewares
+├── validators/      # Joi validation schemas
+├── lib/             # Prisma, Redis, Logger
+├── utils/           # Custom error classes
+└── index.ts         # App entry point
 ```
 
-## Komutlar
+## 🧪 Test
+
+```bash
+# Health check
+curl http://localhost:3000/health
+
+# Register
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"123456","role":"client"}'
+```
+
+## 📜 Komutlar
 
 | Komut | Açıklama |
 |-------|----------|
-| `npm run dev` | Development server başlat |
+| `npm run dev` | Development server |
+| `npm run build` | TypeScript build |
 | `npm run prisma:generate` | Prisma Client oluştur |
 | `npm run prisma:migrate` | Migration çalıştır |
 | `npm run prisma:studio` | Prisma Studio aç |
