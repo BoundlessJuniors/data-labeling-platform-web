@@ -34,9 +34,10 @@ npm install
 cp .env.example .env
 ```
 
-### 3. Docker Servislerini Başlat
+### 3. Docker Servislerini Başlat (Root Klasörde)
 
 ```bash
+cd ..                    # Root klasöre git
 docker-compose up -d
 ```
 
