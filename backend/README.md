@@ -1,197 +1,30 @@
 # Data Labeling Platform - Backend API
 
-RESTful API for the Data Labeling Marketplace Platform.
+Görsel veri etiketleme platformu için RESTful API.
 
 ## 🛠️ Tech Stack
 
-- **Runtime:** Node.js + TypeScript
-- **Framework:** Express.js
-- **ORM:** Prisma
-- **Database:** PostgreSQL
-- **Cache:** Redis
-- **Auth:** JWT + bcrypt
+| Kategori | Teknoloji |
+|----------|-----------|
+| **Runtime** | Node.js + TypeScript |
+| **Framework** | Express.js |
+| **ORM** | Prisma |
+| **Database** | PostgreSQL |
+| **Cache** | Redis |
+| **Auth** | JWT + bcrypt |
 
-## 📋 Gereksinimler
-
-- Node.js 18+
-- Docker & Docker Compose
-- npm
-
-## 🚀 Kurulum
-
-### 1. Bağımlılıkları Yükle
+## 🚀 Hızlı Kurulum
 
 ```bash
 cd backend
 npm install
-```
-
-### 2. Environment Variables
-
-`.env.example` dosyasını `.env` olarak kopyala:
-
-```bash
 cp .env.example .env
-```
-
-### 3. Docker Servislerini Başlat (Root Klasörde)
-
-```bash
-cd ..                    # Root klasöre git
-docker-compose up -d
-```
-
-Bu komut şunları başlatır:
-- **PostgreSQL:** `localhost:5433`
-- **Redis:** `localhost:6379`
-
-### 4. Prisma Setup
-
-```bash
-# Client oluştur
 npx prisma generate
-
-# Migration çalıştır (ilk kurulumda)
 npx prisma migrate dev
-
-# Seed data ekle (opsiyonel)
-npx prisma db seed
-```
-
-### 5. Sunucuyu Başlat
-
-```bash
 npm run dev
 ```
 
-API: `http://localhost:3000`
-
-## 🔌 API Endpoints
-
-### Authentication
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| POST | `/api/auth/register` | ❌ | Kullanıcı kaydı |
-| POST | `/api/auth/login` | ❌ | JWT token al |
-| GET | `/api/auth/profile` | ✅ | Profil bilgisi |
-
-### Datasets
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/datasets` | 🔶 | Tüm datasetleri listele |
-| POST | `/api/datasets` | ✅ | Yeni dataset oluştur |
-| GET | `/api/datasets/:id` | 🔶 | Dataset detayı |
-| PUT | `/api/datasets/:id` | ✅ | Dataset güncelle |
-| DELETE | `/api/datasets/:id` | ✅ | Dataset sil |
-
-### Assets
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/assets` | ✅ | Varlıkları listele |
-| POST | `/api/assets` | ✅ | Yeni varlık ekle |
-| GET | `/api/assets/:id` | ✅ | Varlık detayı |
-| PUT | `/api/assets/:id` | ✅ | Varlık güncelle |
-| DELETE | `/api/assets/:id` | ✅ | Varlık sil |
-
-### LabelSets
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/labelsets` | ✅ | Etiket setlerini listele |
-| POST | `/api/labelsets` | ✅ | Etiket seti oluştur |
-| GET | `/api/labelsets/:id` | ✅ | Etiket seti detayı |
-| DELETE | `/api/labelsets/:id` | ✅ | Etiket seti sil |
-
-### Listings
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/listings` | 🔶 | İlanları listele |
-| POST | `/api/listings` | ✅ | Yeni ilan oluştur |
-| GET | `/api/listings/:id` | 🔶 | İlan detayı |
-| PUT | `/api/listings/:id` | ✅ | İlan güncelle |
-| DELETE | `/api/listings/:id` | ✅ | İlan sil |
-| POST | `/api/listings/:id/generate-tasks` | ✅ | Task üret |
-
-### Contracts
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/contracts` | ✅ | Sözleşmeleri listele |
-| POST | `/api/contracts` | ✅ | Labeler başvurusu |
-| GET | `/api/contracts/:id` | ✅ | Sözleşme detayı |
-| PATCH | `/api/contracts/:id/submit` | ✅ | Labeler teslim |
-| PATCH | `/api/contracts/:id/approve` | ✅ | Client onay |
-| PATCH | `/api/contracts/:id/reject` | ✅ | Client red |
-| PATCH | `/api/contracts/:id/cancel` | ✅ | İptal |
-
-### Tasks
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/tasks` | ✅ | Task listesi |
-| GET | `/api/tasks/:id` | ✅ | Task detayı |
-| POST | `/api/tasks/:id/lease` | ✅ | Task kilitle |
-| POST | `/api/tasks/:id/submit` | ✅ | Annotation teslim |
-| PATCH | `/api/tasks/:id/accept` | ✅ | QC onay |
-| PATCH | `/api/tasks/:id/reject` | ✅ | QC red |
-| GET | `/api/tasks/:id/annotations` | ✅ | Annotation'lar |
-
-### Annotations
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| POST | `/api/annotations/raw` | ✅ | Ham annotation |
-| POST | `/api/annotations/normalize` | ✅ | Normalize et |
-
-### Reviews
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/reviews` | ✅ | Review listesi |
-| POST | `/api/reviews` | ✅ | Review oluştur |
-| GET | `/api/reviews/:id` | ✅ | Review detayı |
-| PATCH | `/api/reviews/:id/resolve` | ✅ | Sonuçlandır |
-
-### Admin (Sadece Admin Rolü)
-| Method | Endpoint | Auth | Açıklama |
-|--------|----------|------|----------|
-| GET | `/api/admin/users` | 🔐 | Tüm kullanıcıları listele |
-| GET | `/api/admin/users/:id` | 🔐 | Kullanıcı detayı |
-| PATCH | `/api/admin/users/:id` | 🔐 | Kullanıcı rol/bilgi güncelle |
-| DELETE | `/api/admin/users/:id` | 🔐 | Kullanıcı sil |
-
-> ✅ = JWT gerekli | 🔶 = Opsiyonel auth | ❌ = Public | 🔐 = Admin only
-
-## 🗄️ Veritabanı Şeması
-
-15 tablo içerir:
-
-| Tablo | Amaç |
-|-------|------|
-| `users` | Kullanıcılar (client, labeler, admin) |
-| `datasets` | Dataset metadata |
-| `assets` | Dataset içindeki görseller |
-| `label_sets` | Etiket sınıfları seti |
-| `labels` | Tekil etiketler |
-| `listings` | Etiketleme ilanları |
-| `contracts` | Labeler-Client sözleşmeleri |
-| `tasks` | En küçük iş birimi (1 task = 1 asset) |
-| `task_leases` | Task kilitleme |
-| `annotations_raw` | Ham annotation JSON |
-| `annotations_normalized` | Normalize annotation |
-| `payments` | Ödeme kayıtları |
-| `escrow_ledger` | Para hareketleri |
-| `audit_logs` | Denetim logları |
-| `reviews` | QC review kayıtları |
-
-## 🛡️ Middleware Stack
-
-| Middleware | Açıklama |
-|------------|----------|
-| **Helmet** | HTTP security headers |
-| **CORS** | Cross-origin resource sharing |
-| **Rate Limiting** | 100 req/min (auth: 10 req/min) |
-| **JWT Auth** | Token doğrulama |
-| **RBAC** | Role-based access control |
-| **Joi Validation** | Request body/params doğrulama |
-| **Redis Cache** | GET istekleri cache'leme |
-| **Winston Logger** | Request/response logging |
-| **Error Handler** | Merkezi hata yönetimi |
+**API:** `http://localhost:3000`
 
 ## 📁 Proje Yapısı
 
@@ -206,17 +39,24 @@ src/
 └── index.ts         # App entry point
 ```
 
-## 🧪 Test
+## 🔌 API Endpoints Özeti
 
-```bash
-# Health check
-curl http://localhost:3000/health
+| Grup | Endpoint | Açıklama |
+|------|----------|----------|
+| Auth | `/api/auth/*` | Kayıt, giriş, profil |
+| Datasets | `/api/datasets/*` | Dataset CRUD |
+| Assets | `/api/assets/*` | Görsel varlıklar |
+| LabelSets | `/api/labelsets/*` | Etiket setleri |
+| Listings | `/api/listings/*` | İlanlar |
+| Contracts | `/api/contracts/*` | Sözleşmeler |
+| Tasks | `/api/tasks/*` | Görevler |
+| Annotations | `/api/annotations/*` | Etiketlemeler |
+| Reviews | `/api/reviews/*` | QC reviews |
+| Admin | `/api/admin/*` | Admin işlemleri |
 
-# Register
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","password":"123456","role":"client"}'
-```
+## 🗄️ Veritabanı
+
+15 tablo: `users`, `datasets`, `assets`, `label_sets`, `labels`, `listings`, `contracts`, `tasks`, `task_leases`, `annotations_raw`, `annotations_normalized`, `payments`, `escrow_ledger`, `audit_logs`, `reviews`
 
 ## 📜 Komutlar
 
@@ -224,7 +64,17 @@ curl -X POST http://localhost:3000/api/auth/register \
 |-------|----------|
 | `npm run dev` | Development server |
 | `npm run build` | TypeScript build |
-| `npm run prisma:generate` | Prisma Client oluştur |
-| `npm run prisma:migrate` | Migration çalıştır |
-| `npm run prisma:studio` | Prisma Studio aç |
-| `npm run db:seed` | Seed data ekle |
+| `npx prisma studio` | Prisma Studio |
+| `npx prisma migrate dev` | Migration çalıştır |
+
+## 🐳 Docker Servisleri
+
+```bash
+# Root klasörde çalıştır
+docker-compose up -d
+```
+
+- **PostgreSQL:** `localhost:5433`
+- **Redis:** `localhost:6379`
+
+Detaylı API dokümantasyonu için tüm endpoint'lerin listesi backend kodunda mevcuttur.

@@ -6,9 +6,9 @@ Görsel veri etiketleme işlerini yöneten bir pazar yeri platformu.
 
 ```
 data-labeling-platform-web/
-├── backend/          # Node.js + Express + Prisma API
-├── frontend/         # Vue 3 + Tailwind CSS web app
-├── docker-compose.yml # PostgreSQL + Redis
+├── backend/              # Node.js + Express + Prisma API
+├── frontend/             # Vue 3 + Tailwind CSS web app
+├── docker-compose.yml    # PostgreSQL + Redis
 └── README.md
 ```
 
@@ -23,7 +23,6 @@ data-labeling-platform-web/
 ### 1. Docker Servislerini Başlat (Root Klasörde)
 
 ```bash
-# PostgreSQL (port 5433) ve Redis (port 6379) başlatır
 docker-compose up -d
 ```
 
@@ -31,32 +30,32 @@ docker-compose up -d
 
 ```bash
 cd backend
-cp .env.example .env    # Environment variables
+cp .env.example .env
 npm install
-npx prisma generate     # Prisma client
-npx prisma migrate dev  # Database migrations
+npx prisma generate
+npx prisma migrate dev
 npm run dev
 ```
 
-API: `http://localhost:3000`
+**API:** `http://localhost:3000`
 
 ### 3. Frontend Kurulum
 
 ```bash
 cd frontend
-cp .env.example .env    # Environment variables
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-UI: `http://localhost:5173`
+**UI:** `http://localhost:5173`
 
 ## 📚 Teknoloji Stack
 
 | Katman | Teknoloji |
 |--------|-----------|
+| **Frontend** | Vue 3, Tailwind CSS, Pinia, TypeScript |
 | **Backend** | Node.js, Express, TypeScript |
-| **Frontend** | Vue 3, Tailwind CSS, Pinia |
 | **ORM** | Prisma |
 | **Database** | PostgreSQL |
 | **Cache** | Redis |
@@ -69,10 +68,12 @@ UI: `http://localhost:5173`
 | PostgreSQL | 5433 | data-labeling-postgres |
 | Redis | 6379 | data-labeling-redis |
 
-## 🔗 Linkler
+## 📖 Detaylı Dokümantasyon
 
-- [Backend README](./backend/README.md)
-- [Frontend README](./frontend/README.md)
+| Proje | Dokümantasyon |
+|-------|---------------|
+| **Frontend** | [frontend/README.md](./frontend/README.md) - Kapsamlı geliştirme rehberi |
+| **Backend** | [backend/README.md](./backend/README.md) - API özeti |
 
 ## 👥 Takım
 

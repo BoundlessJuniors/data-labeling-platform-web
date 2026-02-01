@@ -1,133 +1,200 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import apiClient from '@/api/client'
+/**
+ * MyContractsPage - Labeler's accepted contracts
+ */
+import { ref, onMounted, computed } from 'vue';
+import { useSeo } from '@/composables/useSeo';
+import apiClient from '@/api/client';
+import AppLayout from '@/layouts/AppLayout.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
+import BasePagination from '@/components/ui/BasePagination.vue';
+import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
+import { useRouter } from 'vue-router';
 
-const authStore = useAuthStore()
+useSeo({
+  title: 'Sözleşmelerim',
+  description: 'Kabul ettiğiniz etiketleme sözleşmelerini görüntüleyin.',
+});
 
-interface Contract {
-  id: string
-  status: string
-  createdAt: string
-  listing: { title: string; priceTotal: string; currency: string }
-  client: { displayName: string | null; email: string }
+const router = useRouter();
+
+interface MyContract {
+  id: string;
+  listingTitle: string;
+  clientName: string;
+  status: string;
+  assignedAssets: number;
+  completedAssets: number;
+  totalPayment: number;
+  currency: string;
+  createdAt: string;
 }
 
-const contracts = ref<Contract[]>([])
-const loading = ref(true)
+// State
+const contracts = ref<MyContract[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const page = ref(1);
+const total = ref(0);
+const limit = ref(10);
+const totalPages = computed(() => Math.ceil(total.value / limit.value));
 
 async function fetchContracts() {
-  loading.value = true
+  loading.value = true;
+  error.value = null;
+
   try {
-    const response = await apiClient.get('/contracts')
-    contracts.value = response.data.data
-  } catch (error) {
-    console.error('Failed to fetch contracts:', error)
+    const response = await apiClient.get('/contracts/my', {
+      params: { page: page.value, limit: limit.value },
+    });
+
+    contracts.value = response.data.data;
+    total.value = response.data.pagination?.total ?? response.data.data.length;
+  } catch (_err) {
+    error.value = 'Sözleşmeler yüklenemedi';
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
-async function submitContract(id: string) {
-  try {
-    await apiClient.patch(`/contracts/${id}/submit`)
-    await fetchContracts()
-  } catch (error) {
-    console.error('Failed to submit:', error)
+onMounted(fetchContracts);
+
+function goToPage(newPage: number) {
+  if (newPage >= 1 && newPage <= totalPages.value) {
+    page.value = newPage;
+    fetchContracts();
   }
+}
+
+function viewTasks(contractId: string) {
+  router.push({ name: 'labeler-tasks', query: { contractId } });
 }
 
 function getStatusBadge(status: string) {
-  switch (status) {
-    case 'active': return 'badge-warning'
-    case 'approved': return 'badge-success'
-    case 'rejected': return 'badge-error'
-    case 'submitted': return 'badge-info'
-    default: return 'badge'
-  }
+  const badges: Record<string, string> = {
+    pending: 'badge-warning',
+    accepted: 'badge-info',
+    in_progress: 'badge-info',
+    submitted: 'badge-warning',
+    revision_requested: 'badge-warning',
+    completed: 'badge-success',
+    cancelled: 'badge-error',
+    rejected: 'badge-error',
+  };
+  return badges[status] || 'badge-neutral';
 }
 
-function handleLogout() {
-  authStore.logout()
+function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: 'Onay Bekleniyor',
+    accepted: 'Kabul Edildi',
+    in_progress: 'Devam Ediyor',
+    submitted: 'Gönderildi',
+    revision_requested: 'Revizyon',
+    completed: 'Tamamlandı',
+    cancelled: 'İptal Edildi',
+    rejected: 'Reddedildi',
+  };
+  return labels[status] || status;
 }
 
-onMounted(fetchContracts)
+function formatPrice(amount: number, currency: string) {
+  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount);
+}
+
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('tr-TR');
+}
+
+function getProgressPercent(completed: number, total: number) {
+  if (total === 0) return 0;
+  return Math.round((completed / total) * 100);
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <aside class="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
-      <div class="flex items-center justify-center h-16 border-b">
-        <RouterLink to="/" class="flex items-center space-x-2">
-          <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold">D</span>
-          </div>
-          <span class="font-bold text-gray-900">DataLabel</span>
-        </RouterLink>
+  <AppLayout>
+    <template #header>Sözleşmelerim</template>
+
+    <!-- Loading -->
+    <div v-if="loading && contracts.length === 0" class="space-y-4">
+      <div v-for="i in 4" :key="i" class="card">
+        <BaseSkeleton variant="text" class="w-1/3 mb-2" />
+        <BaseSkeleton variant="text" class="w-1/2 mb-2" />
+        <BaseSkeleton variant="rectangular" class="w-full h-2 mt-3" />
       </div>
-      <nav class="mt-6 px-4">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Labeler Panel</p>
-        <RouterLink to="/labeler/listings" class="flex items-center px-4 py-2 rounded-lg mb-1 text-gray-600 hover:bg-gray-100">
-          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          İş Bul
-        </RouterLink>
-        <RouterLink to="/labeler/contracts" class="flex items-center px-4 py-2 rounded-lg mb-1 bg-primary-50 text-primary-700">
-          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Sözleşmelerim
-        </RouterLink>
-        <RouterLink to="/labeler/tasks" class="flex items-center px-4 py-2 rounded-lg mb-1 text-gray-600 hover:bg-gray-100">
-          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-          Görevlerim
-        </RouterLink>
-      </nav>
-    </aside>
+    </div>
 
-    <div class="ml-64">
-      <header class="bg-white shadow-sm h-16 flex items-center justify-between px-6">
-        <h1 class="text-xl font-semibold text-gray-900">Sözleşmelerim</h1>
-        <div class="flex items-center space-x-4">
-          <span class="text-sm text-gray-600">{{ authStore.user?.email }}</span>
-          <button @click="handleLogout" class="text-sm text-red-600 hover:text-red-700">Çıkış</button>
-        </div>
-      </header>
+    <!-- Error -->
+    <div v-else-if="error" class="card text-center py-12">
+      <p class="text-red-600 dark:text-red-400 mb-4">{{ error }}</p>
+      <BaseButton variant="secondary" @click="fetchContracts">Tekrar Dene</BaseButton>
+    </div>
 
-      <main class="p-6">
-        <h2 class="text-2xl font-bold text-gray-900 mb-6">Aktif Sözleşmelerim</h2>
+    <!-- Empty -->
+    <BaseEmptyState
+      v-else-if="contracts.length === 0"
+      icon="database"
+      title="Henüz sözleşme yok"
+      description="İlanlara başvurup kabul edildiğinizde burada görünecektir."
+    >
+      <template #action>
+        <BaseButton variant="primary" @click="$router.push({ name: 'labeler-listings' })">
+          İlanları Gör
+        </BaseButton>
+      </template>
+    </BaseEmptyState>
 
-        <div v-if="loading" class="flex justify-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-        </div>
-
-        <div v-else-if="contracts.length === 0" class="text-center py-12">
-          <p class="text-gray-500">Henüz sözleşmeniz yok. İş ilanlarına göz atın!</p>
-        </div>
-
-        <div v-else class="space-y-4">
-          <div v-for="contract in contracts" :key="contract.id" class="card hover:shadow-lg transition-shadow">
-            <div class="flex justify-between items-center">
-              <div>
-                <h3 class="font-semibold text-gray-900">{{ contract.listing.title }}</h3>
-                <p class="text-sm text-gray-600">İşveren: {{ contract.client.displayName || contract.client.email }}</p>
-                <p class="text-xs text-gray-500 mt-1">{{ new Date(contract.createdAt).toLocaleDateString('tr-TR') }}</p>
+    <!-- List -->
+    <div v-else class="space-y-4">
+      <article
+        v-for="contract in contracts"
+        :key="contract.id"
+        class="card hover:shadow-lg transition-shadow cursor-pointer"
+        @click="viewTasks(contract.id)"
+      >
+        <div class="flex flex-col sm:flex-row justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <h2 class="font-semibold text-gray-900 dark:text-white truncate">
+                {{ contract.listingTitle }}
+              </h2>
+              <span :class="getStatusBadge(contract.status)">{{ getStatusLabel(contract.status) }}</span>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Müşteri: {{ contract.clientName }} • {{ formatDate(contract.createdAt) }}
+            </p>
+            <!-- Progress bar -->
+            <div class="mt-3">
+              <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                <span>{{ contract.completedAssets }} / {{ contract.assignedAssets }} tamamlandı</span>
+                <span>{{ getProgressPercent(contract.completedAssets, contract.assignedAssets) }}%</span>
               </div>
-              <div class="flex items-center space-x-3">
-                <span class="text-lg font-bold text-primary-600">{{ contract.listing.priceTotal }} {{ contract.listing.currency }}</span>
-                <span :class="getStatusBadge(contract.status)">{{ contract.status }}</span>
-                <button v-if="contract.status === 'active'" @click="submitContract(contract.id)" class="btn-primary text-sm">
-                  Teslim Et
-                </button>
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  class="bg-primary-600 h-2 rounded-full transition-all"
+                  :style="{ width: getProgressPercent(contract.completedAssets, contract.assignedAssets) + '%' }"
+                ></div>
               </div>
             </div>
           </div>
+          <div class="flex flex-col items-end gap-2">
+            <p class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ formatPrice(contract.totalPayment, contract.currency) }}
+            </p>
+          </div>
         </div>
-      </main>
+      </article>
     </div>
-  </div>
+
+    <!-- Pagination -->
+    <BasePagination
+      :current-page="page"
+      :total-pages="totalPages"
+      :loading="loading"
+      class="mt-6"
+      @page-change="goToPage"
+    />
+  </AppLayout>
 </template>

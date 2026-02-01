@@ -1,6 +1,7 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { authApi, type User, type LoginRequest, type RegisterRequest } from '@/api/auth'
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+import { authApi, type User, type LoginRequest, type RegisterRequest } from '@/api/auth';
+import { getErrorMessage } from '@/types/api';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
@@ -23,8 +24,8 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', token.value)
       localStorage.setItem('user', JSON.stringify(user.value))
       return true
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Login failed'
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err, 'Login failed');
       return false
     } finally {
       loading.value = false
@@ -41,8 +42,8 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', token.value)
       localStorage.setItem('user', JSON.stringify(user.value))
       return true
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Registration failed'
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err, 'Registration failed');
       return false
     } finally {
       loading.value = false
@@ -55,7 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authApi.getProfile()
       user.value = response.data.data
       localStorage.setItem('user', JSON.stringify(user.value))
-    } catch (err) {
+    } catch (_err: unknown) {
       logout()
     }
   }

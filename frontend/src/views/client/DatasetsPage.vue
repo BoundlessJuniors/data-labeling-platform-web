@@ -1,158 +1,309 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import apiClient from '@/api/client'
+/**
+ * DatasetsPage - Client datasets list with CRUD
+ */
+import { ref, onMounted, watch } from 'vue';
+import { useDatasetsStore } from '@/stores/datasets';
+import { useSeo } from '@/composables/useSeo';
+import AppLayout from '@/layouts/AppLayout.vue';
+import BaseModal from '@/components/ui/BaseModal.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
+import BasePagination from '@/components/ui/BasePagination.vue';
+import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
 
-const authStore = useAuthStore()
+useSeo({
+  title: 'Datasetler',
+  description: 'Veri etiketleme projeleriniz için datasetlerinizi yönetin.',
+});
 
-interface Dataset {
-  id: string
-  name: string
-  description: string | null
-  status: string
-  createdAt: string
-  _count: { assets: number }
+const datasetsStore = useDatasetsStore();
+
+// Modal state
+const showCreateModal = ref(false);
+const showEditModal = ref(false);
+const showDeleteModal = ref(false);
+
+// Form state
+const formName = ref('');
+const formDescription = ref('');
+const editingId = ref<string | null>(null);
+const deletingId = ref<string | null>(null);
+
+// Search
+const searchInput = ref('');
+let searchTimeout: ReturnType<typeof setTimeout>;
+
+// Fetch on mount
+onMounted(() => {
+  datasetsStore.fetchDatasets();
+});
+
+// Debounced search
+watch(searchInput, (value) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    datasetsStore.setSearch(value);
+  }, 300);
+});
+
+// Modal handlers
+function openCreateModal() {
+  formName.value = '';
+  formDescription.value = '';
+  showCreateModal.value = true;
 }
 
-const datasets = ref<Dataset[]>([])
-const loading = ref(true)
-const showCreateModal = ref(false)
-const newDataset = ref({ name: '', description: '' })
+function openEditModal(id: string, name: string, description: string | null) {
+  editingId.value = id;
+  formName.value = name;
+  formDescription.value = description || '';
+  showEditModal.value = true;
+}
 
-async function fetchDatasets() {
-  loading.value = true
-  try {
-    const response = await apiClient.get('/datasets')
-    datasets.value = response.data.data
-  } catch (error) {
-    console.error('Failed to fetch datasets:', error)
-  } finally {
-    loading.value = false
+function openDeleteModal(id: string) {
+  deletingId.value = id;
+  showDeleteModal.value = true;
+}
+
+async function handleCreate() {
+  if (!formName.value.trim()) return;
+  const result = await datasetsStore.createDataset({
+    name: formName.value.trim(),
+    description: formDescription.value.trim() || undefined,
+  });
+  if (result) {
+    showCreateModal.value = false;
   }
 }
 
-async function createDataset() {
-  try {
-    await apiClient.post('/datasets', newDataset.value)
-    showCreateModal.value = false
-    newDataset.value = { name: '', description: '' }
-    await fetchDatasets()
-  } catch (error) {
-    console.error('Failed to create dataset:', error)
+async function handleUpdate() {
+  if (!editingId.value || !formName.value.trim()) return;
+  const result = await datasetsStore.updateDataset(editingId.value, {
+    name: formName.value.trim(),
+    description: formDescription.value.trim() || undefined,
+  });
+  if (result) {
+    showEditModal.value = false;
+    editingId.value = null;
+  }
+}
+
+async function handleDelete() {
+  if (!deletingId.value) return;
+  const result = await datasetsStore.deleteDataset(deletingId.value);
+  if (result) {
+    showDeleteModal.value = false;
+    deletingId.value = null;
   }
 }
 
 function getStatusBadge(status: string) {
   switch (status) {
-    case 'ready': return 'badge-success'
-    case 'uploading': return 'badge-warning'
-    case 'draft': return 'badge-info'
-    default: return 'badge'
+    case 'ready':
+      return 'badge-success';
+    case 'uploading':
+      return 'badge-warning';
+    case 'draft':
+      return 'badge-info';
+    default:
+      return 'badge-neutral';
   }
 }
 
-function handleLogout() {
-  authStore.logout()
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('tr-TR');
 }
-
-onMounted(fetchDatasets)
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <!-- Sidebar -->
-    <aside class="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
-      <div class="flex items-center justify-center h-16 border-b">
-        <RouterLink to="/" class="flex items-center space-x-2">
-          <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold">D</span>
-          </div>
-          <span class="font-bold text-gray-900">DataLabel</span>
-        </RouterLink>
+  <AppLayout>
+    <template #header>Datasetler</template>
+
+    <!-- Toolbar -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div class="relative w-full sm:w-80">
+        <input
+          v-model="searchInput"
+          type="search"
+          placeholder="Dataset ara..."
+          class="input pl-10"
+          aria-label="Dataset ara"
+        />
+        <svg
+          class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
       </div>
-      
-      <nav class="mt-6 px-4">
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Client Panel</p>
-        <RouterLink to="/client/datasets" class="flex items-center px-4 py-2 rounded-lg mb-1 bg-primary-50 text-primary-700">
-          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-          </svg>
-          Datasets
-        </RouterLink>
-        <RouterLink to="/client/listings" class="flex items-center px-4 py-2 rounded-lg mb-1 text-gray-600 hover:bg-gray-100">
-          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          Listings
-        </RouterLink>
-        <RouterLink to="/client/contracts" class="flex items-center px-4 py-2 rounded-lg mb-1 text-gray-600 hover:bg-gray-100">
-          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Contracts
-        </RouterLink>
-      </nav>
-    </aside>
+      <BaseButton variant="primary" @click="openCreateModal">
+        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Yeni Dataset
+      </BaseButton>
+    </div>
 
-    <!-- Main -->
-    <div class="ml-64">
-      <header class="bg-white shadow-sm h-16 flex items-center justify-between px-6">
-        <h1 class="text-xl font-semibold text-gray-900">Datasets</h1>
-        <div class="flex items-center space-x-4">
-          <span class="text-sm text-gray-600">{{ authStore.user?.email }}</span>
-          <button @click="handleLogout" class="text-sm text-red-600 hover:text-red-700">Çıkış</button>
+    <!-- Loading state -->
+    <div v-if="datasetsStore.loading && datasetsStore.datasets.length === 0" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-for="i in 6" :key="i" class="card">
+        <BaseSkeleton variant="text" class="w-2/3 mb-2" />
+        <BaseSkeleton variant="text" class="w-full mb-2" />
+        <BaseSkeleton variant="text" class="w-1/2" />
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div v-else-if="datasetsStore.error && datasetsStore.datasets.length === 0" class="card text-center py-12">
+      <p class="text-red-600 dark:text-red-400 mb-4">{{ datasetsStore.error }}</p>
+      <BaseButton variant="secondary" @click="datasetsStore.fetchDatasets()">
+        Tekrar Dene
+      </BaseButton>
+    </div>
+
+    <!-- Empty state -->
+    <BaseEmptyState
+      v-else-if="datasetsStore.datasets.length === 0 && !datasetsStore.loading"
+      :icon="searchInput ? 'search' : 'database'"
+      :title="searchInput ? 'Sonuç bulunamadı' : 'Henüz dataset yok'"
+      :description="searchInput ? 'Arama kriterlerinizi değiştirin.' : 'İlk datasetinizi oluşturarak başlayın.'"
+    >
+      <template v-if="!searchInput" #action>
+        <BaseButton variant="primary" @click="openCreateModal">
+          Yeni Dataset Oluştur
+        </BaseButton>
+      </template>
+    </BaseEmptyState>
+
+    <!-- Datasets grid -->
+    <div v-else class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <article
+        v-for="dataset in datasetsStore.datasets"
+        :key="dataset.id"
+        class="card hover:shadow-lg transition-shadow group"
+      >
+        <div class="flex justify-between items-start mb-3">
+          <h2 class="font-semibold text-gray-900 dark:text-white">{{ dataset.name }}</h2>
+          <span :class="getStatusBadge(dataset.status)">{{ dataset.status }}</span>
         </div>
-      </header>
-
-      <main class="p-6">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl font-bold text-gray-900">Datasetlerim</h2>
-          <button @click="showCreateModal = true" class="btn-primary">+ Yeni Dataset</button>
-        </div>
-
-        <div v-if="loading" class="flex justify-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-        </div>
-
-        <div v-else-if="datasets.length === 0" class="text-center py-12">
-          <p class="text-gray-500">Henüz dataset yok. İlk datasetinizi oluşturun!</p>
-        </div>
-
-        <div v-else class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div v-for="dataset in datasets" :key="dataset.id" class="card hover:shadow-lg transition-shadow">
-            <div class="flex justify-between items-start mb-3">
-              <h3 class="font-semibold text-gray-900">{{ dataset.name }}</h3>
-              <span :class="getStatusBadge(dataset.status)">{{ dataset.status }}</span>
-            </div>
-            <p class="text-sm text-gray-600 mb-3">{{ dataset.description || 'Açıklama yok' }}</p>
-            <div class="text-xs text-gray-500">
-              {{ dataset._count.assets }} asset • {{ new Date(dataset.createdAt).toLocaleDateString('tr-TR') }}
-            </div>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-3 truncate-2">
+          {{ dataset.description || 'Açıklama yok' }}
+        </p>
+        <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+          <span>{{ dataset.assetCount ?? 0 }} asset • {{ formatDate(dataset.createdAt) }}</span>
+          <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Düzenle"
+              @click="openEditModal(dataset.id, dataset.name, dataset.description)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
+              aria-label="Sil"
+              @click="openDeleteModal(dataset.id)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
         </div>
-      </main>
+      </article>
     </div>
+
+    <!-- Pagination -->
+    <BasePagination
+      :current-page="datasetsStore.page"
+      :total-pages="datasetsStore.totalPages"
+      :loading="datasetsStore.loading"
+      class="mt-6"
+      @page-change="datasetsStore.goToPage"
+    />
 
     <!-- Create Modal -->
-    <div v-if="showCreateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl p-6 w-full max-w-md">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Yeni Dataset</h3>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">İsim</label>
-            <input v-model="newDataset.name" type="text" class="input" placeholder="Dataset ismi" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
-            <textarea v-model="newDataset.description" class="input" rows="3" placeholder="Açıklama (opsiyonel)"></textarea>
-          </div>
+    <BaseModal :open="showCreateModal" title="Yeni Dataset" @close="showCreateModal = false">
+      <form class="space-y-4" @submit.prevent="handleCreate">
+        <BaseInput
+          id="create-name"
+          v-model="formName"
+          label="İsim"
+          placeholder="Dataset ismi"
+          required
+        />
+        <div>
+          <label for="create-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Açıklama (Opsiyonel)
+          </label>
+          <textarea
+            id="create-description"
+            v-model="formDescription"
+            class="input"
+            rows="3"
+            placeholder="Dataset açıklaması..."
+          ></textarea>
         </div>
-        <div class="flex justify-end space-x-3 mt-6">
-          <button @click="showCreateModal = false" class="btn-secondary">İptal</button>
-          <button @click="createDataset" class="btn-primary">Oluştur</button>
+      </form>
+      <template #footer>
+        <BaseButton variant="secondary" @click="showCreateModal = false">İptal</BaseButton>
+        <BaseButton variant="primary" :loading="datasetsStore.loading" @click="handleCreate">
+          Oluştur
+        </BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- Edit Modal -->
+    <BaseModal :open="showEditModal" title="Dataset Düzenle" @close="showEditModal = false">
+      <form class="space-y-4" @submit.prevent="handleUpdate">
+        <BaseInput
+          id="edit-name"
+          v-model="formName"
+          label="İsim"
+          placeholder="Dataset ismi"
+          required
+        />
+        <div>
+          <label for="edit-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Açıklama
+          </label>
+          <textarea
+            id="edit-description"
+            v-model="formDescription"
+            class="input"
+            rows="3"
+            placeholder="Dataset açıklaması..."
+          ></textarea>
         </div>
-      </div>
-    </div>
-  </div>
+      </form>
+      <template #footer>
+        <BaseButton variant="secondary" @click="showEditModal = false">İptal</BaseButton>
+        <BaseButton variant="primary" :loading="datasetsStore.loading" @click="handleUpdate">
+          Kaydet
+        </BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- Delete Confirmation Modal -->
+    <BaseModal :open="showDeleteModal" title="Dataset Sil" size="sm" @close="showDeleteModal = false">
+      <p class="text-gray-600 dark:text-gray-400">
+        Bu dataseti silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+      </p>
+      <template #footer>
+        <BaseButton variant="secondary" @click="showDeleteModal = false">İptal</BaseButton>
+        <BaseButton variant="danger" :loading="datasetsStore.loading" @click="handleDelete">
+          Sil
+        </BaseButton>
+      </template>
+    </BaseModal>
+  </AppLayout>
 </template>

@@ -59,7 +59,7 @@ function handleLogout() {
           <span class="text-sm text-gray-600">
             {{ authStore.user?.displayName || authStore.user?.email }}
           </span>
-          <button @click="handleLogout" class="text-sm text-red-600 hover:text-red-700">
+          <button class="text-sm text-red-600 hover:text-red-700" @click="handleLogout">
             Çıkış Yap
           </button>
         </div>

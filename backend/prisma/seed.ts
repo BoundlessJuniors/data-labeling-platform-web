@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -28,10 +29,13 @@ async function main() {
   // =========================================================================
   console.log('👤 Creating users...');
   
+  // Create hashes
+  const passwordHash = await bcrypt.hash('password123', 10);
+
   const adminUser = await prisma.user.create({
     data: {
       email: 'admin@datalabeling.com',
-      passwordHash: '$2b$10$placeholder_hash_for_admin', // "password123" hashed
+      passwordHash,
       role: UserRole.admin,
       displayName: 'Platform Admin',
     },
@@ -40,7 +44,7 @@ async function main() {
   const clientUser = await prisma.user.create({
     data: {
       email: 'client@example.com',
-      passwordHash: '$2b$10$placeholder_hash_for_client',
+      passwordHash,
       role: UserRole.client,
       displayName: 'Demo Client',
     },
@@ -49,14 +53,14 @@ async function main() {
   const labelerUser = await prisma.user.create({
     data: {
       email: 'labeler@example.com',
-      passwordHash: '$2b$10$placeholder_hash_for_labeler',
+      passwordHash,
       role: UserRole.labeler,
       displayName: 'Demo Labeler',
       ratingAvg: 4.5,
     },
   });
 
-  console.log(`   ✅ Created ${3} users`);
+  console.log(`   ✅ Created ${3} users with password: "password123"`);
 
   // =========================================================================
   // 2. Create Label Sets
