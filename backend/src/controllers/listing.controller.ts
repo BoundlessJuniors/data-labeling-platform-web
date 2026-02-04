@@ -187,8 +187,11 @@ export const getListingById = async (
             labels: true,
           },
         },
-        contract: {
-          select: { id: true, status: true },
+        contracts: {
+          select: { id: true, status: true, labelerUserId: true },
+        },
+        _count: {
+          select: { proposals: true },
         },
       },
     });
@@ -284,7 +287,7 @@ export const deleteListing = async (
     // Check if listing exists and user has access
     const existingListing = await prisma.listing.findUnique({
       where: { id },
-      include: { contract: true },
+      include: { contracts: true },
     });
 
     if (!existingListing) {
@@ -295,9 +298,9 @@ export const deleteListing = async (
       throw new ForbiddenError('You do not have permission to delete this listing');
     }
 
-    // Can't delete if listing has a contract
-    if (existingListing.contract) {
-      throw new BadRequestError('Cannot delete listing with an active contract');
+    // Can't delete if listing has any contracts
+    if (existingListing.contracts.length > 0) {
+      throw new BadRequestError('Cannot delete listing with active contracts');
     }
 
     await prisma.listing.delete({

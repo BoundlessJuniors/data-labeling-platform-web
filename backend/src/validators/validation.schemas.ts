@@ -252,3 +252,26 @@ export const updateUserSchema = Joi.object({
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
 });
+
+// ============================================================================
+// Proposal Schemas
+// ============================================================================
+
+export const createProposalSchema = Joi.object({
+  listingId: uuidSchema.messages({
+    'any.required': 'Listing ID is required',
+  }),
+  priceQuote: Joi.number().positive().precision(2).required().messages({
+    'any.required': 'Price quote is required',
+    'number.positive': 'Price quote must be positive',
+  }),
+  coverLetter: Joi.string().max(2000).optional().allow(''),
+});
+
+export const updateProposalStatusSchema = Joi.object({
+  status: Joi.string().valid('accepted', 'rejected', 'withdrawn').required().messages({
+    'any.only': 'Status must be accepted, rejected, or withdrawn',
+    'any.required': 'Status is required',
+  }),
+});
+

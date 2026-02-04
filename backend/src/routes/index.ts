@@ -9,7 +9,9 @@ import taskRoutes from './task.routes';
 import annotationRoutes from './annotation.routes';
 import reviewRoutes from './review.routes';
 import adminRoutes from './admin.routes';
+import proposalRoutes from './proposal.routes';
 import * as taskController from '../controllers/task.controller';
+import * as proposalController from '../controllers/proposal.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { idParamSchema } from '../validators/validation.schemas';
@@ -27,6 +29,7 @@ router.use('/tasks', taskRoutes);
 router.use('/annotations', annotationRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/admin', adminRoutes);
+router.use('/proposals', proposalRoutes);
 
 // Special routes
 // POST /api/listings/:id/generate-tasks
@@ -44,6 +47,13 @@ router.get(
   authenticate,
   validate(idParamSchema, 'params'),
   annotationController.getTaskAnnotations
+);
+
+// GET /api/listings/:id/proposals (get all proposals for a listing)
+router.get(
+  '/listings/:listingId/proposals',
+  authenticate,
+  proposalController.getListingProposals
 );
 
 export default router;

@@ -19,7 +19,7 @@ export const generateTasks = async (
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
       include: {
-        contract: true,
+        contracts: true,
         dataset: {
           include: {
             assets: true,
@@ -37,14 +37,15 @@ export const generateTasks = async (
       throw new ForbiddenError('Only the listing owner can generate tasks');
     }
 
-    // Must have a contract
-    if (!listing.contract) {
-      throw new BadRequestError('Listing must have a contract before generating tasks');
+    // Must have an active contract
+    const activeContract = listing.contracts.find(c => c.status === 'active');
+    if (!activeContract) {
+      throw new BadRequestError('Listing must have an active contract before generating tasks');
     }
 
     // Check if tasks already exist
     const existingTasks = await prisma.task.count({
-      where: { contractId: listing.contract.id },
+      where: { contractId: activeContract.id },
     });
 
     if (existingTasks > 0) {
@@ -60,7 +61,7 @@ export const generateTasks = async (
 
     const tasks = await prisma.task.createMany({
       data: assets.map((asset) => ({
-        contractId: listing.contract!.id,
+        contractId: activeContract.id,
         assetId: asset.id,
         status: TaskStatus.ready,
       })),
@@ -70,7 +71,7 @@ export const generateTasks = async (
 
     // Fetch created tasks
     const createdTasks = await prisma.task.findMany({
-      where: { contractId: listing.contract.id },
+      where: { contractId: activeContract.id },
       include: {
         asset: {
           select: { id: true, objectKey: true, mimeType: true },

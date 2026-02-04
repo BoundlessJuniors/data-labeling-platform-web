@@ -23,7 +23,7 @@ export const createContract = async (
     // Verify listing exists and is open
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
-      include: { contract: true },
+      include: { contracts: true },
     });
 
     if (!listing) {
@@ -34,8 +34,9 @@ export const createContract = async (
       throw new BadRequestError('Listing is not open for applications');
     }
 
-    // Check if listing already has a contract
-    if (listing.contract) {
+    // Check if listing already has an active contract
+    const activeContracts = listing.contracts.filter(c => c.status === 'active');
+    if (activeContracts.length > 0) {
       throw new ConflictError('Listing already has an active contract');
     }
 

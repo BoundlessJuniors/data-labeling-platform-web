@@ -13,6 +13,10 @@ Vue 3 + Tailwind CSS ile oluşturulmuş görsel veri etiketleme platformu kullan
 | **State Management** | Pinia | ^3.0.4 |
 | **Routing** | Vue Router | ^4.6.4 |
 | **HTTP Client** | Axios | ^1.13.4 |
+| **SEO** | @unhead/vue | ^2.1.2 |
+| **Testing** | Vitest + Vue Test Utils | ^4.0.18 |
+| **Linting** | ESLint + eslint-plugin-vue | ^9.39.2 |
+| **Formatting** | Prettier | ^3.8.1 |
 
 ## 📋 Gereksinimler
 
@@ -39,55 +43,104 @@ npm run dev
 
 ```
 frontend/
-├── public/                   # Static assets
-├── src/
-│   ├── api/                  # API katmanı
-│   │   ├── client.ts         # Axios instance & interceptors
-│   │   └── auth.ts           # Auth API fonksiyonları
-│   │
-│   ├── stores/               # Pinia state management
-│   │   └── auth.ts           # Authentication store
-│   │
-│   ├── router/               # Vue Router
-│   │   └── index.ts          # Route tanımları & guards
-│   │
-│   ├── layouts/              # Layout bileşenleri
-│   │   └── AdminLayout.vue   # Admin panel layout
-│   │
-│   ├── components/           # Reusable bileşenler
-│   │   └── HelloWorld.vue    # Örnek bileşen
-│   │
-│   ├── views/                # Sayfa bileşenleri
-│   │   ├── HomePage.vue          # Landing page
-│   │   ├── LoginPage.vue         # Giriş sayfası
-│   │   ├── RegisterPage.vue      # Kayıt sayfası
-│   │   ├── DashboardRedirect.vue # Role-based yönlendirme
-│   │   ├── NotFoundPage.vue      # 404 sayfası
-│   │   │
-│   │   ├── admin/            # Admin sayfaları
-│   │   │   └── UsersPage.vue     # Kullanıcı yönetimi
-│   │   │
-│   │   ├── client/           # Client (Veri Sahibi) sayfaları
-│   │   │   ├── DatasetsPage.vue  # Dataset yönetimi
-│   │   │   ├── ListingsPage.vue  # İlan yönetimi
-│   │   │   └── ContractsPage.vue # Sözleşme yönetimi
-│   │   │
-│   │   └── labeler/          # Labeler sayfaları
-│   │       ├── AvailableListingsPage.vue # Mevcut ilanlar
-│   │       ├── MyContractsPage.vue       # Sözleşmelerim
-│   │       └── TasksPage.vue             # Görevlerim
-│   │
-│   ├── assets/               # Proje assets
-│   ├── App.vue               # Root component
-│   ├── main.ts               # Entry point
-│   └── style.css             # Global styles & Tailwind
+├── public/                    # Static assets
+│   └── vite.svg
 │
-├── index.html                # HTML template
-├── vite.config.ts            # Vite configuration
-├── tailwind.config.js        # Tailwind configuration
-├── postcss.config.js         # PostCSS configuration
-├── tsconfig.json             # TypeScript config
-└── package.json              # Dependencies
+├── src/
+│   ├── api/                   # API katmanı (7 modül)
+│   │   ├── client.ts          # Axios instance & interceptors
+│   │   ├── auth.ts            # Auth API fonksiyonları
+│   │   ├── datasets.ts        # Dataset API
+│   │   ├── assets.ts          # Asset API
+│   │   ├── listings.ts        # Listing API
+│   │   ├── contracts.ts       # Contract API
+│   │   └── tasks.ts           # Task API
+│   │
+│   ├── stores/                # Pinia state management (8 store)
+│   │   ├── auth.ts            # Authentication store
+│   │   ├── datasets.ts        # Dataset store
+│   │   ├── assets.ts          # Asset store
+│   │   ├── listings.ts        # Listing store
+│   │   ├── contracts.ts       # Contract store
+│   │   ├── tasks.ts           # Task store
+│   │   ├── toast.ts           # Toast notifications
+│   │   └── __tests__/         # Store testleri
+│   │
+│   ├── router/                # Vue Router
+│   │   └── index.ts           # Route tanımları & guards
+│   │
+│   ├── layouts/               # Layout bileşenleri (3 layout)
+│   │   ├── AppLayout.vue      # Ana uygulama layout
+│   │   ├── AdminLayout.vue    # Admin panel layout
+│   │   ├── PublicLayout.vue   # Public sayfa layout
+│   │   └── index.ts           # Export barrel
+│   │
+│   ├── components/            # Reusable bileşenler
+│   │   ├── ui/                # 8 UI bileşeni
+│   │   │   ├── BaseButton.vue
+│   │   │   ├── BaseInput.vue
+│   │   │   ├── BaseSelect.vue
+│   │   │   ├── BaseModal.vue
+│   │   │   ├── BasePagination.vue
+│   │   │   ├── BaseSkeleton.vue
+│   │   │   ├── BaseEmptyState.vue
+│   │   │   ├── BaseToast.vue
+│   │   │   ├── index.ts
+│   │   │   └── __tests__/     # Bileşen testleri
+│   │   ├── ToastContainer.vue
+│   │   └── HelloWorld.vue
+│   │
+│   ├── views/                 # Sayfa bileşenleri (15 sayfa)
+│   │   ├── HomePage.vue       # Landing page
+│   │   ├── LoginPage.vue      # Giriş sayfası
+│   │   ├── RegisterPage.vue   # Kayıt sayfası
+│   │   ├── DashboardRedirect.vue
+│   │   ├── NotFoundPage.vue   # 404 sayfası
+│   │   │
+│   │   ├── admin/             # Admin sayfaları
+│   │   │   ├── AdminDashboardPage.vue
+│   │   │   └── UsersPage.vue
+│   │   │
+│   │   ├── client/            # Client sayfaları
+│   │   │   ├── DatasetsPage.vue
+│   │   │   ├── DatasetDetailPage.vue
+│   │   │   ├── ListingsPage.vue
+│   │   │   ├── ContractsPage.vue
+│   │   │   └── ContractDetailPage.vue
+│   │   │
+│   │   └── labeler/           # Labeler sayfaları
+│   │       ├── AvailableListingsPage.vue
+│   │       ├── MyContractsPage.vue
+│   │       └── TasksPage.vue
+│   │
+│   ├── types/                 # TypeScript type tanımları (9 dosya)
+│   │   ├── index.ts           # Export barrel
+│   │   ├── api.ts             # API response types
+│   │   ├── auth.ts            # Auth types
+│   │   ├── dataset.ts         # Dataset types
+│   │   ├── asset.ts           # Asset types
+│   │   ├── labelset.ts        # LabelSet types
+│   │   ├── listing.ts         # Listing types
+│   │   ├── contract.ts        # Contract types
+│   │   └── task.ts            # Task types
+│   │
+│   ├── composables/           # Vue composables
+│   │
+│   ├── assets/                # Proje assets
+│   ├── App.vue                # Root component
+│   ├── main.ts                # Entry point
+│   └── style.css              # Global styles & Tailwind
+│
+├── index.html                 # HTML template
+├── vite.config.ts             # Vite configuration
+├── vitest.config.ts           # Vitest test configuration
+├── tailwind.config.js         # Tailwind configuration
+├── postcss.config.js          # PostCSS configuration
+├── eslint.config.js           # ESLint flat config
+├── tsconfig.json              # TypeScript config
+├── tsconfig.app.json          # App-specific TS config
+├── tsconfig.vitest.json       # Vitest TS config
+└── package.json
 ```
 
 ## 🧭 Route Yapısı
@@ -105,10 +158,13 @@ frontend/
 | Route | Rol | Açıklama |
 |-------|-----|----------|
 | `/dashboard` | Tümü | Role göre yönlendirme |
+| `/admin` | Admin | Admin dashboard |
 | `/admin/users` | Admin | Kullanıcı listesi & yönetim |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
+| `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/listings` | Client | İlan CRUD işlemleri |
 | `/client/contracts` | Client | Sözleşme yönetimi |
+| `/client/contracts/:id` | Client | Sözleşme detay sayfası |
 | `/labeler/listings` | Labeler | Mevcut ilanları görüntüle |
 | `/labeler/contracts` | Labeler | Sözleşmelerimi görüntüle |
 | `/labeler/tasks` | Labeler | Görevlerimi yönet |
@@ -137,35 +193,23 @@ Pinia store ile merkezi authentication yönetimi:
 Router seviyesinde güvenlik:
 
 - **requiresAuth:** Giriş yapılmadan erişilemez
-- **guest:** Sadece giriş yapmamış kullanıcılar
-- **role:** Belirli role sahip kullanıcılar
+- **guestOnly:** Sadece giriş yapmamış kullanıcılar
+- **role:** Belirli role sahip kullanıcılar (admin her yere erişebilir)
 
-## 🎨 Styling Sistemi
+## 🎨 UI Bileşen Kütüphanesi
 
-### Tailwind CSS Konfigürasyonu
+### Base Components (`components/ui/`)
 
-```javascript
-// tailwind.config.js
-{
-  content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-  theme: {
-    extend: {
-      // Özel renkler ve spacing eklenebilir
-    }
-  }
-}
-```
-
-### Custom Styles (`style.css`)
-
-```css
-/* Tailwind base */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Custom component styles */
-```
+| Bileşen | Açıklama |
+|---------|----------|
+| `BaseButton` | Çoklu varyant destekli buton |
+| `BaseInput` | Form input bileşeni |
+| `BaseSelect` | Dropdown select |
+| `BaseModal` | Modal dialog |
+| `BasePagination` | Sayfalama bileşeni |
+| `BaseSkeleton` | Loading skeleton |
+| `BaseEmptyState` | Boş durum gösterimi |
+| `BaseToast` | Toast notification |
 
 ## 🔌 API Entegrasyonu
 
@@ -180,105 +224,34 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 - Response: 401 hata yakalama → logout
 ```
 
-### API Fonksiyonları (`api/auth.ts`)
+### API Servisleri
 
-```typescript
-// Auth endpoints
-- login(email, password)     // POST /api/auth/login
-- register(data)             // POST /api/auth/register
-- getProfile()               // GET /api/auth/profile
-```
-
-## 🚧 Geliştirme Planı
-
-### Tamamlanan Özellikler ✅
-
-- [x] Vue 3 + Vite proje kurulumu
-- [x] Tailwind CSS entegrasyonu
-- [x] Vue Router kurulumu ve guard'lar
-- [x] Pinia store (auth)
-- [x] Axios client & interceptors
-- [x] Login/Register sayfaları
-- [x] HomePage (landing page)
-- [x] Role-based routing
-- [x] Admin/Client/Labeler sayfa iskeletleri
-
-### Geliştirme Bekleyen Özellikler 🔄
-
-- [ ] Dataset yönetim arayüzü (CRUD)
-- [ ] Listing oluşturma & düzenleme formları
-- [ ] Asset upload bileşeni
-- [ ] LabelSet yönetimi
-- [ ] Annotation editörü (canvas-based)
-- [ ] Task assignment & workflow
-- [ ] Real-time bildirimler
-- [ ] Payment dashboard
-- [ ] Admin analytics sayfası
-- [ ] Dark mode desteği
-
-## 📦 Bileşen Geliştirme Rehberi
-
-### Yeni Sayfa Ekleme
-
-1. `src/views/` altına Vue dosyası oluştur
-2. `src/router/index.ts`'e route ekle
-3. Gerekirse navigation guard ekle
-
-```typescript
-// Örnek route ekleme
-{
-  path: '/client/new-page',
-  name: 'client-new-page',
-  component: () => import('@/views/client/NewPage.vue'),
-  meta: { requiresAuth: true, role: 'client' }
-}
-```
-
-### Yeni Store Ekleme
-
-```typescript
-// src/stores/example.ts
-import { defineStore } from 'pinia'
-
-export const useExampleStore = defineStore('example', {
-  state: () => ({
-    items: []
-  }),
-  actions: {
-    async fetchItems() {
-      // API call
-    }
-  }
-})
-```
-
-### API Fonksiyonu Ekleme
-
-```typescript
-// src/api/datasets.ts
-import client from './client'
-
-export const datasetApi = {
-  getAll: () => client.get('/datasets'),
-  getById: (id: string) => client.get(`/datasets/${id}`),
-  create: (data: object) => client.post('/datasets', data),
-  update: (id: string, data: object) => client.put(`/datasets/${id}`, data),
-  delete: (id: string) => client.delete(`/datasets/${id}`)
-}
-```
+| Servis | Dosya | Endpoint Base |
+|--------|-------|---------------|
+| Auth | `api/auth.ts` | `/api/auth` |
+| Datasets | `api/datasets.ts` | `/api/datasets` |
+| Assets | `api/assets.ts` | `/api/assets` |
+| Listings | `api/listings.ts` | `/api/listings` |
+| Contracts | `api/contracts.ts` | `/api/contracts` |
+| Tasks | `api/tasks.ts` | `/api/tasks` |
 
 ## 🧪 Test
 
 ```bash
-# Development server
-npm run dev
+# Testleri izleyerek çalıştır
+npm run test
 
-# Production build
-npm run build
+# Testleri tek seferlik çalıştır
+npm run test:run
 
-# Preview production
-npm run preview
+# Coverage raporu ile
+npm run test:coverage
 ```
+
+### Test Yapısı
+
+- `src/stores/__tests__/` - Pinia store testleri
+- `src/components/ui/__tests__/` - UI bileşen testleri
 
 ## 📜 NPM Komutları
 
@@ -287,6 +260,14 @@ npm run preview
 | `npm run dev` | Development server (HMR) |
 | `npm run build` | Production build |
 | `npm run preview` | Production build önizleme |
+| `npm run lint` | ESLint kontrolü |
+| `npm run lint:fix` | Lint hatalarını düzelt |
+| `npm run format` | Prettier ile formatlama |
+| `npm run format:check` | Format kontrolü |
+| `npm run typecheck` | TypeScript tip kontrolü |
+| `npm run test` | Vitest watch mode |
+| `npm run test:run` | Vitest tek çalıştırma |
+| `npm run test:coverage` | Coverage raporu |
 
 ## 🔧 Environment Variables
 
@@ -304,6 +285,36 @@ VITE_API_URL=http://localhost:3000/api
 - Dosya isimleri: `PascalCase.vue`
 - Bileşen isimleri: `PascalCase`
 - Props/Emits: `camelCase`
+- ESLint + Prettier ile otomatik formatlama
+
+## 🚧 Geliştirme Durumu
+
+### Tamamlanan Özellikler ✅
+
+- [x] Vue 3 + Vite proje kurulumu
+- [x] Tailwind CSS entegrasyonu
+- [x] Vue Router kurulumu ve guard'lar
+- [x] Pinia store (auth, datasets, assets, listings, contracts, tasks, toast)
+- [x] Axios client & interceptors
+- [x] Login/Register sayfaları
+- [x] HomePage (landing page)
+- [x] Role-based routing (admin/client/labeler)
+- [x] Admin sayfaları (Dashboard, Users)
+- [x] Client sayfaları (Datasets, Listings, Contracts)
+- [x] Labeler sayfaları (Listings, Contracts, Tasks)
+- [x] 8 reusable UI bileşeni
+- [x] Toast notification sistemi
+- [x] TypeScript type tanımları
+- [x] ESLint + Prettier konfigürasyonu
+- [x] Vitest test altyapısı
+
+### Geliştirme Bekleyen Özellikler 🔄
+
+- [ ] Asset upload bileşeni
+- [ ] Annotation editörü (canvas-based)
+- [ ] Real-time bildirimler
+- [ ] Payment dashboard
+- [ ] Dark mode desteği
 
 ## 🤝 Backend API Bağlantısı
 

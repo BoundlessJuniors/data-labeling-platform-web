@@ -77,6 +77,20 @@ enum ReviewDecision {
   reject
 }
 
+enum ProposalStatus {
+  pending
+  accepted
+  rejected
+  withdrawn
+}
+
+enum SubmissionStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
 // ============================================================================
 // 1. USERS
 // Hem müşteri hem etiketleyici tek tabloda. Rol alanıyla ayrılır.
@@ -104,6 +118,8 @@ model User {
   payments               Payment[]
   auditLogs              AuditLog[]
   reviews                Review[]
+  proposals              Proposal[]
+  submissions            Submission[]
 
   @@map("users")
 }
@@ -223,10 +239,11 @@ model Listing {
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  dataset  Dataset   @relation(fields: [datasetId], references: [id])
-  owner    User      @relation("ListingOwner", fields: [ownerUserId], references: [id])
-  labelSet LabelSet  @relation(fields: [labelSetId], references: [id])
-  contract Contract?
+  dataset   Dataset    @relation(fields: [datasetId], references: [id])
+  owner     User       @relation("ListingOwner", fields: [ownerUserId], references: [id])
+  labelSet  LabelSet   @relation(fields: [labelSetId], references: [id])
+  contracts Contract[]
+  proposals Proposal[]
 
   @@index([datasetId])
   @@index([ownerUserId])
@@ -238,12 +255,12 @@ model Listing {
 // ============================================================================
 // 7. CONTRACTS
 // Listing'i bir labeler aldığında oluşan iş/sözleşme.
-// MVP: 1 listing = 1 contract
+// 1 listing = N contract (büyük veri setleri parçalanabilir)
 // ============================================================================
 
 model Contract {
   id               String         @id @default(uuid()) @db.Uuid
-  listingId        String         @unique @map("listing_id") @db.Uuid
+  listingId        String         @map("listing_id") @db.Uuid
   clientUserId     String         @map("client_user_id") @db.Uuid
   labelerUserId    String         @map("labeler_user_id") @db.Uuid
   agreedPriceTotal Decimal        @map("agreed_price_total") @db.Decimal(12, 2)
@@ -260,7 +277,9 @@ model Contract {
   tasks         Task[]
   payments      Payment[]
   escrowLedgers EscrowLedger[]
+  submissions   Submission[]
 
+  @@index([listingId])
   @@index([clientUserId])
   @@index([labelerUserId])
   @@index([status])
@@ -273,13 +292,15 @@ model Contract {
 // ============================================================================
 
 model Task {
-  id           String     @id @default(uuid()) @db.Uuid
-  contractId   String     @map("contract_id") @db.Uuid
-  assetId      String     @map("asset_id") @db.Uuid
-  status       TaskStatus @default(ready)
-  attemptCount Int        @default(0) @map("attempt_count")
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  id              String     @id @default(uuid()) @db.Uuid
+  contractId      String     @map("contract_id") @db.Uuid
+  assetId         String     @map("asset_id") @db.Uuid
+  status          TaskStatus @default(ready)
+  attemptCount    Int        @default(0) @map("attempt_count")
+  annotationCount Int        @default(0) @map("annotation_count")
+  lastLeasedAt    DateTime?  @map("last_leased_at") @db.Timestamptz
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   contract              Contract               @relation(fields: [contractId], references: [id])
@@ -292,6 +313,7 @@ model Task {
   @@unique([contractId, assetId])
   @@index([contractId, status])
   @@index([assetId])
+  @@index([lastLeasedAt])
   @@map("tasks")
 }
 
@@ -449,4 +471,54 @@ model Review {
   @@index([taskId])
   @@index([reviewerUserId])
   @@map("reviews")
+}
+
+// ============================================================================
+// 16. PROPOSALS
+// İlana başvuru. Bir labeler ilana başvurur, client kabul/red eder.
+// ============================================================================
+
+model Proposal {
+  id            String         @id @default(uuid()) @db.Uuid
+  listingId     String         @map("listing_id") @db.Uuid
+  labelerUserId String         @map("labeler_user_id") @db.Uuid
+  priceQuote    Decimal        @map("price_quote") @db.Decimal(12, 2)
+  coverLetter   String?        @db.Text
+  status        ProposalStatus @default(pending)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  listing Listing @relation(fields: [listingId], references: [id])
+  labeler User    @relation(fields: [labelerUserId], references: [id])
+
+  @@unique([listingId, labelerUserId])
+  @@index([listingId])
+  @@index([labelerUserId])
+  @@index([status])
+  @@map("proposals")
+}
+
+// ============================================================================
+// 17. SUBMISSIONS
+// Masaüstünden gelen toplu COCO/YOLO dosya gönderimlerini takip eder.
+// ============================================================================
+
+model Submission {
+  id            String           @id @default(uuid()) @db.Uuid
+  contractId    String           @map("contract_id") @db.Uuid
+  labelerUserId String           @map("labeler_user_id") @db.Uuid
+  format        String           // "COCO", "YOLO_ZIP", "CUSTOM_JSON"
+  s3Key         String           @map("s3_key")
+  status        SubmissionStatus @default(pending)
+  errorMessage  String?          @map("error_message")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  contract Contract @relation(fields: [contractId], references: [id])
+  labeler  User     @relation(fields: [labelerUserId], references: [id])
+
+  @@index([contractId])
+  @@index([labelerUserId])
+  @@index([status])
+  @@map("submissions")
 }
