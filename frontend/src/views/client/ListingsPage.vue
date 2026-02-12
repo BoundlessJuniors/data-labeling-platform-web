@@ -3,8 +3,10 @@
  * ListingsPage - Client listings list with CRUD and status actions
  */
 import { ref, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useListingsStore } from '@/stores/listings';
 import { useDatasetsStore } from '@/stores/datasets';
+import { useLabelSetsStore } from '@/stores/labelsets';
 import { useSeo } from '@/composables/useSeo';
 import type { ListingStatus, AnnotationFormat } from '@/types/listing';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -23,6 +25,8 @@ useSeo({
 
 const listingsStore = useListingsStore();
 const datasetsStore = useDatasetsStore();
+const labelSetsStore = useLabelSetsStore();
+const router = useRouter();
 
 // Modal state
 const showCreateModal = ref(false);
@@ -62,6 +66,7 @@ const formatOptions = [
 onMounted(() => {
   listingsStore.fetchListings();
   datasetsStore.fetchDatasets({ limit: 100 }); // Get datasets for create form
+  labelSetsStore.fetchLabelSets(); // Get label sets for create form
 });
 
 // Debounced search
@@ -90,15 +95,34 @@ function openDeleteModal(id: string) {
 }
 
 async function handleCreate() {
-  if (!formTitle.value.trim() || !formDatasetId.value) return;
+  if (!formTitle.value.trim() || !formDatasetId.value || !formLabelSetId.value) return;
+
+  // --- Field mapping: Frontend → Backend (Prisma Listing model) ---
+
+  // 1) Get the selected dataset's asset count to compute priceTotal
+  const selectedDataset = datasetsStore.datasets.find((d) => d.id === formDatasetId.value);
+  const totalAssets = selectedDataset?.assetCount ?? 0;
+  const priceTotal = formPricePerAsset.value * (totalAssets > 0 ? totalAssets : 1);
+
+  // 2) Get the selected LabelSet's version
+  const selectedLabelSet = labelSetsStore.getLabelSetById(formLabelSetId.value);
+  const labelSetVersion = selectedLabelSet?.version ?? 1;
+
+  // 3) Package instructions and annotationFormat into labelingSpecJson
+  const labelingSpecJson = {
+    instructions: formInstructions.value.trim() || undefined,
+    format: formAnnotationFormat.value,
+  };
+
   const result = await listingsStore.createListing({
     title: formTitle.value.trim(),
     description: formDescription.value.trim() || undefined,
     datasetId: formDatasetId.value,
-    labelSetId: formLabelSetId.value || 'default', // TODO: Label set selection
-    pricePerAsset: formPricePerAsset.value,
-    annotationFormat: formAnnotationFormat.value,
-    instructions: formInstructions.value.trim() || undefined,
+    labelSetId: formLabelSetId.value,
+    labelSetVersion,
+    labelingSpecJson,
+    priceTotal,
+    currency: 'TRY',
   });
   if (result) {
     showCreateModal.value = false;
@@ -262,6 +286,17 @@ function formatDate(dateString: string) {
             </p>
             <!-- Actions -->
             <div class="flex gap-1">
+              <BaseButton
+                v-if="listing.status === 'published'"
+                variant="outline"
+                size="sm"
+                @click="router.push({ name: 'client-listing-proposals', params: { id: listing.id } })"
+              >
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Başvuruları Gör
+              </BaseButton>
               <button
                 v-if="listing.status === 'draft'"
                 type="button"
@@ -339,26 +374,36 @@ function formatDate(dateString: string) {
             id="create-dataset"
             v-model="formDatasetId"
             label="Dataset"
-            :options="datasetsStore.datasets.map(d => ({ value: d.id, label: d.name }))"
+            :options="datasetsStore.datasets.map(d => ({ value: d.id, label: `${d.name} (${d.assetCount} asset)` }))"
             placeholder="Dataset seçin"
             required
           />
+          <BaseSelect
+            id="create-labelset"
+            v-model="formLabelSetId"
+            label="Etiket Seti (Label Set)"
+            :options="labelSetsStore.labelSets.map(ls => ({ value: ls.id, label: `${ls.name} (v${ls.version})` }))"
+            placeholder="Etiket seti seçin"
+            required
+          />
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
           <BaseSelect
             id="create-format"
             v-model="formAnnotationFormat"
             label="Annotation Formatı"
             :options="formatOptions"
           />
+          <BaseInput
+            id="create-price"
+            v-model.number="formPricePerAsset"
+            label="Asset Başına Ücret (TRY)"
+            type="number"
+            :min="0"
+            step="0.01"
+            required
+          />
         </div>
-        <BaseInput
-          id="create-price"
-          v-model.number="formPricePerAsset"
-          label="Asset Başına Ücret (TRY)"
-          type="number"
-          :min="0"
-          step="0.01"
-          required
-        />
         <div>
           <label for="create-instructions" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Talimatlar

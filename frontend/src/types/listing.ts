@@ -29,18 +29,18 @@ export interface Listing {
   updatedAt: string;
 }
 
-/** Create listing request */
+/** Create listing request — matches backend Prisma Listing model */
 export interface CreateListingRequest {
   title: string;
   description?: string;
   datasetId: string;
   labelSetId: string;
-  pricePerAsset: number;
-  currency?: string;
-  annotationFormat: AnnotationFormat;
-  instructions?: string;
-  deadline?: string;
-  maxLabelers?: number;
+  labelSetVersion: number;
+  labelingSpecJson: Record<string, unknown>;
+  priceTotal: number;
+  currency: string;
+  qcMode?: string;
+  deadlineAt?: string;
 }
 
 /** Update listing request */

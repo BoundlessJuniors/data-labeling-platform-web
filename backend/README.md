@@ -15,6 +15,8 @@ Görsel veri etiketleme platformu için RESTful API.
 | **Validation** | Joi | ^18.0.2 |
 | **Security** | Helmet, Rate Limiting | ^8.1.0 / ^8.2.1 |
 | **Logging** | Winston | ^3.19.0 |
+| **Storage** | Cloudflare R2 (AWS S3 SDK) | ^3.x |
+| **Upload** | Multer (memoryStorage) | ^1.4.5 |
 
 ## 🚀 Hızlı Kurulum
 
@@ -66,18 +68,19 @@ backend/
 │   │   ├── annotation.routes.ts
 │   │   └── review.routes.ts
 │   │
-│   ├── middlewares/       # 8 Express middleware
+│   ├── middlewares/       # 9 Express middleware
 │   │   ├── auth.middleware.ts        # JWT doğrulama
 │   │   ├── role.middleware.ts        # Rol tabanlı erişim
 │   │   ├── validate.middleware.ts    # Joi validation
 │   │   ├── error.middleware.ts       # Global error handler
 │   │   ├── cache.middleware.ts       # Redis cache
+│   │   ├── upload.middleware.ts      # Multer file upload (R2)
 │   │   ├── rate-limit.middleware.ts  # Rate limiting
 │   │   ├── security.middleware.ts    # Helmet & CORS
 │   │   └── request-logger.middleware.ts
 │   │
 │   ├── validators/        # Joi validation schemas
-│   ├── lib/               # Prisma, Redis, Logger instances
+│   ├── lib/               # Prisma, Redis, Logger, R2 Storage
 │   ├── utils/             # Custom error classes
 │   └── index.ts           # App entry point
 │
@@ -119,10 +122,11 @@ backend/
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/dataset/:datasetId` | Dataset varlıkları |
-| GET | `/:id` | Asset detayı |
-| POST | `/` | Yeni asset ekle |
-| DELETE | `/:id` | Asset sil |
+| GET | `/` | Assetleri listele (datasetId query) |
+| GET | `/:id` | Asset detayı (signed URL ile) |
+| POST | `/` | Görsel yükle (multipart/form-data → R2) |
+| PUT | `/:id` | Asset güncelle |
+| DELETE | `/:id` | Asset sil (R2 + DB) |
 
 ### LabelSet Routes (`/api/labelsets`)
 
@@ -281,6 +285,12 @@ REDIS_URL=redis://localhost:6379
 # JWT
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=7d
+
+# Cloudflare R2 (S3 Compatible Storage)
+R2_ACCOUNT_ID=your_r2_account_id
+R2_ACCESS_KEY_ID=your_r2_access_key
+R2_SECRET_ACCESS_KEY=your_r2_secret_key
+R2_BUCKET_NAME=your_r2_bucket_name
 ```
 
 ## 🔐 Authentication

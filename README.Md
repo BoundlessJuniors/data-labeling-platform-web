@@ -8,24 +8,24 @@ Görsel veri etiketleme işlerini yöneten bir pazar yeri platformu. Müşterile
 data-labeling-platform-web/
 ├── backend/              # Node.js + Express + Prisma API
 │   ├── src/
-│   │   ├── controllers/  # 10 API endpoint handler
-│   │   ├── routes/       # 10 route modülü
-│   │   ├── middlewares/  # 8 middleware (auth, cache, rate-limit...)
-│   │   ├── lib/          # Prisma, Redis, Logger
+│   │   ├── controllers/  # 11 API endpoint handler
+│   │   ├── routes/       # 11 route modülü
+│   │   ├── middlewares/  # 9 middleware (auth, cache, rate-limit, upload...)
+│   │   ├── lib/          # Prisma, Redis, Logger, R2 Storage
 │   │   ├── validators/   # Joi validation schemas
 │   │   └── utils/        # Error classes
 │   └── prisma/           # Database schema & migrations
 │
 ├── frontend/             # Vue 3 + Tailwind CSS web app
 │   ├── src/
-│   │   ├── api/          # 7 API service modülü
+│   │   ├── api/          # 9 API service modülü
 │   │   ├── components/   # 13+ UI bileşeni
 │   │   ├── composables/  # Vue composables
 │   │   ├── layouts/      # 3 layout (Admin, App, Public)
 │   │   ├── router/       # Role-based routing
-│   │   ├── stores/       # 8 Pinia store
-│   │   ├── types/        # 9 TypeScript type dosyası
-│   │   └── views/        # 15 sayfa bileşeni
+│   │   ├── stores/       # 10 Pinia store
+│   │   ├── types/        # 10 TypeScript type dosyası
+│   │   └── views/        # 17 sayfa bileşeni
 │   └── public/           # Static assets
 │
 ├── docker-compose.yml    # PostgreSQL 16 + Redis 7
@@ -76,6 +76,7 @@ npm run dev
 |--------|-----------|
 | **Frontend** | Vue 3, Tailwind CSS 3.4, Pinia 3, TypeScript 5.9, Vite 7 |
 | **Backend** | Node.js, Express 4, TypeScript 5.6 |
+| **Storage** | Cloudflare R2 (S3 Compatible) |
 | **ORM** | Prisma 5.22 |
 | **Database** | PostgreSQL 16 |
 | **Cache** | Redis 7 |
@@ -110,7 +111,7 @@ npm run dev
 |------|----------|----------|
 | Auth | `/api/auth/*` | Kayıt, giriş, profil |
 | Datasets | `/api/datasets/*` | Dataset CRUD |
-| Assets | `/api/assets/*` | Görsel varlıklar |
+| Assets | `/api/assets/*` | Görsel yükleme (R2) & varlıklar |
 | LabelSets | `/api/labelsets/*` | Etiket setleri |
 | Listings | `/api/listings/*` | İlanlar |
 | Contracts | `/api/contracts/*` | Sözleşmeler |

@@ -11,5 +11,6 @@ export * from './dataset';
 export * from './asset';
 export * from './listing';
 export * from './contract';
+export * from './proposal';
 export * from './task';
 export * from './labelset';

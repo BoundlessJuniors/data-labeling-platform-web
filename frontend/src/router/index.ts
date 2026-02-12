@@ -94,6 +94,12 @@ const router = createRouter({
           meta: { title: 'İlanlar' },
         },
         {
+          path: 'listings/:id/proposals',
+          name: 'client-listing-proposals',
+          component: () => import('@/views/client/ListingProposalsPage.vue'),
+          meta: { title: 'Başvurular' },
+        },
+        {
           path: 'contracts',
           name: 'client-contracts',
           component: () => import('@/views/client/ContractsPage.vue'),

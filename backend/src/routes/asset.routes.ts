@@ -2,7 +2,8 @@ import { Router } from 'express';
 import * as assetController from '../controllers/asset.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { createAssetSchema, updateAssetSchema, idParamSchema } from '../validators/validation.schemas';
+import { upload } from '../middlewares/upload.middleware';
+import { updateAssetSchema, idParamSchema } from '../validators/validation.schemas';
 import { cacheMiddleware } from '../middlewares/cache.middleware';
 
 const router = Router();
@@ -12,15 +13,15 @@ router.get(
   '/',
   authenticate,
   cacheMiddleware({ ttl: 60, keyPrefix: 'cache' }),
-  assetController.getAssets
+  assetController.getAssets,
 );
 
-// POST /api/assets - Create a new asset
+// POST /api/assets - Upload a new asset (multipart/form-data)
 router.post(
   '/',
   authenticate,
-  validate(createAssetSchema),
-  assetController.createAsset
+  upload.single('file'),
+  assetController.createAsset,
 );
 
 // GET /api/assets/:id - Get a single asset
@@ -29,7 +30,7 @@ router.get(
   authenticate,
   validate(idParamSchema, 'params'),
   cacheMiddleware({ ttl: 120, keyPrefix: 'cache' }),
-  assetController.getAssetById
+  assetController.getAssetById,
 );
 
 // PUT /api/assets/:id - Update an asset
@@ -38,7 +39,7 @@ router.put(
   authenticate,
   validate(idParamSchema, 'params'),
   validate(updateAssetSchema),
-  assetController.updateAsset
+  assetController.updateAsset,
 );
 
 // DELETE /api/assets/:id - Delete an asset
@@ -46,7 +47,7 @@ router.delete(
   '/:id',
   authenticate,
   validate(idParamSchema, 'params'),
-  assetController.deleteAsset
+  assetController.deleteAsset,
 );
 
 export default router;

@@ -1,18 +1,52 @@
 import { Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
+import path from 'path';
 import prisma from '../lib/db';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import { cacheDelete } from '../lib/redis';
+import { uploadToR2, getSignedUrl, deleteFromR2 } from '../lib/storage';
 import logger from '../lib/logger';
 
-// Create a new asset
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Attach a signed URL to a single asset record */
+async function attachSignedUrl<T extends { objectKey: string }>(
+  asset: T,
+): Promise<T & { signedUrl: string }> {
+  const signedUrl = await getSignedUrl(asset.objectKey);
+  return { ...asset, signedUrl };
+}
+
+/** Attach signed URLs to a list of asset records */
+async function attachSignedUrls<T extends { objectKey: string }>(
+  assets: T[],
+): Promise<(T & { signedUrl: string })[]> {
+  return Promise.all(assets.map((a) => attachSignedUrl(a)));
+}
+
+// ---------------------------------------------------------------------------
+// Create a new asset (multipart upload)
+// ---------------------------------------------------------------------------
+
 export const createAsset = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
-    const { datasetId, objectKey, mimeType, width, height, sizeBytes, checksum } = req.body;
+    const file = req.file;
+    const { datasetId } = req.body;
+
+    if (!file) {
+      throw new BadRequestError('Dosya yüklenmedi. Lütfen bir resim dosyası seçin.');
+    }
+
+    if (!datasetId) {
+      throw new BadRequestError('Dataset ID zorunludur.');
+    }
 
     // Verify dataset exists and user has access
     const dataset = await prisma.dataset.findUnique({
@@ -24,18 +58,23 @@ export const createAsset = async (
     }
 
     if (req.user?.role !== 'admin' && dataset.ownerUserId !== req.user?.id) {
-      throw new ForbiddenError('You do not have permission to add assets to this dataset');
+      throw new ForbiddenError('Bu datasete asset ekleme yetkiniz yok.');
     }
 
+    // Build a unique object key
+    const ext = path.extname(file.originalname) || '.jpg';
+    const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
+
+    // Upload to R2
+    await uploadToR2(objectKey, file.buffer, file.mimetype);
+
+    // Persist metadata in DB
     const asset = await prisma.asset.create({
       data: {
         datasetId,
         objectKey,
-        mimeType,
-        width,
-        height,
-        sizeBytes,
-        checksum,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
       },
       include: {
         dataset: {
@@ -44,22 +83,28 @@ export const createAsset = async (
       },
     });
 
+    // Return with signed URL
+    const signedUrl = await getSignedUrl(objectKey);
+
     logger.info(`Asset created: ${asset.id} in dataset ${datasetId}`);
 
     res.status(201).json({
       success: true,
-      data: asset,
+      data: { ...asset, signedUrl },
     });
   } catch (error) {
     next(error);
   }
 };
 
+// ---------------------------------------------------------------------------
 // Get all assets (with pagination and filtering)
+// ---------------------------------------------------------------------------
+
 export const getAssets = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -69,7 +114,7 @@ export const getAssets = async (
 
     // Build where clause
     const where: any = {};
-    
+
     if (datasetId) {
       where.datasetId = datasetId;
     }
@@ -81,7 +126,7 @@ export const getAssets = async (
       };
     }
 
-    const [assets, total] = await Promise.all([
+    const [rawAssets, total] = await Promise.all([
       prisma.asset.findMany({
         where,
         skip,
@@ -95,6 +140,9 @@ export const getAssets = async (
       }),
       prisma.asset.count({ where }),
     ]);
+
+    // Attach signed URLs
+    const assets = await attachSignedUrls(rawAssets);
 
     res.json({
       success: true,
@@ -111,16 +159,19 @@ export const getAssets = async (
   }
 };
 
+// ---------------------------------------------------------------------------
 // Get a single asset by ID
+// ---------------------------------------------------------------------------
+
 export const getAssetById = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const { id } = req.params;
 
-    const asset = await prisma.asset.findUnique({
+    const rawAsset = await prisma.asset.findUnique({
       where: { id },
       include: {
         dataset: {
@@ -129,17 +180,19 @@ export const getAssetById = async (
       },
     });
 
-    if (!asset) {
+    if (!rawAsset) {
       throw new NotFoundError('Asset');
     }
 
     // Check access rights
     if (
-      req.user?.role !== 'admin' && 
-      asset.dataset.ownerUserId !== req.user?.id
+      req.user?.role !== 'admin' &&
+      rawAsset.dataset.ownerUserId !== req.user?.id
     ) {
-      throw new ForbiddenError('You do not have access to this asset');
+      throw new ForbiddenError('Bu asete erişim yetkiniz yok.');
     }
+
+    const asset = await attachSignedUrl(rawAsset);
 
     res.json({
       success: true,
@@ -150,11 +203,14 @@ export const getAssetById = async (
   }
 };
 
+// ---------------------------------------------------------------------------
 // Update an asset
+// ---------------------------------------------------------------------------
+
 export const updateAsset = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -175,7 +231,7 @@ export const updateAsset = async (
     }
 
     if (req.user?.role !== 'admin' && existingAsset.dataset.ownerUserId !== req.user?.id) {
-      throw new ForbiddenError('You do not have permission to update this asset');
+      throw new ForbiddenError('Bu aseti güncelleme yetkiniz yok.');
     }
 
     const asset = await prisma.asset.update({
@@ -200,20 +256,24 @@ export const updateAsset = async (
 
     logger.info(`Asset updated: ${asset.id}`);
 
+    const result = await attachSignedUrl(asset);
     res.json({
       success: true,
-      data: asset,
+      data: result,
     });
   } catch (error) {
     next(error);
   }
 };
 
+// ---------------------------------------------------------------------------
 // Delete an asset
+// ---------------------------------------------------------------------------
+
 export const deleteAsset = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -233,7 +293,14 @@ export const deleteAsset = async (
     }
 
     if (req.user?.role !== 'admin' && existingAsset.dataset.ownerUserId !== req.user?.id) {
-      throw new ForbiddenError('You do not have permission to delete this asset');
+      throw new ForbiddenError('Bu aseti silme yetkiniz yok.');
+    }
+
+    // Delete from R2 first
+    try {
+      await deleteFromR2(existingAsset.objectKey);
+    } catch (r2Err) {
+      logger.warn(`Failed to delete object from R2 (key: ${existingAsset.objectKey}): ${r2Err}`);
     }
 
     await prisma.asset.delete({

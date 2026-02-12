@@ -15,6 +15,8 @@ export const useAssetsStore = defineStore('assets', () => {
   const assets = ref<Asset[]>([]);
   const currentAsset = ref<Asset | null>(null);
   const loading = ref(false);
+  const uploading = ref(false);
+  const uploadProgress = ref(0); // 0-100
   const error = ref<string | null>(null);
   const currentDatasetId = ref<string | null>(null);
 
@@ -72,6 +74,56 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   /**
+   * Upload a single asset file to a dataset
+   */
+  async function uploadAsset(datasetId: string, file: File) {
+    try {
+      const response = await assetsApi.upload(datasetId, file);
+      return response.data.data;
+    } catch (_err) {
+      const msg = getErrorMessage(_err, `"${file.name}" yüklenemedi`);
+      toastStore.error(msg);
+      return null;
+    }
+  }
+
+  /**
+   * Upload multiple asset files to a dataset
+   */
+  async function uploadAssets(datasetId: string, files: File[]) {
+    if (files.length === 0) return;
+
+    uploading.value = true;
+    uploadProgress.value = 0;
+    error.value = null;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const result = await uploadAsset(datasetId, files[i]);
+      if (result) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+      uploadProgress.value = Math.round(((i + 1) / files.length) * 100);
+    }
+
+    uploading.value = false;
+    uploadProgress.value = 0;
+
+    if (successCount > 0) {
+      toastStore.success(`${successCount} asset başarıyla yüklendi.`);
+      // Refresh the list
+      await fetchAssets(datasetId, 1);
+    }
+    if (failCount > 0 && successCount > 0) {
+      toastStore.warning(`${failCount} dosya yüklenemedi.`);
+    }
+  }
+
+  /**
    * Delete an asset
    */
   async function deleteAsset(datasetId: string, assetId: string) {
@@ -110,6 +162,8 @@ export const useAssetsStore = defineStore('assets', () => {
     assets.value = [];
     currentAsset.value = null;
     loading.value = false;
+    uploading.value = false;
+    uploadProgress.value = 0;
     error.value = null;
     currentDatasetId.value = null;
     page.value = 1;
@@ -121,6 +175,8 @@ export const useAssetsStore = defineStore('assets', () => {
     assets,
     currentAsset,
     loading,
+    uploading,
+    uploadProgress,
     error,
     currentDatasetId,
     // Pagination
@@ -131,6 +187,8 @@ export const useAssetsStore = defineStore('assets', () => {
     // Actions
     fetchAssets,
     fetchAsset,
+    uploadAsset,
+    uploadAssets,
     deleteAsset,
     goToPage,
     reset,

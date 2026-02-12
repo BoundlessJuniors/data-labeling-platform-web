@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * DatasetDetailPage - View dataset with assets grid
+ * DatasetDetailPage - View dataset with assets grid + upload
  */
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -14,12 +14,27 @@ import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
 import BasePagination from '@/components/ui/BasePagination.vue';
 import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
 
+/** Flexible asset shape covering both upload responses and fetch results */
+interface DisplayableAsset {
+  id?: string;
+  fileName?: string;
+  objectKey?: string;
+  fileUrl?: string;
+  signedUrl?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+
 const route = useRoute();
 const router = useRouter();
 const datasetsStore = useDatasetsStore();
 const assetsStore = useAssetsStore();
 
 const datasetId = computed(() => route.params.id as string);
+
+// Upload
+const fileInputRef = ref<HTMLInputElement | null>(null);
 
 // Preview modal
 const showPreviewModal = ref(false);
@@ -38,10 +53,26 @@ onMounted(async () => {
   }
 });
 
-function openPreview(asset: { fileUrl: string; fileName: string; metadata?: Record<string, unknown> | null }) {
+// Upload handlers
+function triggerFileSelect() {
+  fileInputRef.value?.click();
+}
+
+async function onFilesSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (!input.files || input.files.length === 0) return;
+
+  const files = Array.from(input.files);
+  await assetsStore.uploadAssets(datasetId.value, files);
+
+  // Reset input so same files can be re-selected
+  input.value = '';
+}
+
+function openPreview(asset: DisplayableAsset) {
   previewAsset.value = {
-    url: asset.fileUrl,
-    name: asset.fileName,
+    url: asset.signedUrl || asset.fileUrl || '',
+    name: asset.fileName || asset.objectKey || asset.id || 'Bilinmeyen Dosya',
     metadata: asset.metadata ?? null,
   };
   showPreviewModal.value = true;
@@ -63,6 +94,14 @@ function getStatusBadge(status: string) {
     default:
       return 'badge-neutral';
   }
+}
+
+function getAssetDisplayName(asset: DisplayableAsset): string {
+  return asset.fileName || asset.objectKey || asset.id || 'Bilinmeyen Dosya';
+}
+
+function getAssetImageUrl(asset: DisplayableAsset): string {
+  return asset.signedUrl || asset.fileUrl || '';
 }
 
 function goBack() {
@@ -106,7 +145,50 @@ function goBack() {
           <span class="text-sm text-gray-500 dark:text-gray-400">
             {{ assetsStore.total }} asset
           </span>
+          <!-- Upload Button -->
+          <BaseButton
+            variant="primary"
+            :loading="assetsStore.uploading"
+            :disabled="assetsStore.uploading"
+            @click="triggerFileSelect"
+          >
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Görsel Yükle
+          </BaseButton>
+          <!-- Hidden file input -->
+          <input
+            ref="fileInputRef"
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            class="hidden"
+            @change="onFilesSelected"
+          />
         </div>
+      </div>
+    </div>
+
+    <!-- Upload Progress Bar -->
+    <div v-if="assetsStore.uploading" class="card mb-4">
+      <div class="flex items-center gap-4">
+        <div class="flex-1">
+          <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+            <span>Yükleniyor...</span>
+            <span>{{ assetsStore.uploadProgress }}%</span>
+          </div>
+          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+            <div
+              class="bg-primary-600 h-2.5 rounded-full transition-all duration-300"
+              :style="{ width: `${assetsStore.uploadProgress}%` }"
+            ></div>
+          </div>
+        </div>
+        <svg class="w-6 h-6 text-primary-600 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
       </div>
     </div>
 
@@ -130,8 +212,17 @@ function goBack() {
       v-else-if="assetsStore.assets.length === 0 && !assetsStore.loading"
       icon="database"
       title="Henüz asset yok"
-      description="Bu dataset'e henüz asset eklenmemiş. Desktop uygulaması ile asset yükleyebilirsiniz."
-    />
+      description="Bu dataset'e henüz asset eklenmemiş. 'Görsel Yükle' butonunu kullanarak görsel yükleyebilirsiniz."
+    >
+      <template #action>
+        <BaseButton variant="primary" @click="triggerFileSelect">
+          <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          İlk Görseli Yükle
+        </BaseButton>
+      </template>
+    </BaseEmptyState>
 
     <!-- Assets grid -->
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -144,9 +235,9 @@ function goBack() {
       >
         <!-- Thumbnail -->
         <img
-          v-if="asset.thumbnailUrl || asset.mimeType.startsWith('image/')"
-          :src="asset.thumbnailUrl || asset.fileUrl"
-          :alt="asset.fileName"
+          v-if="asset.mimeType?.startsWith('image/')"
+          :src="getAssetImageUrl(asset)"
+          :alt="getAssetDisplayName(asset)"
           class="w-full h-full object-cover"
           loading="lazy"
         />
@@ -159,17 +250,8 @@ function goBack() {
         <!-- Overlay -->
         <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
           <div class="text-white text-xs truncate w-full">
-            {{ asset.fileName }}
+            {{ getAssetDisplayName(asset) }}
           </div>
-        </div>
-        <!-- Status indicator -->
-        <div
-          v-if="asset.status !== 'ready'"
-          class="absolute top-2 right-2"
-        >
-          <span :class="getStatusBadge(asset.status)" class="text-xs">
-            {{ asset.status }}
-          </span>
         </div>
       </button>
     </div>

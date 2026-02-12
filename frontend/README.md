@@ -47,20 +47,24 @@ frontend/
 │   └── vite.svg
 │
 ├── src/
-│   ├── api/                   # API katmanı (7 modül)
+│   ├── api/                   # API katmanı (9 modül)
 │   │   ├── client.ts          # Axios instance & interceptors
 │   │   ├── auth.ts            # Auth API fonksiyonları
 │   │   ├── datasets.ts        # Dataset API
-│   │   ├── assets.ts          # Asset API
+│   │   ├── assets.ts          # Asset API (upload dahil)
 │   │   ├── listings.ts        # Listing API
+│   │   ├── labelsets.ts       # LabelSet API
+│   │   ├── proposals.ts       # Proposal API
 │   │   ├── contracts.ts       # Contract API
 │   │   └── tasks.ts           # Task API
 │   │
-│   ├── stores/                # Pinia state management (8 store)
+│   ├── stores/                # Pinia state management (10 store)
 │   │   ├── auth.ts            # Authentication store
 │   │   ├── datasets.ts        # Dataset store
-│   │   ├── assets.ts          # Asset store
+│   │   ├── assets.ts          # Asset store (upload + progress)
 │   │   ├── listings.ts        # Listing store
+│   │   ├── labelsets.ts       # LabelSet store
+│   │   ├── proposals.ts       # Proposal store
 │   │   ├── contracts.ts       # Contract store
 │   │   ├── tasks.ts           # Task store
 │   │   ├── toast.ts           # Toast notifications
@@ -103,8 +107,9 @@ frontend/
 │   │   │
 │   │   ├── client/            # Client sayfaları
 │   │   │   ├── DatasetsPage.vue
-│   │   │   ├── DatasetDetailPage.vue
-│   │   │   ├── ListingsPage.vue
+│   │   │   ├── DatasetDetailPage.vue   # Görsel yükleme (R2)
+│   │   │   ├── ListingsPage.vue        # LabelSet seçimi
+│   │   │   ├── ListingProposalsPage.vue # Başvuru yönetimi
 │   │   │   ├── ContractsPage.vue
 │   │   │   └── ContractDetailPage.vue
 │   │   │
@@ -231,6 +236,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 | Auth | `api/auth.ts` | `/api/auth` |
 | Datasets | `api/datasets.ts` | `/api/datasets` |
 | Assets | `api/assets.ts` | `/api/assets` |
+| LabelSets | `api/labelsets.ts` | `/api/labelsets` |
+| Proposals | `api/proposals.ts` | `/api/proposals` |
 | Listings | `api/listings.ts` | `/api/listings` |
 | Contracts | `api/contracts.ts` | `/api/contracts` |
 | Tasks | `api/tasks.ts` | `/api/tasks` |
@@ -307,10 +314,12 @@ VITE_API_URL=http://localhost:3000/api
 - [x] TypeScript type tanımları
 - [x] ESLint + Prettier konfigürasyonu
 - [x] Vitest test altyapısı
+- [x] Asset upload bileşeni (Cloudflare R2)
+- [x] LabelSet seçimi (ilan oluşturma)
+- [x] Proposal (başvuru) yönetim sayfası
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
-- [ ] Asset upload bileşeni
 - [ ] Annotation editörü (canvas-based)
 - [ ] Real-time bildirimler
 - [ ] Payment dashboard
