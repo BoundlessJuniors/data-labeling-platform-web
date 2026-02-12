@@ -261,13 +261,44 @@ export const acceptProposal = async (
         },
         include: {
           listing: {
-            select: { id: true, title: true },
+            select: { id: true, title: true, datasetId: true },
           },
           labeler: {
             select: { id: true, email: true, displayName: true },
           },
         },
       });
+
+      // ============================================================
+      //  FIX: CREATE TASKS FOR THE CONTRACT
+      // ============================================================
+      
+      // 6.1. Find all assets in the dataset
+      const assets = await tx.asset.findMany({
+        where: { datasetId: contract.listing.datasetId },
+        select: { id: true }
+      });
+
+      if (assets.length === 0) {
+        throw new BadRequestError('Dataset is empty, cannot create tasks.');
+      }
+
+      // 6.2. Create a task for each asset (Bulk Insert)
+      await tx.task.createMany({
+        data: assets.map((asset) => ({
+          contractId: contract.id,
+          assetId: asset.id,
+          status: 'ready',
+          attemptCount: 0,
+          annotationCount: 0
+        })),
+      });
+
+      logger.info(`${assets.length} tasks created for contract ${contract.id}`);
+      
+      // ============================================================
+      //  END FIX
+      // ============================================================
 
       // 7. Reject all other pending proposals for this listing
       await tx.proposal.updateMany({

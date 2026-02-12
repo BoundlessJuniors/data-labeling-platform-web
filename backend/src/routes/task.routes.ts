@@ -6,6 +6,7 @@ import { validate } from '../middlewares/validate.middleware';
 import { 
   idParamSchema,
   leaseTaskSchema,
+  leaseTaskBatchSchema,
   submitTaskSchema,
   rejectTaskSchema
 } from '../validators/validation.schemas';
@@ -19,6 +20,13 @@ router.use(authenticate);
 router.get(
   '/',
   taskController.getTasks
+);
+
+// POST /api/tasks/lease-batch - Batch lease tasks (Desktop App)
+router.post(
+  '/lease-batch',
+  validate(leaseTaskBatchSchema),
+  taskController.leaseTaskBatch
 );
 
 // GET /api/tasks/:id - Get a single task

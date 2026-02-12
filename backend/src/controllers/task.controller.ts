@@ -355,10 +355,9 @@ export const submitTask = async (
       throw new ForbiddenError('Invalid or expired lease token');
     }
 
-    // Check if lease is expired
-    if (task.taskLease.leasedUntil < new Date()) {
-      throw new BadRequestError('Task lease has expired');
-    }
+    // NOTE: Lease expiry check removed intentionally.
+    // Contract is user-specific, so late submissions should still be accepted
+    // rather than discarding the labeler's work.
 
     // Save raw annotation
     await prisma.annotationRaw.create({
@@ -541,6 +540,100 @@ export const releaseExpiredLeases = async (
       data: {
         releasedCount: expiredLeases.length,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Lease multiple tasks at once (For Desktop App Bulk Download)
+export const leaseTaskBatch = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { contractId, amount } = req.body;
+    const labelerId = req.user!.id;
+    const count = typeof amount === 'number' ? Math.min(amount, 100) : 10; // Default 10, max 100
+    const leaseDurationMinutes = 120; // Desktop app needs more time (2 hours)
+
+    // Verify contract ownership
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+    });
+
+    if (!contract) {
+      throw new NotFoundError('Contract');
+    }
+
+    if (req.user?.role !== 'admin' && contract.labelerUserId !== labelerId) {
+      throw new ForbiddenError('You are not the labeler for this contract');
+    }
+
+    if (contract.status !== 'active') {
+      throw new BadRequestError('Contract is not active');
+    }
+
+    // Transaction for bulk locking
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Find 'count' available tasks
+      const availableTasks = await tx.task.findMany({
+        where: {
+          contractId,
+          status: TaskStatus.ready,
+        },
+        take: count,
+        select: { id: true },
+      });
+
+      if (availableTasks.length === 0) {
+        return [];
+      }
+
+      const taskIds = availableTasks.map((t) => t.id);
+      const leasedUntil = new Date(Date.now() + leaseDurationMinutes * 60 * 1000);
+
+      // 2. Bulk update task status
+      await tx.task.updateMany({
+        where: { id: { in: taskIds } },
+        data: { status: TaskStatus.leased },
+      });
+
+      // 3. Create lease records with unique tokens per task
+      const leases = taskIds.map((taskId) => ({
+        taskId,
+        labelerUserId: labelerId,
+        leaseToken: crypto.randomUUID(),
+        leasedUntil,
+      }));
+
+      await tx.taskLease.createMany({
+        data: leases,
+      });
+
+      // 4. Return the tasks with their assets and new tokens
+      const finalTasks = await tx.task.findMany({
+        where: { id: { in: taskIds } },
+        include: {
+          asset: {
+            select: { id: true, objectKey: true, mimeType: true, width: true, height: true },
+          },
+          taskLease: {
+            select: { leaseToken: true, leasedUntil: true },
+          },
+        },
+      });
+
+      return finalTasks;
+    });
+
+    logger.info(`Batch leased ${result.length} tasks for contract ${contractId} by ${labelerId}`);
+
+    res.json({
+      success: true,
+      data: result,
+      count: result.length,
     });
   } catch (error) {
     next(error);

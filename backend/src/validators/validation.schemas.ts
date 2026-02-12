@@ -182,6 +182,16 @@ export const leaseTaskSchema = Joi.object({
   leaseDurationMinutes: Joi.number().integer().min(5).max(120).optional().default(30),
 });
 
+export const leaseTaskBatchSchema = Joi.object({
+  contractId: uuidSchema.messages({
+    'any.required': 'Contract ID is required',
+  }),
+  amount: Joi.number().integer().min(1).max(100).optional().default(10).messages({
+    'number.min': 'Amount must be at least 1',
+    'number.max': 'Amount cannot exceed 100',
+  }),
+});
+
 export const submitTaskSchema = Joi.object({
   leaseToken: Joi.string().uuid().required().messages({
     'any.required': 'Lease token is required',
