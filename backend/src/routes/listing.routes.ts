@@ -43,6 +43,15 @@ router.put(
   listingController.updateListing
 );
 
+// PATCH /api/listings/:id - Update a listing (same handler)
+router.patch(
+  '/:id',
+  authenticate,
+  validate(idParamSchema, 'params'),
+  validate(updateListingSchema),
+  listingController.updateListing
+);
+
 // DELETE /api/listings/:id - Delete a listing
 router.delete(
   '/:id',

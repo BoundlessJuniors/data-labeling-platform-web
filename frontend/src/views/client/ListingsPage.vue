@@ -30,6 +30,7 @@ const router = useRouter();
 
 // Modal state
 const showCreateModal = ref(false);
+const showEditModal = ref(false);
 const showDeleteModal = ref(false);
 
 // Form state
@@ -40,7 +41,14 @@ const formLabelSetId = ref('');
 const formPricePerAsset = ref(0);
 const formAnnotationFormat = ref<AnnotationFormat>('COCO');
 const formInstructions = ref('');
+const editingId = ref<string | null>(null);
 const deletingId = ref<string | null>(null);
+
+// Edit form state
+const editTitle = ref('');
+const editDescription = ref('');
+const editPricePerAsset = ref(0);
+const editInstructions = ref('');
 
 // Search & Filter
 const searchInput = ref('');
@@ -49,6 +57,7 @@ let searchTimeout: ReturnType<typeof setTimeout>;
 // Status filter options
 const statusOptions = [
   { value: '', label: 'Tüm Durumlar' },
+  { value: 'open', label: 'Açık' },
   { value: 'draft', label: 'Taslak' },
   { value: 'published', label: 'Yayında' },
   { value: 'closed', label: 'Kapalı' },
@@ -87,6 +96,15 @@ function openCreateModal() {
   formAnnotationFormat.value = 'COCO';
   formInstructions.value = '';
   showCreateModal.value = true;
+}
+
+function openEditModal(listing: { id: string; title: string; description?: string | null; pricePerAsset: number; labelingSpecJson?: { instructions?: string } }) {
+  editingId.value = listing.id;
+  editTitle.value = listing.title;
+  editDescription.value = listing.description || '';
+  editPricePerAsset.value = listing.pricePerAsset;
+  editInstructions.value = listing.labelingSpecJson?.instructions || '';
+  showEditModal.value = true;
 }
 
 function openDeleteModal(id: string) {
@@ -129,6 +147,20 @@ async function handleCreate() {
   }
 }
 
+async function handleEdit() {
+  if (!editingId.value || !editTitle.value.trim()) return;
+
+  const result = await listingsStore.updateListing(editingId.value, {
+    title: editTitle.value.trim(),
+    description: editDescription.value.trim() || undefined,
+    priceTotal: editPricePerAsset.value,
+  });
+  if (result) {
+    showEditModal.value = false;
+    editingId.value = null;
+  }
+}
+
 async function handleDelete() {
   if (!deletingId.value) return;
   const result = await listingsStore.deleteListing(deletingId.value);
@@ -140,6 +172,8 @@ async function handleDelete() {
 
 function getStatusBadge(status: string) {
   switch (status) {
+    case 'open':
+      return 'badge-success';
     case 'published':
       return 'badge-success';
     case 'draft':
@@ -155,6 +189,8 @@ function getStatusBadge(status: string) {
 
 function getStatusLabel(status: string) {
   switch (status) {
+    case 'open':
+      return 'Açık';
     case 'published':
       return 'Yayında';
     case 'draft':
@@ -321,8 +357,21 @@ function formatDate(dateString: string) {
               >
                 Kapat
               </button>
+              <!-- Edit button for open listings -->
               <button
-                v-if="listing.status === 'draft'"
+                v-if="listing.status === 'open'"
+                type="button"
+                class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Düzenle"
+                @click="openEditModal(listing)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <!-- Delete button for open listings -->
+              <button
+                v-if="listing.status === 'open'"
                 type="button"
                 class="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
                 aria-label="Sil"
@@ -421,6 +470,57 @@ function formatDate(dateString: string) {
         <BaseButton variant="secondary" @click="showCreateModal = false">İptal</BaseButton>
         <BaseButton variant="primary" :loading="listingsStore.loading" @click="handleCreate">
           Oluştur
+        </BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- Edit Modal (for open listings) -->
+    <BaseModal :open="showEditModal" title="İlanı Düzenle" @close="showEditModal = false">
+      <form class="space-y-4" @submit.prevent="handleEdit">
+        <BaseInput
+          id="edit-title"
+          v-model="editTitle"
+          label="Başlık"
+          placeholder="İş ilanı başlığı"
+          required
+        />
+        <div>
+          <label for="edit-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Açıklama
+          </label>
+          <textarea
+            id="edit-description"
+            v-model="editDescription"
+            class="input"
+            rows="2"
+            placeholder="İlan açıklaması..."
+          ></textarea>
+        </div>
+        <BaseInput
+          id="edit-price"
+          v-model.number="editPricePerAsset"
+          label="Asset Başına Ücret (TRY)"
+          type="number"
+          :min="0"
+          step="0.01"
+        />
+        <div>
+          <label for="edit-instructions" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Talimatlar
+          </label>
+          <textarea
+            id="edit-instructions"
+            v-model="editInstructions"
+            class="input"
+            rows="3"
+            placeholder="Etiketleme talimatları..."
+          ></textarea>
+        </div>
+      </form>
+      <template #footer>
+        <BaseButton variant="secondary" @click="showEditModal = false">İptal</BaseButton>
+        <BaseButton variant="primary" :loading="listingsStore.loading" @click="handleEdit">
+          Kaydet
         </BaseButton>
       </template>
     </BaseModal>

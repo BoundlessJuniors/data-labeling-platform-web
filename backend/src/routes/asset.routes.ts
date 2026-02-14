@@ -24,6 +24,14 @@ router.post(
   assetController.createAsset,
 );
 
+// POST /api/assets/bulk - Upload multiple assets at once
+router.post(
+  '/bulk',
+  authenticate,
+  upload.array('files', 100),
+  assetController.createAssetBulk,
+);
+
 // GET /api/assets/:id - Get a single asset
 router.get(
   '/:id',

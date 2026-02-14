@@ -287,7 +287,7 @@ export const deleteListing = async (
     // Check if listing exists and user has access
     const existingListing = await prisma.listing.findUnique({
       where: { id },
-      include: { contracts: true },
+      include: { contracts: true, proposals: true },
     });
 
     if (!existingListing) {
@@ -303,8 +303,18 @@ export const deleteListing = async (
       throw new BadRequestError('Cannot delete listing with active contracts');
     }
 
-    await prisma.listing.delete({
-      where: { id },
+    // Delete within a transaction: first proposals, then listing
+    await prisma.$transaction(async (tx) => {
+      // Delete related proposals first to avoid FK constraint
+      if (existingListing.proposals.length > 0) {
+        await tx.proposal.deleteMany({
+          where: { listingId: id },
+        });
+      }
+
+      await tx.listing.delete({
+        where: { id },
+      });
     });
 
     // Invalidate cache

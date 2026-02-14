@@ -4,6 +4,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { datasetsApi, type DatasetListParams } from '@/api/datasets';
+import { assetsApi } from '@/api/assets';
 import type { Dataset } from '@/types/dataset';
 import { getErrorMessage } from '@/types/api';
 import { useToastStore } from './toast';
@@ -16,6 +17,10 @@ export const useDatasetsStore = defineStore('datasets', () => {
   const currentDataset = ref<Dataset | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+
+  // Upload state
+  const uploading = ref(false);
+  const uploadProgress = ref(0);
 
   // Pagination
   const page = ref(1);
@@ -91,6 +96,63 @@ export const useDatasetsStore = defineStore('datasets', () => {
       return null;
     } finally {
       loading.value = false;
+    }
+  }
+
+  /**
+   * Create a dataset and upload assets in one atomic flow.
+   * If the bulk upload fails completely, the empty dataset is rolled back (deleted).
+   */
+  async function createDatasetWithAssets(
+    data: { name: string; description?: string },
+    files: File[],
+  ) {
+    loading.value = true;
+    uploading.value = false;
+    uploadProgress.value = 0;
+    error.value = null;
+
+    // Step 1: Create dataset
+    let dataset: Dataset | null = null;
+    try {
+      const response = await datasetsApi.create(data);
+      dataset = response.data.data;
+      datasets.value.unshift(dataset);
+      total.value += 1;
+    } catch (_err) {
+      error.value = getErrorMessage(_err, 'Dataset oluşturulamadı');
+      toastStore.error(error.value);
+      loading.value = false;
+      return null;
+    }
+
+    // Step 2: Upload assets (bulk)
+    uploading.value = true;
+    uploadProgress.value = 10; // indeterminate-ish start
+
+    try {
+      await assetsApi.uploadBulk(dataset.id, files);
+      uploadProgress.value = 100;
+      toastStore.success(`Dataset oluşturuldu ve ${files.length} görsel yüklendi.`);
+      loading.value = false;
+      uploading.value = false;
+      return dataset;
+    } catch (_err) {
+      // Rollback: delete the empty dataset
+      try {
+        await datasetsApi.delete(dataset.id);
+        datasets.value = datasets.value.filter((d) => d.id !== dataset!.id);
+        total.value -= 1;
+      } catch {
+        // Rollback itself failed – log but don't hide original error
+      }
+
+      error.value = getErrorMessage(_err, 'Görseller yüklenemedi, dataset geri alındı');
+      toastStore.error(error.value);
+      loading.value = false;
+      uploading.value = false;
+      uploadProgress.value = 0;
+      return null;
     }
   }
 
@@ -173,6 +235,8 @@ export const useDatasetsStore = defineStore('datasets', () => {
     datasets.value = [];
     currentDataset.value = null;
     loading.value = false;
+    uploading.value = false;
+    uploadProgress.value = 0;
     error.value = null;
     page.value = 1;
     total.value = 0;
@@ -184,6 +248,8 @@ export const useDatasetsStore = defineStore('datasets', () => {
     datasets,
     currentDataset,
     loading,
+    uploading,
+    uploadProgress,
     error,
     // Pagination
     page,
@@ -195,6 +261,7 @@ export const useDatasetsStore = defineStore('datasets', () => {
     fetchDatasets,
     fetchDataset,
     createDataset,
+    createDatasetWithAssets,
     updateDataset,
     deleteDataset,
     setSearch,

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * DatasetsPage - Client datasets list with CRUD
+ * DatasetsPage - Client datasets list with CRUD + image upload on create
  */
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useDatasetsStore } from '@/stores/datasets';
 import { useSeo } from '@/composables/useSeo';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -31,6 +31,16 @@ const formDescription = ref('');
 const editingId = ref<string | null>(null);
 const deletingId = ref<string | null>(null);
 
+// File upload state
+/* global File */
+const selectedFiles = ref<File[]>([]);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+// Computed: create button disabled unless name + at least one file
+const isCreateDisabled = computed(() => {
+  return !formName.value.trim() || selectedFiles.value.length === 0;
+});
+
 // Search
 const searchInput = ref('');
 let searchTimeout: ReturnType<typeof setTimeout>;
@@ -52,7 +62,15 @@ watch(searchInput, (value) => {
 function openCreateModal() {
   formName.value = '';
   formDescription.value = '';
+  selectedFiles.value = [];
   showCreateModal.value = true;
+}
+
+function closeCreateModal() {
+  showCreateModal.value = false;
+  formName.value = '';
+  formDescription.value = '';
+  selectedFiles.value = [];
 }
 
 function openEditModal(id: string, name: string, description: string | null) {
@@ -67,14 +85,41 @@ function openDeleteModal(id: string) {
   showDeleteModal.value = true;
 }
 
+// File selection
+function triggerFileSelect() {
+  fileInputRef.value?.click();
+}
+
+function onFilesSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (!input.files || input.files.length === 0) return;
+  const newFiles = Array.from(input.files);
+  selectedFiles.value = [...selectedFiles.value, ...newFiles];
+  input.value = ''; // reset so same files can be re-selected
+}
+
+function removeFile(index: number) {
+  selectedFiles.value.splice(index, 1);
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// CRUD handlers
 async function handleCreate() {
-  if (!formName.value.trim()) return;
-  const result = await datasetsStore.createDataset({
-    name: formName.value.trim(),
-    description: formDescription.value.trim() || undefined,
-  });
+  if (isCreateDisabled.value) return;
+  const result = await datasetsStore.createDatasetWithAssets(
+    {
+      name: formName.value.trim(),
+      description: formDescription.value.trim() || undefined,
+    },
+    selectedFiles.value,
+  );
   if (result) {
-    showCreateModal.value = false;
+    closeCreateModal();
   }
 }
 
@@ -231,8 +276,10 @@ function formatDate(dateString: string) {
       @page-change="datasetsStore.goToPage"
     />
 
+    <!-- ================================================================ -->
     <!-- Create Modal -->
-    <BaseModal :open="showCreateModal" title="Yeni Dataset" @close="showCreateModal = false">
+    <!-- ================================================================ -->
+    <BaseModal :open="showCreateModal" title="Yeni Dataset" @close="closeCreateModal">
       <form class="space-y-4" @submit.prevent="handleCreate">
         <BaseInput
           id="create-name"
@@ -253,10 +300,94 @@ function formatDate(dateString: string) {
             placeholder="Dataset açıklaması..."
           ></textarea>
         </div>
+
+        <!-- File Selection Area -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Görseller <span class="text-red-500">*</span>
+          </label>
+          <div
+            class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-primary-500 dark:hover:border-primary-400 transition-colors"
+            @click="triggerFileSelect"
+          >
+            <svg class="mx-auto w-10 h-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Görsel seçmek için tıklayın
+            </p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              JPEG, PNG, WEBP • Maks. 10 MB/dosya • Maks. 100 dosya
+            </p>
+          </div>
+          <input
+            ref="fileInputRef"
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            class="hidden"
+            @change="onFilesSelected"
+          />
+
+          <!-- Selected Files List -->
+          <div v-if="selectedFiles.length > 0" class="mt-3 space-y-2">
+            <div class="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300">
+              <span class="font-medium">{{ selectedFiles.length }} dosya seçildi</span>
+              <button
+                type="button"
+                class="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400"
+                @click="selectedFiles = []"
+              >
+                Tümünü Kaldır
+              </button>
+            </div>
+            <ul class="max-h-40 overflow-y-auto space-y-1">
+              <li
+                v-for="(file, index) in selectedFiles"
+                :key="index"
+                class="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800 rounded px-3 py-1.5"
+              >
+                <span class="truncate mr-2 text-gray-700 dark:text-gray-300">{{ file.name }}</span>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="text-xs text-gray-400">{{ formatFileSize(file.size) }}</span>
+                  <button
+                    type="button"
+                    class="text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                    aria-label="Dosyayı kaldır"
+                    @click.stop="removeFile(index)"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Upload Progress -->
+        <div v-if="datasetsStore.uploading" class="space-y-2">
+          <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+            <span>Görseller yükleniyor...</span>
+            <span>{{ datasetsStore.uploadProgress }}%</span>
+          </div>
+          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div
+              class="bg-primary-600 h-2 rounded-full transition-all duration-300"
+              :style="{ width: `${datasetsStore.uploadProgress}%` }"
+            ></div>
+          </div>
+        </div>
       </form>
       <template #footer>
-        <BaseButton variant="secondary" @click="showCreateModal = false">İptal</BaseButton>
-        <BaseButton variant="primary" :loading="datasetsStore.loading" @click="handleCreate">
+        <BaseButton variant="secondary" :disabled="datasetsStore.loading || datasetsStore.uploading" @click="closeCreateModal">İptal</BaseButton>
+        <BaseButton
+          variant="primary"
+          :loading="datasetsStore.loading || datasetsStore.uploading"
+          :disabled="isCreateDisabled || datasetsStore.loading || datasetsStore.uploading"
+          @click="handleCreate"
+        >
           Oluştur
         </BaseButton>
       </template>

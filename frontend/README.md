@@ -320,7 +320,6 @@ VITE_API_URL=http://localhost:3000/api
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
-- [ ] Annotation editörü (canvas-based)
 - [ ] Real-time bildirimler
 - [ ] Payment dashboard
 - [ ] Dark mode desteği

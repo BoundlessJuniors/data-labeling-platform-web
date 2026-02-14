@@ -3,7 +3,7 @@
  */
 
 /** Listing status */
-export type ListingStatus = 'draft' | 'published' | 'closed' | 'completed';
+export type ListingStatus = 'open' | 'draft' | 'published' | 'closed' | 'completed';
 
 /** Annotation format types */
 export type AnnotationFormat = 'COCO' | 'YOLO' | 'VOC' | 'Custom';
@@ -43,14 +43,15 @@ export interface CreateListingRequest {
   deadlineAt?: string;
 }
 
-/** Update listing request */
+/** Update listing request — matches backend updateListing controller */
 export interface UpdateListingRequest {
   title?: string;
   description?: string;
-  pricePerAsset?: number;
-  instructions?: string;
-  deadline?: string;
-  maxLabelers?: number;
+  priceTotal?: number;
+  qcMode?: string;
+  deadlineAt?: string;
+  status?: string;
+  labelingSpecJson?: Record<string, unknown>;
 }
 
 /** Listing with relations */

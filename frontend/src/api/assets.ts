@@ -24,7 +24,7 @@ export const assetsApi = {
   /**
    * Get single asset by ID
    */
-  get(datasetId: string, assetId: string) {
+  get(assetId: string) {
     return apiClient.get<ApiResponse<Asset>>(`/assets/${assetId}`);
   },
 
@@ -44,9 +44,26 @@ export const assetsApi = {
   },
 
   /**
+   * Upload multiple assets at once (bulk)
+   */
+  uploadBulk(datasetId: string, files: File[]) {
+    const formData = new FormData();
+    formData.append('datasetId', datasetId);
+    for (const file of files) {
+      formData.append('files', file);
+    }
+
+    return apiClient.post<ApiResponse<Asset[]>>('/assets/bulk', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  /**
    * Delete an asset
    */
-  delete(datasetId: string, assetId: string) {
+  delete(assetId: string) {
     return apiClient.delete<ApiResponse<void>>(`/assets/${assetId}`);
   },
 };

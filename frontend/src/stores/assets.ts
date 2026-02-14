@@ -57,12 +57,12 @@ export const useAssetsStore = defineStore('assets', () => {
   /**
    * Fetch single asset by ID
    */
-  async function fetchAsset(datasetId: string, assetId: string) {
+  async function fetchAsset(assetId: string) {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await assetsApi.get(datasetId, assetId);
+      const response = await assetsApi.get(assetId);
       currentAsset.value = response.data.data;
       return true;
     } catch (_err) {
@@ -101,11 +101,14 @@ export const useAssetsStore = defineStore('assets', () => {
     let failCount = 0;
 
     for (let i = 0; i < files.length; i++) {
-      const result = await uploadAsset(datasetId, files[i]);
-      if (result) {
-        successCount++;
-      } else {
-        failCount++;
+      const file = files[i];
+      if (file) {
+        const result = await uploadAsset(datasetId, file);
+        if (result) {
+          successCount++;
+        } else {
+          failCount++;
+        }
       }
       uploadProgress.value = Math.round(((i + 1) / files.length) * 100);
     }
@@ -126,12 +129,12 @@ export const useAssetsStore = defineStore('assets', () => {
   /**
    * Delete an asset
    */
-  async function deleteAsset(datasetId: string, assetId: string) {
+  async function deleteAsset(assetId: string) {
     loading.value = true;
     error.value = null;
 
     try {
-      await assetsApi.delete(datasetId, assetId);
+      await assetsApi.delete(assetId);
       assets.value = assets.value.filter((a) => a.id !== assetId);
       total.value -= 1;
       toastStore.success('Asset silindi');

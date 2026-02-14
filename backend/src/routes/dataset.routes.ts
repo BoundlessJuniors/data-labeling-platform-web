@@ -43,6 +43,15 @@ router.put(
   datasetController.updateDataset
 );
 
+// PATCH /api/datasets/:id - Update a dataset (protected, same handler)
+router.patch(
+  '/:id',
+  authenticate,
+  validate(idParamSchema, 'params'),
+  validate(updateDatasetSchema),
+  datasetController.updateDataset
+);
+
 // DELETE /api/datasets/:id - Delete a dataset (protected)
 router.delete(
   '/:id',

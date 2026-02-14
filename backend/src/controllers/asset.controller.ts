@@ -86,11 +86,91 @@ export const createAsset = async (
     // Return with signed URL
     const signedUrl = await getSignedUrl(objectKey);
 
+    // Update dataset status from draft → uploading
+    await prisma.dataset.updateMany({
+      where: { id: datasetId, status: 'draft' },
+      data: { status: 'uploading' },
+    });
+
     logger.info(`Asset created: ${asset.id} in dataset ${datasetId}`);
 
     res.status(201).json({
       success: true,
       data: { ...asset, signedUrl },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Create multiple assets at once (bulk upload)
+// ---------------------------------------------------------------------------
+
+export const createAssetBulk = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    const { datasetId } = req.body;
+
+    if (!files || files.length === 0) {
+      throw new BadRequestError('En az bir dosya yüklenmelidir.');
+    }
+
+    if (!datasetId) {
+      throw new BadRequestError('Dataset ID zorunludur.');
+    }
+
+    // Verify dataset exists and user has access
+    const dataset = await prisma.dataset.findUnique({
+      where: { id: datasetId },
+    });
+
+    if (!dataset) {
+      throw new NotFoundError('Dataset');
+    }
+
+    if (req.user?.role !== 'admin' && dataset.ownerUserId !== req.user?.id) {
+      throw new ForbiddenError('Bu datasete asset ekleme yetkiniz yok.');
+    }
+
+    // Upload all files to R2 and save metadata
+    const createdAssets = [];
+
+    for (const file of files) {
+      const ext = path.extname(file.originalname) || '.jpg';
+      const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
+
+      await uploadToR2(objectKey, file.buffer, file.mimetype);
+
+      const asset = await prisma.asset.create({
+        data: {
+          datasetId,
+          objectKey,
+          mimeType: file.mimetype,
+          sizeBytes: file.size,
+        },
+      });
+
+      const signedUrl = await getSignedUrl(objectKey);
+      createdAssets.push({ ...asset, signedUrl });
+    }
+
+    // Update dataset status from draft → uploading
+    await prisma.dataset.updateMany({
+      where: { id: datasetId, status: 'draft' },
+      data: { status: 'uploading' },
+    });
+
+    logger.info(`Bulk upload: ${createdAssets.length} assets created in dataset ${datasetId}`);
+
+    res.status(201).json({
+      success: true,
+      data: createdAssets,
+      count: createdAssets.length,
     });
   } catch (error) {
     next(error);
