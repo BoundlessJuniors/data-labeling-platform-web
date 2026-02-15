@@ -1,16 +1,23 @@
 /**
- * Cloudflare R2 (S3 Compatible) Storage Utility
+ * S3-Compatible Storage Utility
+ *
+ * In development → connects to a local MinIO instance.
+ * In production  → connects to Cloudflare R2.
  *
  * Provides helpers for uploading, downloading (via signed URL),
- * and deleting objects in R2.
+ * deleting objects, and ensuring the target bucket exists.
  */
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import https from 'https';
 import logger from './logger';
 
 // ---------------------------------------------------------------------------
@@ -21,32 +28,114 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID ?? '';
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID ?? '';
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY ?? '';
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME ?? '';
+const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT ?? '';
 
-if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
   logger.warn(
-    'R2 environment variables (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME) are not fully set. File uploads will fail.',
+    'Storage environment variables (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME) are not fully set. File uploads will fail.',
   );
 }
 
 // ---------------------------------------------------------------------------
-// S3 Client (R2-compatible)
+// S3 Client — MinIO (dev) / Cloudflare R2 (prod)
 // ---------------------------------------------------------------------------
 
-export const s3Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-});
+function buildS3Client(): S3Client {
+  // ---------- Development: MinIO ----------
+  if (isDevelopment && MINIO_ENDPOINT) {
+    logger.info(`Using MinIO at ${MINIO_ENDPOINT} for object storage`);
+    return new S3Client({
+      region: 'us-east-1',
+      endpoint: MINIO_ENDPOINT,
+      credentials: {
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY,
+      },
+      forcePathStyle: true, // MinIO requires path-style: endpoint/bucket/key
+      // Disable TLS certificate validation for local MinIO over HTTP
+      ...(MINIO_ENDPOINT.startsWith('https')
+        ? {
+            requestHandler: new NodeHttpHandler({
+              httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+            }),
+          }
+        : {}),
+    });
+  }
+
+  // ---------- Production: Cloudflare R2 ----------
+  logger.info('Using Cloudflare R2 for object storage');
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    },
+  });
+}
+
+export const s3Client = buildS3Client();
+
+// ---------------------------------------------------------------------------
+// Bucket Bootstrapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensure the target bucket exists.
+ * - If the bucket is already present → logs success.
+ * - If missing → creates it automatically (dev) or logs an error (prod).
+ */
+export async function ensureBucket(): Promise<void> {
+  try {
+    await s3Client.send(new HeadBucketCommand({ Bucket: R2_BUCKET_NAME }));
+    logger.info(`✅ Bucket "${R2_BUCKET_NAME}" is ready`);
+  } catch (error: any) {
+    // Bucket does not exist or we have no access
+    if (
+      error.name === 'NotFound' ||
+      error.name === 'NoSuchBucket' ||
+      error.$metadata?.httpStatusCode === 404 ||
+      error.$metadata?.httpStatusCode === 403
+    ) {
+      if (isDevelopment) {
+        logger.info(`Bucket "${R2_BUCKET_NAME}" not found — creating it now…`);
+        try {
+          await s3Client.send(
+            new CreateBucketCommand({ Bucket: R2_BUCKET_NAME }),
+          );
+          logger.info(`✅ Bucket "${R2_BUCKET_NAME}" created successfully`);
+        } catch (createErr) {
+          logger.error(
+            `❌ Failed to create bucket "${R2_BUCKET_NAME}". ` +
+              `Make sure MinIO is running at ${MINIO_ENDPOINT}. Error:`,
+            createErr,
+          );
+        }
+      } else {
+        logger.error(
+          `❌ Bucket "${R2_BUCKET_NAME}" does not exist on Cloudflare R2. ` +
+            `Please create it manually via the Cloudflare dashboard.`,
+        );
+      }
+    } else {
+      logger.error(
+        `❌ Could not verify bucket "${R2_BUCKET_NAME}". ` +
+          `Check your storage credentials and connectivity. Error:`,
+        error,
+      );
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Upload a file buffer to R2.
+ * Upload a file buffer to the storage bucket.
  */
 export async function uploadToR2(
   key: string,
@@ -61,12 +150,12 @@ export async function uploadToR2(
   });
 
   await s3Client.send(command);
-  logger.info(`Uploaded to R2: ${key}`);
+  logger.info(`Uploaded to storage: ${key}`);
 }
 
 /**
- * Generate a time-limited signed URL for reading an object from R2.
- * @param key  - The object key in the bucket.
+ * Generate a time-limited signed URL for reading an object.
+ * @param key       - The object key in the bucket.
  * @param expiresIn - Seconds until the URL expires (default 1 hour).
  */
 export async function getSignedUrl(
@@ -82,7 +171,7 @@ export async function getSignedUrl(
 }
 
 /**
- * Delete an object from R2.
+ * Delete an object from the storage bucket.
  */
 export async function deleteFromR2(key: string): Promise<void> {
   const command = new DeleteObjectCommand({
@@ -91,5 +180,5 @@ export async function deleteFromR2(key: string): Promise<void> {
   });
 
   await s3Client.send(command);
-  logger.info(`Deleted from R2: ${key}`);
+  logger.info(`Deleted from storage: ${key}`);
 }

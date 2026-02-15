@@ -11,7 +11,7 @@ data-labeling-platform-web/
 │   │   ├── controllers/  # 11 API endpoint handler
 │   │   ├── routes/       # 11 route modülü
 │   │   ├── middlewares/  # 9 middleware (auth, cache, rate-limit, upload...)
-│   │   ├── lib/          # Prisma, Redis, Logger, R2 Storage
+│   │   ├── lib/          # Prisma, Redis, Logger, MinIO/R2 Storage
 │   │   ├── validators/   # Joi validation schemas
 │   │   └── utils/        # Error classes
 │   └── prisma/           # Database schema & migrations
@@ -28,7 +28,7 @@ data-labeling-platform-web/
 │   │   └── views/        # 17 sayfa bileşeni
 │   └── public/           # Static assets
 │
-├── docker-compose.yml    # PostgreSQL 16 + Redis 7
+├── docker-compose.yml    # PostgreSQL 16 + Redis 7 + MinIO
 └── README.md
 ```
 
@@ -76,7 +76,7 @@ npm run dev
 |--------|-----------|
 | **Frontend** | Vue 3, Tailwind CSS 3.4, Pinia 3, TypeScript 5.9, Vite 7 |
 | **Backend** | Node.js, Express 4, TypeScript 5.6 |
-| **Storage** | Cloudflare R2 (S3 Compatible) |
+| **Storage** | MinIO (S3 Compatible, local) / Cloudflare R2 (prod) |
 | **ORM** | Prisma 5.22 |
 | **Database** | PostgreSQL 16 |
 | **Cache** | Redis 7 |
@@ -111,7 +111,7 @@ npm run dev
 |------|----------|----------|
 | Auth | `/api/auth/*` | Kayıt, giriş, profil |
 | Datasets | `/api/datasets/*` | Dataset CRUD |
-| Assets | `/api/assets/*` | Görsel yükleme (R2) & varlıklar |
+| Assets | `/api/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
 | LabelSets | `/api/labelsets/*` | Etiket setleri |
 | Listings | `/api/listings/*` | İlanlar |
 | Contracts | `/api/contracts/*` | Sözleşmeler |
@@ -126,6 +126,7 @@ npm run dev
 |--------|------|-----------|-------|
 | PostgreSQL | 5433 | data-labeling-postgres | postgres:16-alpine |
 | Redis | 6379 | data-labeling-redis | redis:7-alpine |
+| MinIO | 9000 (API) / 9001 (Console) | data-labeling-minio | minio/minio:latest |
 
 ## 👥 Kullanıcı Rolleri
 

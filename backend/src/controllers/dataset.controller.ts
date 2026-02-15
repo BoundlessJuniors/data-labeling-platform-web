@@ -2,8 +2,9 @@ import { Response, NextFunction } from 'express';
 import { DatasetStatus, Prisma } from '@prisma/client';
 import prisma from '../lib/db';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
-import { cacheDelete } from '../lib/redis';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
+import { cacheDelete, cacheDeletePattern } from '../lib/redis';
+import { deleteFromR2 } from '../lib/storage';
 import logger from '../lib/logger';
 
 // Create a new dataset
@@ -31,6 +32,9 @@ export const createDataset = async (
     });
 
     logger.info(`Dataset created: ${dataset.id} by user ${userId}`);
+
+    // Invalidate all dataset list caches so the new entry appears immediately
+    await cacheDeletePattern('cache:/api/datasets*');
 
     res.status(201).json({
       success: true,
@@ -63,7 +67,7 @@ export const getDatasets = async (
       where = { status: DatasetStatus.ready };
     }
 
-    const [datasets, total] = await Promise.all([
+    const [rawDatasets, total] = await Promise.all([
       prisma.dataset.findMany({
         where,
         skip,
@@ -80,6 +84,14 @@ export const getDatasets = async (
       }),
       prisma.dataset.count({ where }),
     ]);
+
+    // Flatten _count into assetCount / listingCount for the frontend
+    const datasets = rawDatasets.map((d) => ({
+      ...d,
+      assetCount: d._count.assets,
+      listingCount: d._count.listings,
+      _count: undefined,
+    }));
 
     res.json({
       success: true,
@@ -134,9 +146,17 @@ export const getDatasetById = async (
       throw new ForbiddenError('You do not have access to this dataset');
     }
 
+    // Flatten _count for the frontend
+    const result = {
+      ...dataset,
+      assetCount: dataset._count.assets,
+      listingCount: dataset._count.listings,
+      _count: undefined,
+    };
+
     res.json({
       success: true,
-      data: dataset,
+      data: result,
     });
   } catch (error) {
     next(error);
@@ -180,9 +200,8 @@ export const updateDataset = async (
       },
     });
 
-    // Invalidate cache
-    await cacheDelete(`cache:/api/datasets/${id}`);
-    await cacheDelete(`cache:/api/datasets`);
+    // Invalidate all dataset-related cache keys
+    await cacheDeletePattern('cache:/api/datasets*');
 
     logger.info(`Dataset updated: ${dataset.id}`);
 
@@ -207,6 +226,9 @@ export const deleteDataset = async (
     // Check if dataset exists and user has access
     const existingDataset = await prisma.dataset.findUnique({
       where: { id },
+      include: {
+        _count: { select: { listings: true } },
+      },
     });
 
     if (!existingDataset) {
@@ -217,15 +239,34 @@ export const deleteDataset = async (
       throw new ForbiddenError('You do not have permission to delete this dataset');
     }
 
-    await prisma.dataset.delete({
-      where: { id },
+    // Block deletion if the dataset is linked to any listing
+    if (existingDataset._count.listings > 0) {
+      throw new BadRequestError(
+        'Bu dataset bir ilana bağlı. Önce ilgili ilanı silmeniz gerekiyor.'
+      );
+    }
+
+    // 1. Fetch all assets so we can clean up MinIO objects
+    const assets = await prisma.asset.findMany({
+      where: { datasetId: id },
+      select: { id: true, objectKey: true },
     });
 
-    // Invalidate cache
-    await cacheDelete(`cache:/api/datasets/${id}`);
-    await cacheDelete(`cache:/api/datasets`);
+    // 2. Delete physical files from MinIO / R2
+    await Promise.allSettled(
+      assets.map((a) => deleteFromR2(a.objectKey))
+    );
 
-    logger.info(`Dataset deleted: ${id}`);
+    // 3. Delete DB records inside a transaction (assets first, then dataset)
+    await prisma.$transaction([
+      prisma.asset.deleteMany({ where: { datasetId: id } }),
+      prisma.dataset.delete({ where: { id } }),
+    ]);
+
+    // Invalidate all dataset-related cache keys (covers paginated/filtered variants)
+    await cacheDeletePattern('cache:/api/datasets*');
+
+    logger.info(`Dataset deleted: ${id} (${assets.length} assets cleaned up)`);
 
     res.status(204).send();
   } catch (error) {

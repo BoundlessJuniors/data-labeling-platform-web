@@ -4,6 +4,13 @@ import dotenv from 'dotenv';
 // Load environment variables first
 dotenv.config();
 
+// BigInt cannot be serialised to JSON by default.
+// Prisma returns BigInt for columns like sizeBytes – this polyfill converts
+// them to Number so JSON.stringify works without errors.
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 import routes from './routes';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 import { requestLogger } from './middlewares/request-logger.middleware';
@@ -11,6 +18,7 @@ import { defaultRateLimiter } from './middlewares/rate-limit.middleware';
 import { setupSecurity } from './middlewares/security.middleware';
 import logger from './lib/logger';
 import redis from './lib/redis';
+import { ensureBucket } from './lib/storage';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -56,6 +64,9 @@ const startServer = async () => {
     await redis.connect().catch((error) => {
       logger.warn('Redis connection failed, caching disabled:', error.message);
     });
+
+    // Ensure the storage bucket exists (creates it on MinIO if missing)
+    await ensureBucket();
 
     app.listen(PORT, () => {
       logger.info(`🚀 Server running on http://localhost:${PORT}`);

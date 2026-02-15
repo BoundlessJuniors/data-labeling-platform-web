@@ -4,7 +4,7 @@ import path from 'path';
 import prisma from '../lib/db';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
-import { cacheDelete } from '../lib/redis';
+import { cacheDelete, cacheDeletePattern } from '../lib/redis';
 import { uploadToR2, getSignedUrl, deleteFromR2 } from '../lib/storage';
 import logger from '../lib/logger';
 
@@ -86,13 +86,17 @@ export const createAsset = async (
     // Return with signed URL
     const signedUrl = await getSignedUrl(objectKey);
 
-    // Update dataset status from draft → uploading
+    // Update dataset status → ready (assets have been uploaded)
     await prisma.dataset.updateMany({
-      where: { id: datasetId, status: 'draft' },
-      data: { status: 'uploading' },
+      where: { id: datasetId, status: { in: ['draft', 'uploading'] } },
+      data: { status: 'ready' },
     });
 
     logger.info(`Asset created: ${asset.id} in dataset ${datasetId}`);
+
+    // Invalidate asset and dataset list caches
+    await cacheDeletePattern('cache:/api/assets*');
+    await cacheDeletePattern('cache:/api/datasets*');
 
     res.status(201).json({
       success: true,
@@ -159,13 +163,17 @@ export const createAssetBulk = async (
       createdAssets.push({ ...asset, signedUrl });
     }
 
-    // Update dataset status from draft → uploading
+    // Update dataset status → ready (assets have been uploaded)
     await prisma.dataset.updateMany({
-      where: { id: datasetId, status: 'draft' },
-      data: { status: 'uploading' },
+      where: { id: datasetId, status: { in: ['draft', 'uploading'] } },
+      data: { status: 'ready' },
     });
 
     logger.info(`Bulk upload: ${createdAssets.length} assets created in dataset ${datasetId}`);
+
+    // Invalidate asset and dataset list caches
+    await cacheDeletePattern('cache:/api/assets*');
+    await cacheDeletePattern('cache:/api/datasets*');
 
     res.status(201).json({
       success: true,

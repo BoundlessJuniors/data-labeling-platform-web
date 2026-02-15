@@ -134,6 +134,10 @@ export const useDatasetsStore = defineStore('datasets', () => {
       await assetsApi.uploadBulk(dataset.id, files);
       uploadProgress.value = 100;
       toastStore.success(`Dataset oluşturuldu ve ${files.length} görsel yüklendi.`);
+
+      // Re-fetch so assetCount and status are up-to-date
+      await fetchDatasets();
+
       loading.value = false;
       uploading.value = false;
       return dataset;

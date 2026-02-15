@@ -15,7 +15,7 @@ Görsel veri etiketleme platformu için RESTful API.
 | **Validation** | Joi | ^18.0.2 |
 | **Security** | Helmet, Rate Limiting | ^8.1.0 / ^8.2.1 |
 | **Logging** | Winston | ^3.19.0 |
-| **Storage** | Cloudflare R2 (AWS S3 SDK) | ^3.x |
+| **Storage** | MinIO (local) / Cloudflare R2 (prod) — AWS S3 SDK | ^3.x |
 | **Upload** | Multer (memoryStorage) | ^1.4.5 |
 
 ## 🚀 Hızlı Kurulum
@@ -74,13 +74,13 @@ backend/
 │   │   ├── validate.middleware.ts    # Joi validation
 │   │   ├── error.middleware.ts       # Global error handler
 │   │   ├── cache.middleware.ts       # Redis cache
-│   │   ├── upload.middleware.ts      # Multer file upload (R2)
+│   │   ├── upload.middleware.ts      # Multer file upload (MinIO/R2)
 │   │   ├── rate-limit.middleware.ts  # Rate limiting
 │   │   ├── security.middleware.ts    # Helmet & CORS
 │   │   └── request-logger.middleware.ts
 │   │
 │   ├── validators/        # Joi validation schemas
-│   ├── lib/               # Prisma, Redis, Logger, R2 Storage
+│   ├── lib/               # Prisma, Redis, Logger, MinIO/R2 Storage
 │   ├── utils/             # Custom error classes
 │   └── index.ts           # App entry point
 │
@@ -124,9 +124,9 @@ backend/
 |--------|----------|----------|
 | GET | `/` | Assetleri listele (datasetId query) |
 | GET | `/:id` | Asset detayı (signed URL ile) |
-| POST | `/` | Görsel yükle (multipart/form-data → R2) |
+| POST | `/` | Görsel yükle (multipart/form-data → MinIO/R2) |
 | PUT | `/:id` | Asset güncelle |
-| DELETE | `/:id` | Asset sil (R2 + DB) |
+| DELETE | `/:id` | Asset sil (MinIO/R2 + DB) |
 
 ### LabelSet Routes (`/api/labelsets`)
 
@@ -266,6 +266,7 @@ docker-compose up -d
 |--------|------|-----------|
 | PostgreSQL | 5433 | data-labeling-postgres |
 | Redis | 6379 | data-labeling-redis |
+| MinIO | 9000 (API) / 9001 (Console) | data-labeling-minio |
 
 ## 🔧 Environment Variables
 
@@ -286,11 +287,12 @@ REDIS_URL=redis://localhost:6379
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=7d
 
-# Cloudflare R2 (S3 Compatible Storage)
-R2_ACCOUNT_ID=your_r2_account_id
-R2_ACCESS_KEY_ID=your_r2_access_key
-R2_SECRET_ACCESS_KEY=your_r2_secret_key
-R2_BUCKET_NAME=your_r2_bucket_name
+# MinIO / S3-Compatible Storage (replaces Cloudflare R2 in development)
+R2_ACCOUNT_ID="minio-local"
+R2_ACCESS_KEY_ID="minioadmin"
+R2_SECRET_ACCESS_KEY="minioadmin"
+R2_BUCKET_NAME="datalabeling"
+MINIO_ENDPOINT="http://localhost:9000"
 ```
 
 ## 🔐 Authentication

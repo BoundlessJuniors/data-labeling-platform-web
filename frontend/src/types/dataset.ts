@@ -3,7 +3,7 @@
  */
 
 /** Dataset status */
-export type DatasetStatus = 'draft' | 'active' | 'archived';
+export type DatasetStatus = 'draft' | 'uploading' | 'ready' | 'archived';
 
 /** Dataset entity */
 export interface Dataset {

@@ -3,7 +3,9 @@
  * DatasetsPage - Client datasets list with CRUD + image upload on create
  */
 import { ref, onMounted, watch, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useDatasetsStore } from '@/stores/datasets';
+import { assetsApi } from '@/api/assets';
 import { useSeo } from '@/composables/useSeo';
 import AppLayout from '@/layouts/AppLayout.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -18,6 +20,7 @@ useSeo({
   description: 'Veri etiketleme projeleriniz için datasetlerinizi yönetin.',
 });
 
+const router = useRouter();
 const datasetsStore = useDatasetsStore();
 
 // Modal state
@@ -35,6 +38,17 @@ const deletingId = ref<string | null>(null);
 /* global File */
 const selectedFiles = ref<File[]>([]);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+
+// Edit modal gallery state
+interface GalleryAsset {
+  id: string;
+  objectKey: string;
+  mimeType: string;
+  signedUrl?: string;
+}
+const editGalleryAssets = ref<GalleryAsset[]>([]);
+const editGalleryTotal = ref(0);
+const editGalleryLoading = ref(false);
 
 // Computed: create button disabled unless name + at least one file
 const isCreateDisabled = computed(() => {
@@ -73,11 +87,25 @@ function closeCreateModal() {
   selectedFiles.value = [];
 }
 
-function openEditModal(id: string, name: string, description: string | null) {
+async function openEditModal(id: string, name: string, description: string | null) {
   editingId.value = id;
   formName.value = name;
   formDescription.value = description || '';
+  editGalleryAssets.value = [];
+  editGalleryTotal.value = 0;
   showEditModal.value = true;
+
+  // Fetch gallery preview
+  editGalleryLoading.value = true;
+  try {
+    const res = await assetsApi.list({ datasetId: id, page: 1, limit: 8 });
+    editGalleryAssets.value = res.data.data as unknown as GalleryAsset[];
+    editGalleryTotal.value = res.data.pagination?.total ?? res.data.data.length;
+  } catch {
+    // Silently fail — gallery is optional
+  } finally {
+    editGalleryLoading.value = false;
+  }
 }
 
 function openDeleteModal(id: string) {
@@ -142,6 +170,10 @@ async function handleDelete() {
     showDeleteModal.value = false;
     deletingId.value = null;
   }
+}
+
+function goToDatasetDetail(id: string) {
+  router.push({ name: 'client-dataset-detail', params: { id } });
 }
 
 function getStatusBadge(status: string) {
@@ -230,7 +262,8 @@ function formatDate(dateString: string) {
       <article
         v-for="dataset in datasetsStore.datasets"
         :key="dataset.id"
-        class="card hover:shadow-lg transition-shadow group"
+        class="card hover:shadow-lg transition-shadow group cursor-pointer"
+        @click="goToDatasetDetail(dataset.id)"
       >
         <div class="flex justify-between items-start mb-3">
           <h2 class="font-semibold text-gray-900 dark:text-white">{{ dataset.name }}</h2>
@@ -246,7 +279,7 @@ function formatDate(dateString: string) {
               type="button"
               class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               aria-label="Düzenle"
-              @click="openEditModal(dataset.id, dataset.name, dataset.description)"
+              @click.stop="openEditModal(dataset.id, dataset.name, dataset.description)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -256,7 +289,7 @@ function formatDate(dateString: string) {
               type="button"
               class="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
               aria-label="Sil"
-              @click="openDeleteModal(dataset.id)"
+              @click.stop="openDeleteModal(dataset.id)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -393,7 +426,9 @@ function formatDate(dateString: string) {
       </template>
     </BaseModal>
 
-    <!-- Edit Modal -->
+    <!-- ================================================================ -->
+    <!-- Edit Modal with Gallery -->
+    <!-- ================================================================ -->
     <BaseModal :open="showEditModal" title="Dataset Düzenle" @close="showEditModal = false">
       <form class="space-y-4" @submit.prevent="handleUpdate">
         <BaseInput
@@ -414,6 +449,56 @@ function formatDate(dateString: string) {
             rows="3"
             placeholder="Dataset açıklaması..."
           ></textarea>
+        </div>
+
+        <!-- Mini Gallery -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Yüklü Görseller
+              <span v-if="editGalleryTotal > 0" class="text-gray-400 font-normal">({{ editGalleryTotal }})</span>
+            </label>
+            <button
+              v-if="editGalleryTotal > 0 && editingId"
+              type="button"
+              class="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+              @click="showEditModal = false; goToDatasetDetail(editingId)"
+            >
+              Tümünü Gör →
+            </button>
+          </div>
+
+          <!-- Loading -->
+          <div v-if="editGalleryLoading" class="grid grid-cols-4 gap-2">
+            <div v-for="i in 4" :key="i" class="aspect-square rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse"></div>
+          </div>
+
+          <!-- No assets -->
+          <div v-else-if="editGalleryAssets.length === 0" class="text-sm text-gray-400 dark:text-gray-500 text-center py-4 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+            Henüz görsel yüklenmemiş
+          </div>
+
+          <!-- Thumbnails grid -->
+          <div v-else class="grid grid-cols-4 gap-2">
+            <div
+              v-for="asset in editGalleryAssets"
+              :key="asset.id"
+              class="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+            >
+              <img
+                v-if="asset.mimeType?.startsWith('image/')"
+                :src="asset.signedUrl || ''"
+                :alt="asset.objectKey"
+                class="w-full h-full object-cover"
+                loading="lazy"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
       </form>
       <template #footer>
