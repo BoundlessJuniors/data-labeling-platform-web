@@ -15,6 +15,13 @@ export const idParamSchema = Joi.object({
   id: uuidSchema,
 });
 
+export const uuidArraySchema = Joi.object({
+  ids: Joi.array().items(uuidSchema).min(1).required().messages({
+    'array.min': 'At least one ID must be provided',
+    'any.required': 'IDs array is required',
+  }),
+});
+
 // ============================================================================
 // Auth Schemas
 // ============================================================================
@@ -117,6 +124,16 @@ export const createLabelSetSchema = Joi.object({
   ).optional(),
 });
 
+export const addLabelSchema = Joi.object({
+  name: Joi.string().min(1).max(255).required().messages({
+    'any.required': 'Label name is required',
+  }),
+  color: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).optional().messages({
+    'string.pattern.base': 'Color must be a valid hex color (e.g., #FF5733)',
+  }),
+  attributesSchemaJson: Joi.object().optional(),
+});
+
 // ============================================================================
 // Listing Schemas
 // ============================================================================
@@ -174,9 +191,19 @@ export const rejectContractSchema = Joi.object({
   reason: Joi.string().max(1000).optional().allow(''),
 });
 
+export const cancelContractSchema = Joi.object({
+  reason: Joi.string().max(1000).optional().allow(''),
+});
+
 // ============================================================================
 // Task Schemas
 // ============================================================================
+
+export const generateTasksSchema = Joi.object({
+  listingId: uuidSchema.messages({
+    'any.required': 'Listing ID is required to generate tasks',
+  }),
+});
 
 export const leaseTaskSchema = Joi.object({
   leaseDurationMinutes: Joi.number().integer().min(5).max(120).optional().default(30),

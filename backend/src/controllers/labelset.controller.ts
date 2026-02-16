@@ -1,8 +1,8 @@
 import { Response, NextFunction } from 'express';
-import prisma from '../lib/db';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
-import logger from '../lib/logger';
+import { LabelSetService } from '../services/labelset.service';
+
+const labelSetService = new LabelSetService();
 
 // Create a new labelset with labels
 export const createLabelSet = async (
@@ -14,28 +14,11 @@ export const createLabelSet = async (
     const { name, version, labels } = req.body;
     const userId = req.user!.id;
 
-    const labelSet = await prisma.labelSet.create({
-      data: {
-        name,
-        version: version || 1,
-        ownerUserId: userId,
-        labels: labels ? {
-          create: labels.map((label: any) => ({
-            name: label.name,
-            color: label.color,
-            attributesSchemaJson: label.attributesSchemaJson,
-          })),
-        } : undefined,
-      },
-      include: {
-        owner: {
-          select: { id: true, email: true, displayName: true },
-        },
-        labels: true,
-      },
+    const labelSet = await labelSetService.createLabelSet(userId, {
+      name,
+      version,
+      labels,
     });
-
-    logger.info(`LabelSet created: ${labelSet.id} by user ${userId}`);
 
     res.status(201).json({
       success: true,
@@ -55,42 +38,15 @@ export const getLabelSets = async (
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const skip = (page - 1) * limit;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
 
-    // Build where clause based on user role
-    const where = req.user?.role === 'admin' 
-      ? {} 
-      : req.user 
-        ? { ownerUserId: req.user.id }
-        : {};
-
-    const [labelSets, total] = await Promise.all([
-      prisma.labelSet.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          owner: {
-            select: { id: true, email: true, displayName: true },
-          },
-          _count: {
-            select: { labels: true },
-          },
-        },
-      }),
-      prisma.labelSet.count({ where }),
-    ]);
+    const result = await labelSetService.getLabelSets(page, limit, userId, userRole);
 
     res.json({
       success: true,
-      data: labelSets,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: result.labelSets,
+      pagination: result.pagination,
     });
   } catch (error) {
     next(error);
@@ -105,30 +61,10 @@ export const getLabelSetById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
 
-    const labelSet = await prisma.labelSet.findUnique({
-      where: { id },
-      include: {
-        owner: {
-          select: { id: true, email: true, displayName: true },
-        },
-        labels: {
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-    });
-
-    if (!labelSet) {
-      throw new NotFoundError('LabelSet');
-    }
-
-    // Check access rights
-    if (
-      req.user?.role !== 'admin' && 
-      labelSet.ownerUserId !== req.user?.id
-    ) {
-      throw new ForbiddenError('You do not have access to this labelset');
-    }
+    const labelSet = await labelSetService.getLabelSetById(id, userId, userRole);
 
     res.json({
       success: true,
@@ -148,30 +84,14 @@ export const addLabel = async (
   try {
     const { id } = req.params;
     const { name, color, attributesSchemaJson } = req.body;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    // Check if labelset exists and user has access
-    const labelSet = await prisma.labelSet.findUnique({
-      where: { id },
+    const label = await labelSetService.addLabel(id, userId, userRole, {
+      name,
+      color,
+      attributesSchemaJson,
     });
-
-    if (!labelSet) {
-      throw new NotFoundError('LabelSet');
-    }
-
-    if (req.user?.role !== 'admin' && labelSet.ownerUserId !== req.user?.id) {
-      throw new ForbiddenError('You do not have permission to modify this labelset');
-    }
-
-    const label = await prisma.label.create({
-      data: {
-        labelSetId: id,
-        name,
-        color,
-        attributesSchemaJson,
-      },
-    });
-
-    logger.info(`Label created: ${label.id} in labelset ${id}`);
 
     res.status(201).json({
       success: true,
@@ -190,27 +110,10 @@ export const deleteLabelSet = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    // Check if labelset exists and user has access
-    const labelSet = await prisma.labelSet.findUnique({
-      where: { id },
-    });
-
-    if (!labelSet) {
-      throw new NotFoundError('LabelSet');
-    }
-
-    if (req.user?.role !== 'admin' && labelSet.ownerUserId !== req.user?.id) {
-      throw new ForbiddenError('You do not have permission to delete this labelset');
-    }
-
-    // Delete all labels first, then the labelset
-    await prisma.$transaction([
-      prisma.label.deleteMany({ where: { labelSetId: id } }),
-      prisma.labelSet.delete({ where: { id } }),
-    ]);
-
-    logger.info(`LabelSet deleted: ${id}`);
+    await labelSetService.deleteLabelSet(id, userId, userRole);
 
     res.status(204).send();
   } catch (error) {

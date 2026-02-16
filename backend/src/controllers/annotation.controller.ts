@@ -1,8 +1,8 @@
 import { Response, NextFunction } from 'express';
-import prisma from '../lib/db';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
-import logger from '../lib/logger';
+import { AnnotationService } from '../services/annotation.service';
+
+const annotationService = new AnnotationService();
 
 // Create raw annotation
 export const createRawAnnotation = async (
@@ -13,39 +13,14 @@ export const createRawAnnotation = async (
   try {
     const { taskId, payloadJson } = req.body;
     const labelerId = req.user!.id;
+    const labelerRole = req.user!.role;
 
-    // Verify task exists
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      include: { contract: true },
-    });
-
-    if (!task) {
-      throw new NotFoundError('Task');
-    }
-
-    // Verify user is the labeler for this task
-    if (req.user?.role !== 'admin' && task.contract.labelerUserId !== labelerId) {
-      throw new ForbiddenError('You are not the labeler for this task');
-    }
-
-    const annotation = await prisma.annotationRaw.create({
-      data: {
-        taskId,
-        labelerUserId: labelerId,
-        payloadJson,
-      },
-      include: {
-        task: {
-          select: { id: true, status: true },
-        },
-        labeler: {
-          select: { id: true, email: true, displayName: true },
-        },
-      },
-    });
-
-    logger.info(`Raw annotation created for task ${taskId}`);
+    const annotation = await annotationService.createRawAnnotation(
+      taskId,
+      labelerId,
+      labelerRole,
+      payloadJson
+    );
 
     res.status(201).json({
       success: true,
@@ -64,50 +39,15 @@ export const normalizeAnnotation = async (
 ): Promise<void> => {
   try {
     const { taskId, normalizedJson } = req.body;
-    const labelerId = req.user!.id;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    // Verify task exists
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      include: { contract: true },
-    });
-
-    if (!task) {
-      throw new NotFoundError('Task');
-    }
-
-    // Only labeler, client or admin can normalize
-    if (
-      req.user?.role !== 'admin' &&
-      task.contract.clientUserId !== req.user?.id &&
-      task.contract.labelerUserId !== req.user?.id
-    ) {
-      throw new ForbiddenError('You do not have access to this task');
-    }
-
-    // Create or update normalized annotation
-    const normalized = await prisma.annotationNormalized.upsert({
-      where: { taskId },
-      create: {
-        taskId,
-        labelerUserId: labelerId,
-        normalizedJson,
-      },
-      update: {
-        normalizedJson,
-        version: { increment: 1 },
-      },
-      include: {
-        task: {
-          select: { id: true, status: true },
-        },
-        labeler: {
-          select: { id: true, email: true, displayName: true },
-        },
-      },
-    });
-
-    logger.info(`Annotation normalized for task ${taskId}`);
+    const normalized = await annotationService.normalizeAnnotation(
+      taskId,
+      userId,
+      userRole,
+      normalizedJson
+    );
 
     res.json({
       success: true,
@@ -126,52 +66,14 @@ export const getTaskAnnotations = async (
 ): Promise<void> => {
   try {
     const { id: taskId } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    // Verify task exists
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      include: { contract: true },
-    });
-
-    if (!task) {
-      throw new NotFoundError('Task');
-    }
-
-    // Check access rights
-    if (
-      req.user?.role !== 'admin' &&
-      task.contract.clientUserId !== req.user?.id &&
-      task.contract.labelerUserId !== req.user?.id
-    ) {
-      throw new ForbiddenError('You do not have access to this task');
-    }
-
-    const [rawAnnotations, normalizedAnnotation] = await Promise.all([
-      prisma.annotationRaw.findMany({
-        where: { taskId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          labeler: {
-            select: { id: true, email: true, displayName: true },
-          },
-        },
-      }),
-      prisma.annotationNormalized.findUnique({
-        where: { taskId },
-        include: {
-          labeler: {
-            select: { id: true, email: true, displayName: true },
-          },
-        },
-      }),
-    ]);
+    const annotations = await annotationService.getTaskAnnotations(taskId, userId, userRole);
 
     res.json({
       success: true,
-      data: {
-        raw: rawAnnotations,
-        normalized: normalizedAnnotation,
-      },
+      data: annotations,
     });
   } catch (error) {
     next(error);

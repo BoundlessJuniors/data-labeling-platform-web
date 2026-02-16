@@ -3,7 +3,7 @@ import * as labelsetController from '../controllers/labelset.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { adminOrClient } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { createLabelSetSchema, idParamSchema } from '../validators/validation.schemas';
+import { createLabelSetSchema, idParamSchema, addLabelSchema } from '../validators/validation.schemas';
 import { cacheMiddleware } from '../middlewares/cache.middleware';
 
 const router = Router();
@@ -39,6 +39,7 @@ router.post(
   '/:id/labels',
   authenticate,
   validate(idParamSchema, 'params'),
+  validate(addLabelSchema),
   labelsetController.addLabel
 );
 

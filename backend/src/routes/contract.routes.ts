@@ -6,7 +6,8 @@ import { validate } from '../middlewares/validate.middleware';
 import { 
   createContractSchema, 
   idParamSchema,
-  rejectContractSchema 
+  rejectContractSchema,
+  cancelContractSchema 
 } from '../validators/validation.schemas';
 
 const router = Router();
@@ -60,6 +61,7 @@ router.patch(
 router.patch(
   '/:id/cancel',
   validate(idParamSchema, 'params'),
+  validate(cancelContractSchema),
   contractController.cancelContract
 );
 

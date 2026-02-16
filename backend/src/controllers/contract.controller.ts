@@ -1,9 +1,8 @@
 import { Response, NextFunction } from 'express';
-import { ContractStatus, ListingStatus, Prisma } from '@prisma/client';
-import prisma from '../lib/db';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
-import logger from '../lib/logger';
+import { ContractService } from '../services/contract.service';
+
+const contractService = new ContractService();
 
 // Create a new contract (Labeler applies to a listing)
 export const createContract = async (
@@ -14,65 +13,9 @@ export const createContract = async (
   try {
     const { listingId } = req.body;
     const labelerId = req.user!.id;
+    const labelerRole = req.user!.role;
 
-    // Verify user is a labeler
-    if (req.user!.role !== 'labeler' && req.user!.role !== 'admin') {
-      throw new ForbiddenError('Only labelers can apply to listings');
-    }
-
-    // Verify listing exists and is open
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      include: { contracts: true },
-    });
-
-    if (!listing) {
-      throw new NotFoundError('Listing');
-    }
-
-    if (listing.status !== ListingStatus.open) {
-      throw new BadRequestError('Listing is not open for applications');
-    }
-
-    // Check if listing already has an active contract
-    const activeContracts = listing.contracts.filter(c => c.status === 'active');
-    if (activeContracts.length > 0) {
-      throw new ConflictError('Listing already has an active contract');
-    }
-
-    // Check if labeler already applied to this listing
-    // (This shouldn't happen since listing can have only one contract, but good to check)
-
-    // Create contract
-    const contract = await prisma.contract.create({
-      data: {
-        listingId,
-        clientUserId: listing.ownerUserId,
-        labelerUserId: labelerId,
-        agreedPriceTotal: listing.priceTotal,
-        currency: listing.currency,
-        status: ContractStatus.active,
-      },
-      include: {
-        listing: {
-          select: { id: true, title: true },
-        },
-        client: {
-          select: { id: true, email: true, displayName: true },
-        },
-        labeler: {
-          select: { id: true, email: true, displayName: true },
-        },
-      },
-    });
-
-    // Update listing status to in_progress
-    await prisma.listing.update({
-      where: { id: listingId },
-      data: { status: ListingStatus.in_progress },
-    });
-
-    logger.info(`Contract created: ${contract.id} by labeler ${labelerId}`);
+    const contract = await contractService.createContract(labelerId, labelerRole, listingId);
 
     res.status(201).json({
       success: true,
@@ -92,62 +35,24 @@ export const getContracts = async (
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const skip = (page - 1) * limit;
     const status = req.query.status as string | undefined;
     const ownOnly = req.query.ownOnly === 'true';
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    // Build where clause
-    const where: Prisma.ContractWhereInput = {};
-
-    if (status) {
-      where.status = status as ContractStatus;
-    }
-
-    // Filter by user role
-    if (req.user?.role === 'admin' && !ownOnly) {
-      // Admin sees all
-    } else if (req.user?.role === 'client' || ownOnly) {
-      where.OR = [
-        { clientUserId: req.user!.id },
-        { labelerUserId: req.user!.id },
-      ];
-    } else if (req.user?.role === 'labeler') {
-      where.labelerUserId = req.user!.id;
-    }
-
-    const [contracts, total] = await Promise.all([
-      prisma.contract.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { startedAt: 'desc' },
-        include: {
-          listing: {
-            select: { id: true, title: true },
-          },
-          client: {
-            select: { id: true, email: true, displayName: true },
-          },
-          labeler: {
-            select: { id: true, email: true, displayName: true },
-          },
-          _count: {
-            select: { tasks: true },
-          },
-        },
-      }),
-      prisma.contract.count({ where }),
-    ]);
+    const result = await contractService.getContracts(
+      page,
+      limit,
+      userId,
+      userRole,
+      status,
+      ownOnly
+    );
 
     res.json({
       success: true,
-      data: contracts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: result.contracts,
+      pagination: result.pagination,
     });
   } catch (error) {
     next(error);
@@ -162,47 +67,10 @@ export const getContractById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    const contract = await prisma.contract.findUnique({
-      where: { id },
-      include: {
-        listing: {
-          include: {
-            dataset: {
-              select: { id: true, name: true },
-            },
-            labelSet: {
-              include: { labels: true },
-            },
-          },
-        },
-        client: {
-          select: { id: true, email: true, displayName: true, ratingAvg: true },
-        },
-        labeler: {
-          select: { id: true, email: true, displayName: true, ratingAvg: true },
-        },
-        tasks: {
-          select: { id: true, status: true },
-        },
-        _count: {
-          select: { tasks: true, payments: true },
-        },
-      },
-    });
-
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
-
-    // Check access rights
-    if (
-      req.user?.role !== 'admin' &&
-      contract.clientUserId !== req.user?.id &&
-      contract.labelerUserId !== req.user?.id
-    ) {
-      throw new ForbiddenError('You do not have access to this contract');
-    }
+    const contract = await contractService.getContractById(id, userId, userRole);
 
     res.json({
       success: true,
@@ -221,45 +89,10 @@ export const approveContract = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    const contract = await prisma.contract.findUnique({
-      where: { id },
-    });
-
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
-
-    // Only client or admin can approve
-    if (req.user?.role !== 'admin' && contract.clientUserId !== req.user?.id) {
-      throw new ForbiddenError('Only the client can approve this contract');
-    }
-
-    // Can only approve submitted contracts
-    if (contract.status !== ContractStatus.submitted) {
-      throw new BadRequestError(`Cannot approve contract with status: ${contract.status}`);
-    }
-
-    const updatedContract = await prisma.contract.update({
-      where: { id },
-      data: {
-        status: ContractStatus.approved,
-        completedAt: new Date(),
-      },
-      include: {
-        listing: { select: { id: true, title: true } },
-        client: { select: { id: true, email: true, displayName: true } },
-        labeler: { select: { id: true, email: true, displayName: true } },
-      },
-    });
-
-    // Update listing status to completed
-    await prisma.listing.update({
-      where: { id: contract.listingId },
-      data: { status: ListingStatus.completed },
-    });
-
-    logger.info(`Contract approved: ${id}`);
+    const updatedContract = await contractService.approveContract(id, userId, userRole);
 
     res.json({
       success: true,
@@ -279,38 +112,10 @@ export const rejectContract = async (
   try {
     const { id } = req.params;
     const { reason } = req.body;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    const contract = await prisma.contract.findUnique({
-      where: { id },
-    });
-
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
-
-    // Only client or admin can reject
-    if (req.user?.role !== 'admin' && contract.clientUserId !== req.user?.id) {
-      throw new ForbiddenError('Only the client can reject this contract');
-    }
-
-    // Can only reject submitted contracts
-    if (contract.status !== ContractStatus.submitted) {
-      throw new BadRequestError(`Cannot reject contract with status: ${contract.status}`);
-    }
-
-    const updatedContract = await prisma.contract.update({
-      where: { id },
-      data: {
-        status: ContractStatus.rejected,
-      },
-      include: {
-        listing: { select: { id: true, title: true } },
-        client: { select: { id: true, email: true, displayName: true } },
-        labeler: { select: { id: true, email: true, displayName: true } },
-      },
-    });
-
-    logger.info(`Contract rejected: ${id}, reason: ${reason || 'No reason provided'}`);
+    const updatedContract = await contractService.rejectContract(id, userId, userRole, reason);
 
     res.json({
       success: true,
@@ -330,48 +135,10 @@ export const cancelContract = async (
   try {
     const { id } = req.params;
     const { reason } = req.body;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    const contract = await prisma.contract.findUnique({
-      where: { id },
-    });
-
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
-
-    // Client, labeler, or admin can cancel
-    if (
-      req.user?.role !== 'admin' &&
-      contract.clientUserId !== req.user?.id &&
-      contract.labelerUserId !== req.user?.id
-    ) {
-      throw new ForbiddenError('You do not have permission to cancel this contract');
-    }
-
-    // Can only cancel active contracts
-    if (contract.status !== ContractStatus.active) {
-      throw new BadRequestError(`Cannot cancel contract with status: ${contract.status}`);
-    }
-
-    const updatedContract = await prisma.contract.update({
-      where: { id },
-      data: {
-        status: ContractStatus.cancelled,
-      },
-      include: {
-        listing: { select: { id: true, title: true } },
-        client: { select: { id: true, email: true, displayName: true } },
-        labeler: { select: { id: true, email: true, displayName: true } },
-      },
-    });
-
-    // Reopen the listing
-    await prisma.listing.update({
-      where: { id: contract.listingId },
-      data: { status: ListingStatus.open },
-    });
-
-    logger.info(`Contract cancelled: ${id}, reason: ${reason || 'No reason provided'}`);
+    const updatedContract = await contractService.cancelContract(id, userId, userRole, reason);
 
     res.json({
       success: true,
@@ -390,50 +157,10 @@ export const submitContract = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
 
-    const contract = await prisma.contract.findUnique({
-      where: { id },
-      include: {
-        tasks: {
-          where: {
-            status: { not: 'accepted' },
-          },
-        },
-      },
-    });
-
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
-
-    // Only labeler or admin can submit
-    if (req.user?.role !== 'admin' && contract.labelerUserId !== req.user?.id) {
-      throw new ForbiddenError('Only the labeler can submit this contract');
-    }
-
-    // Can only submit active contracts
-    if (contract.status !== ContractStatus.active) {
-      throw new BadRequestError(`Cannot submit contract with status: ${contract.status}`);
-    }
-
-    // Check if all tasks are completed
-    if (contract.tasks.length > 0) {
-      throw new BadRequestError('Not all tasks are completed yet');
-    }
-
-    const updatedContract = await prisma.contract.update({
-      where: { id },
-      data: {
-        status: ContractStatus.submitted,
-      },
-      include: {
-        listing: { select: { id: true, title: true } },
-        client: { select: { id: true, email: true, displayName: true } },
-        labeler: { select: { id: true, email: true, displayName: true } },
-      },
-    });
-
-    logger.info(`Contract submitted: ${id}`);
+    const updatedContract = await contractService.submitContract(id, userId, userRole);
 
     res.json({
       success: true,

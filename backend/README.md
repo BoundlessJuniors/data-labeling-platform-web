@@ -54,6 +54,19 @@ backend/
 │   │   ├── annotation.controller.ts
 │   │   └── review.controller.ts
 │   │
+│   ├── services/          # Business Logic Layer
+│   │   ├── auth.service.ts
+│   │   ├── admin.service.ts
+│   │   ├── dataset.service.ts
+│   │   ├── asset.service.ts
+│   │   ├── labelset.service.ts
+│   │   ├── listing.service.ts
+│   │   ├── contract.service.ts
+│   │   ├── proposal.service.ts
+│   │   ├── task.service.ts
+│   │   ├── annotation.service.ts
+│   │   └── review.service.ts
+│   │
 │   ├── routes/            # Express route tanımları
 │   │   ├── index.ts       # Route aggregator
 │   │   ├── auth.routes.ts
@@ -87,6 +100,16 @@ backend/
 ├── package.json
 └── tsconfig.json
 ```
+
+## 🏗️ Mimari
+
+Proje **Service Layer Pattern** kullanılarak geliştirilmiştir:
+
+- **Controllers:** Sadece HTTP istek/cevap döngüsünden ve validasyondan sorumludur.
+- **Services:** Tüm iş mantığını (business logic) ve veritabanı etkileşimlerini barındırır.
+- **Routes:** Endpoint tanımlamalarını ve middleware zincirlerini içerir.
+
+Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test edilebilir ve yeniden kullanılabilir hale getirilmiştir.
 
 ## 🔌 API Endpoints
 
