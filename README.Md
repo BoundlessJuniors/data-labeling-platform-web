@@ -9,6 +9,7 @@ data-labeling-platform-web/
 ├── backend/              # Node.js + Express + Prisma API
 │   ├── src/
 │   │   ├── controllers/  # 11 API endpoint handler
+│   │   ├── services/     # Business Logic Layer (Service Layer Pattern)
 │   │   ├── routes/       # 11 route modülü
 │   │   ├── middlewares/  # 9 middleware (auth, cache, rate-limit, upload...)
 │   │   ├── lib/          # Prisma, Redis, Logger, MinIO/R2 Storage
@@ -85,7 +86,7 @@ npm run dev
 
 ## 🗄️ Veritabanı Şeması
 
-15 tablo ile kapsamlı veri modeli:
+17 tablo ile kapsamlı veri modeli:
 
 | Tablo | Açıklama |
 |-------|----------|
@@ -95,7 +96,9 @@ npm run dev
 | `label_sets` | Etiket sınıfları seti |
 | `labels` | LabelSet içindeki etiketler |
 | `listings` | Etiketleme ilanları |
+| `proposals` | İlan başvuruları (Listing Proposals) |
 | `contracts` | Labeler-Client sözleşmeleri |
+| `submissions` | Toplu etiket gönderimi (Dataset Import) |
 | `tasks` | En küçük iş birimi (1 task = 1 asset) |
 | `task_leases` | Task kilitleme mekanizması |
 | `annotations_raw` | Ham annotation verileri |
@@ -114,6 +117,7 @@ npm run dev
 | Assets | `/api/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
 | LabelSets | `/api/labelsets/*` | Etiket setleri |
 | Listings | `/api/listings/*` | İlanlar |
+| Proposals | `/api/proposals/*` | İlan başvuruları |
 | Contracts | `/api/contracts/*` | Sözleşmeler |
 | Tasks | `/api/tasks/*` | Görevler |
 | Annotations | `/api/annotations/*` | Etiketlemeler |
