@@ -74,21 +74,64 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   /**
-   * Upload a single asset file to a dataset
+   * Upload a single asset file to a dataset (Direct-to-R2)
    */
-  async function uploadAsset(datasetId: string, file: File) {
+  async function uploadAsset(datasetId: string, file: File, updateState = true) {
+    if (updateState) {
+      uploading.value = true;
+      uploadProgress.value = 0;
+      error.value = null;
+    }
+
+    // 1. Client-side Validation: File Size (10MB)
+    const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const msg = `"${file.name}" 10MB'dan büyük olamaz.`;
+      toastStore.error(msg);
+      
+      // Hata durumunda loading state'i kapatmalıyız
+      if (updateState) {
+        error.value = msg;
+        uploading.value = false;
+      }
+      return null;
+    }
+
     try {
-      const response = await assetsApi.upload(datasetId, file);
-      return response.data.data;
+      // Step 1: Initiate (Dosya boyutunu da gönderiyoruz)
+      // Not: api/assets.ts'deki initiateUpload fonksiyonu file.size parametresini kabul etmeli.
+      const initRes = await assetsApi.initiateUpload(datasetId, file.name, file.type, file.size);
+      const { signedUrl, assetId } = initRes.data.data;
+
+      // Step 2: Upload to R2
+      await assetsApi.uploadToR2(signedUrl, file, (progress) => {
+        if (updateState) {
+          uploadProgress.value = progress;
+        }
+      });
+
+      // Step 3: Complete
+      const completeRes = await assetsApi.completeUpload(assetId);
+      
+      return completeRes.data.data;
+
     } catch (_err) {
       const msg = getErrorMessage(_err, `"${file.name}" yüklenemedi`);
       toastStore.error(msg);
+      
+      if (updateState) {
+        error.value = msg;
+      }
       return null;
+    } finally {
+      if (updateState) {
+        uploading.value = false;
+      }
     }
   }
 
   /**
-   * Upload multiple asset files to a dataset
+   * Upload multiple asset files to a dataset (Parallel)
    */
   async function uploadAssets(datasetId: string, files: File[]) {
     if (files.length === 0) return;
@@ -99,29 +142,39 @@ export const useAssetsStore = defineStore('assets', () => {
 
     let successCount = 0;
     let failCount = 0;
+    let completedCount = 0;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file) {
-        const result = await uploadAsset(datasetId, file);
-        if (result) {
-          successCount++;
-        } else {
-          failCount++;
-        }
+    // Dosyaları paralel işlemek için map + Promise.all kullanıyoruz
+    const uploadPromises = files.map(async (file) => {
+      if (!file) return;
+      
+      // Tekil yüklemelerde state'i güncellemesini engelliyoruz (false)
+      const result = await uploadAsset(datasetId, file, false);
+      
+      if (result) {
+        successCount++;
+      } else {
+        failCount++;
       }
-      uploadProgress.value = Math.round(((i + 1) / files.length) * 100);
-    }
+
+      completedCount++;
+      // Toplu ilerleme durumu (Progress Bar)
+      uploadProgress.value = Math.round((completedCount / files.length) * 100);
+    });
+
+    // Tüm yüklemelerin bitmesini bekle
+    await Promise.all(uploadPromises);
 
     uploading.value = false;
     uploadProgress.value = 0;
 
     if (successCount > 0) {
       toastStore.success(`${successCount} asset başarıyla yüklendi.`);
-      // Refresh the list
+      // Listeyi yenile
       await fetchAssets(datasetId, 1);
     }
-    if (failCount > 0 && successCount > 0) {
+    
+    if (failCount > 0) {
       toastStore.warning(`${failCount} dosya yüklenemedi.`);
     }
   }

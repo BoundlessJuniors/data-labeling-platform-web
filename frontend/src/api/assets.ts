@@ -29,35 +29,57 @@ export const assetsApi = {
   },
 
   /**
-   * Upload a new asset (multipart/form-data)
+   * Step 1: Initiate upload (get presigned URL)
    */
-  upload(datasetId: string, file: File) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('datasetId', datasetId);
+  initiateUpload(datasetId: string, filename: string, contentType: string, fileSize: number) {
+    return apiClient.post<ApiResponse<{ signedUrl: string; assetId: string; objectKey: string }>>(
+      '/assets/initiate',
+      { datasetId, filename, contentType, fileSize }
+    );
+  },
 
-    return apiClient.post<ApiResponse<Asset>>('/assets', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  /**
+   * Step 2: Upload to R2 (Direct PUT)
+   * Uses a fresh axios instance or fetch to avoid global interceptors/headers
+   */
+  async uploadToR2(signedUrl: string, file: File, onProgress?: (progress: number) => void) {
+    // We use a direct XMLHttp or fetch approach, or a clean axios call.
+    // To ensure no 'Authorization' header is sent, we can use XHR or fetch.
+    // However, for progress, XHR or Axios is needed.
+    
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', signedUrl, true);
+      xhr.setRequestHeader('Content-Type', file.type);
+
+      if (onProgress) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            onProgress(percentComplete);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      
+      xhr.send(file);
     });
   },
 
   /**
-   * Upload multiple assets at once (bulk)
+   * Step 3: Complete/Confirm upload
    */
-  uploadBulk(datasetId: string, files: File[]) {
-    const formData = new FormData();
-    formData.append('datasetId', datasetId);
-    for (const file of files) {
-      formData.append('files', file);
-    }
-
-    return apiClient.post<ApiResponse<Asset[]>>('/assets/bulk', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+  completeUpload(assetId: string) {
+    return apiClient.post<ApiResponse<Asset>>(`/assets/${assetId}/confirm`);
   },
 
   /**

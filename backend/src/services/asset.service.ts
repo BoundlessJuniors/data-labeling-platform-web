@@ -4,7 +4,8 @@ import { randomUUID } from 'crypto';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import { cacheDelete, cacheDeletePattern } from '../lib/redis';
-import { uploadToR2, getSignedUrl, deleteFromR2 } from '../lib/storage';
+import { uploadToR2, getSignedUrl, deleteFromR2, getPresignedPutUrl } from '../lib/storage';
+import { addAssetJob } from '../lib/queue';
 import logger from '../lib/logger';
 
 // Interface for Multer file (since we don't import 'express' here)
@@ -32,9 +33,16 @@ export class AssetService {
   }
 
   /**
-   * Create a new asset (upload to R2 + DB record)
+   * Initiate a single file upload (Direct to R2)
+   * Returns a Presigned PUT URL and creates a pending Asset record.
    */
-  async createAsset(userId: string, userRole: UserRole, datasetId: string, file: UploadedFile) {
+  async initiateUpload(
+    userId: string,
+    userRole: UserRole,
+    datasetId: string,
+    filename: string,
+    contentType: string,
+  ) {
     if (!datasetId) {
       throw new BadRequestError('Dataset ID zorunludur.');
     }
@@ -53,102 +61,74 @@ export class AssetService {
     }
 
     // Build a unique object key
-    const ext = path.extname(file.originalname) || '.jpg';
+    const ext = path.extname(filename) || '';
     const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
 
-    // Upload to R2
-    await uploadToR2(objectKey, file.buffer, file.mimetype);
-
-    // Persist metadata in DB
+    // Create pending asset record
     const asset = await prisma.asset.create({
       data: {
         datasetId,
         objectKey,
-        mimeType: file.mimetype,
-        sizeBytes: file.size,
-      },
-      include: {
-        dataset: {
-          select: { id: true, name: true },
-        },
+        mimeType: contentType,
+        status: 'pending',
       },
     });
 
-    // Update dataset status → ready (assets have been uploaded)
-    await prisma.dataset.updateMany({
-      where: { id: datasetId, status: { in: ['draft', 'uploading'] } },
-      data: { status: 'ready' },
-    });
+    // Generate Presigned PUT URL
+    const signedUrl = await getPresignedPutUrl(objectKey, contentType);
 
-    logger.info(`Asset created: ${asset.id} in dataset ${datasetId}`);
-
-    // Invalidate caches
-    await cacheDeletePattern('cache:/api/assets*');
-    await cacheDeletePattern('cache:/api/datasets*');
-
-    // Return with signed URL
-    return this.attachSignedUrl(asset);
+    return {
+      signedUrl,
+      assetId: asset.id,
+      objectKey,
+    };
   }
 
   /**
-   * Create multiple assets (Bulk Upload)
+   * Complete an upload
+   * Verifies the asset exists and triggers the processing job.
    */
-  async createAssetBulk(userId: string, userRole: UserRole, datasetId: string, files: UploadedFile[]) {
-    if (!datasetId) {
-      throw new BadRequestError('Dataset ID zorunludur.');
-    }
-
-    if (!files || files.length === 0) {
-      throw new BadRequestError('En az bir dosya yüklenmelidir.');
-    }
-
-    // Verify dataset exists and user has access
-    const dataset = await prisma.dataset.findUnique({
-      where: { id: datasetId },
+  async completeUpload(userId: string, userRole: UserRole, assetId: string) {
+    const asset = await prisma.asset.findUnique({
+      where: { id: assetId },
+      include: {
+        dataset: { select: { ownerUserId: true, id: true } },
+      },
     });
 
-    if (!dataset) {
-      throw new NotFoundError('Dataset');
+    if (!asset) {
+      throw new NotFoundError('Asset');
     }
 
-    if (userRole !== 'admin' && dataset.ownerUserId !== userId) {
-      throw new ForbiddenError('Bu datasete asset ekleme yetkiniz yok.');
+    if (userRole !== 'admin' && asset.dataset.ownerUserId !== userId) {
+      throw new ForbiddenError('Bu işlem için yetkiniz yok.');
     }
 
-    const createdAssets = [];
+    // Update status to 'uploaded' (processing will start)
+    const updatedAsset = await prisma.asset.update({
+      where: { id: assetId },
+      data: { status: 'uploaded' },
+    });
 
-    for (const file of files) {
-      const ext = path.extname(file.originalname) || '.jpg';
-      const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
+    // Add to queue
+    await addAssetJob(asset.id, asset.objectKey);
 
-      await uploadToR2(objectKey, file.buffer, file.mimetype);
-
-      const asset = await prisma.asset.create({
-        data: {
-          datasetId,
-          objectKey,
-          mimeType: file.mimetype,
-          sizeBytes: file.size,
-        },
+     // Update dataset status → ready (if not already)
+     // Note: In a real bulk scenario, this might be too frequent, but safe for now.
+     if (asset.dataset) {
+      await prisma.dataset.updateMany({
+        where: { id: asset.datasetId, status: { in: ['draft', 'uploading'] } },
+        data: { status: 'ready' },
       });
+     }
 
-      const signedUrl = await getSignedUrl(objectKey);
-      createdAssets.push({ ...asset, signedUrl });
-    }
-
-    // Update dataset status → ready
-    await prisma.dataset.updateMany({
-      where: { id: datasetId, status: { in: ['draft', 'uploading'] } },
-      data: { status: 'ready' },
-    });
-
-    logger.info(`Bulk upload: ${createdAssets.length} assets in dataset ${datasetId}`);
+    logger.info(`Asset upload confirmed: ${assetId} -> Queued for processing`);
 
     // Invalidate caches
     await cacheDeletePattern('cache:/api/assets*');
     await cacheDeletePattern('cache:/api/datasets*');
 
-    return createdAssets;
+    return this.attachSignedUrl(updatedAsset);
   }
 
   /**

@@ -27,6 +27,7 @@
     "@aws-sdk/s3-request-presigner": "^3.989.0",
     "@prisma/client": "^5.22.0",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.69.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^4.21.0",
@@ -36,6 +37,7 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
+    "sharp": "^0.34.5",
     "winston": "^3.19.0"
   },
   "devDependencies": {

@@ -5,51 +5,70 @@ import { BadRequestError } from '../utils/errors';
 
 const assetService = new AssetService();
 
-// Create a new asset (multipart upload)
-export const createAsset = async (
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+// Initiate upload (Get Presigned URL)
+export const initiateUpload = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const file = req.file;
-    const { datasetId } = req.body;
+    const { datasetId, filename, contentType, fileSize } = req.body;
     const userId = req.user!.id;
     const userRole = req.user!.role;
 
-    if (!file) {
-      throw new BadRequestError('Dosya yüklenmedi. Lütfen bir resim dosyası seçin.');
+    if (!filename || !contentType || !fileSize) {
+      throw new BadRequestError('Filename, Content-Type ve File Size zorunludur.');
     }
 
-    const asset = await assetService.createAsset(userId, userRole, datasetId, file);
+    // Security Check: MIME Type
+    if (!ALLOWED_MIME_TYPES.includes(contentType)) {
+      throw new BadRequestError(
+        `Desteklenmeyen dosya formatı. İzin verilen formatlar: ${ALLOWED_MIME_TYPES.join(', ')}`
+      );
+    }
+
+    // Security Check: File Size
+    if (fileSize > MAX_FILE_SIZE_BYTES) {
+      throw new BadRequestError('Dosya boyutu 10MB\'ı geçemez.');
+    }
+
+    const result = await assetService.initiateUpload(
+      userId, 
+      userRole, 
+      datasetId, 
+      filename, 
+      contentType
+    );
 
     res.status(201).json({
       success: true,
-      data: asset,
+      data: result,
     });
   } catch (error) {
     next(error);
   }
 };
 
-// Create multiple assets at once (bulk upload)
-export const createAssetBulk = async (
+// Complete upload (Confirm and Queue)
+export const completeUpload = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const files = req.files as Express.Multer.File[];
-    const { datasetId } = req.body;
+    const { id } = req.params;
     const userId = req.user!.id;
     const userRole = req.user!.role;
 
-    const createdAssets = await assetService.createAssetBulk(userId, userRole, datasetId, files);
+    const result = await assetService.completeUpload(userId, userRole, id);
 
-    res.status(201).json({
+    res.json({
       success: true,
-      data: createdAssets,
-      count: createdAssets.length,
+      message: 'Upload confirmed, processing started.',
+      data: result,
     });
   } catch (error) {
     next(error);

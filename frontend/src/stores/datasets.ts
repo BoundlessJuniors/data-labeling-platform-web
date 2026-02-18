@@ -4,13 +4,15 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { datasetsApi, type DatasetListParams } from '@/api/datasets';
-import { assetsApi } from '@/api/assets';
+// assetsApi yerine store'u kullanacağız
+import { useAssetsStore } from './assets'; 
 import type { Dataset } from '@/types/dataset';
 import { getErrorMessage } from '@/types/api';
 import { useToastStore } from './toast';
 
 export const useDatasetsStore = defineStore('datasets', () => {
   const toastStore = useToastStore();
+  const assetsStore = useAssetsStore(); // Assets store'u buraya dahil ettik
 
   // State
   const datasets = ref<Dataset[]>([]);
@@ -101,7 +103,7 @@ export const useDatasetsStore = defineStore('datasets', () => {
 
   /**
    * Create a dataset and upload assets in one atomic flow.
-   * If the bulk upload fails completely, the empty dataset is rolled back (deleted).
+   * Uses AssetsStore for parallel uploading.
    */
   async function createDatasetWithAssets(
     data: { name: string; description?: string },
@@ -126,38 +128,20 @@ export const useDatasetsStore = defineStore('datasets', () => {
       return null;
     }
 
-    // Step 2: Upload assets (bulk)
+    // Step 2: Upload assets using the Assets Store (Parallel)
     uploading.value = true;
-    uploadProgress.value = 10; // indeterminate-ish start
+    
+    // Dataset oluşturuldu, şimdi dosya yükleme işlemini Assets Store'a devrediyoruz.
+    // Assets Store kendi progress ve hata yönetimini yapar.
+    await assetsStore.uploadAssets(dataset.id, files);
 
-    try {
-      await assetsApi.uploadBulk(dataset.id, files);
-      uploadProgress.value = 100;
-      toastStore.success(`Dataset oluşturuldu ve ${files.length} görsel yüklendi.`);
+    // İşlem bittiğinde listeyi yenile
+    await fetchDatasets();
 
-      // Re-fetch so assetCount and status are up-to-date
-      await fetchDatasets();
-
-      loading.value = false;
-      uploading.value = false;
-      return dataset;
-    } catch (_err) {
-      // Rollback: delete the empty dataset
-      try {
-        await datasetsApi.delete(dataset.id);
-        datasets.value = datasets.value.filter((d) => d.id !== dataset!.id);
-        total.value -= 1;
-      } catch {
-        // Rollback itself failed – log but don't hide original error
-      }
-
-      error.value = getErrorMessage(_err, 'Görseller yüklenemedi, dataset geri alındı');
-      toastStore.error(error.value);
-      loading.value = false;
-      uploading.value = false;
-      uploadProgress.value = 0;
-      return null;
-    }
+    loading.value = false;
+    uploading.value = false;
+    
+    return dataset;
   }
 
   /**

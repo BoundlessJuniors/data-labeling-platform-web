@@ -148,21 +148,32 @@ model Dataset {
   @@map("datasets")
 }
 
+
+enum AssetStatus {
+  pending
+  uploaded
+  processing
+  ready
+  error
+}
+
 // ============================================================================
 // 3. ASSETS
 // Dataset içindeki tek görselin metadata'sı. Dosya storage'da.
 // ============================================================================
 
 model Asset {
-  id        String   @id @default(uuid()) @db.Uuid
-  datasetId String   @map("dataset_id") @db.Uuid
-  objectKey String   @map("object_key")
-  mimeType  String   @map("mime_type")
-  width     Int?
-  height    Int?
-  sizeBytes BigInt?  @map("size_bytes")
-  checksum  String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id              String      @id @default(uuid()) @db.Uuid
+  datasetId       String      @map("dataset_id") @db.Uuid
+  objectKey       String      @map("object_key")
+  mimeType        String      @map("mime_type")
+  width           Int?
+  height          Int?
+  sizeBytes       BigInt?     @map("size_bytes")
+  checksum        String?
+  status          AssetStatus @default(pending)
+  processingError String?     @map("processing_error")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
   dataset Dataset @relation(fields: [datasetId], references: [id])

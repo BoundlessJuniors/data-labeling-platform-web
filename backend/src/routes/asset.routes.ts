@@ -2,8 +2,7 @@ import { Router } from 'express';
 import * as assetController from '../controllers/asset.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { upload } from '../middlewares/upload.middleware';
-import { updateAssetSchema, idParamSchema } from '../validators/validation.schemas';
+import { updateAssetSchema, idParamSchema, initiateUploadSchema } from '../validators/validation.schemas';
 import { cacheMiddleware } from '../middlewares/cache.middleware';
 
 const router = Router();
@@ -16,20 +15,20 @@ router.get(
   assetController.getAssets,
 );
 
-// POST /api/assets - Upload a new asset (multipart/form-data)
+// POST /api/assets/initiate - Initiate upload (get URL)
 router.post(
-  '/',
+  '/initiate',
   authenticate,
-  upload.single('file'),
-  assetController.createAsset,
+  validate(initiateUploadSchema),
+  assetController.initiateUpload,
 );
 
-// POST /api/assets/bulk - Upload multiple assets at once
+// POST /api/assets/:id/confirm - Confirm upload and queue processing
 router.post(
-  '/bulk',
+  '/:id/confirm',
   authenticate,
-  upload.array('files', 100),
-  assetController.createAssetBulk,
+  validate(idParamSchema, 'params'),
+  assetController.completeUpload,
 );
 
 // GET /api/assets/:id - Get a single asset

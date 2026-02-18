@@ -104,6 +104,21 @@ export const updateAssetSchema = Joi.object({
   'object.min': 'At least one field must be provided for update',
 });
 
+export const initiateUploadSchema = Joi.object({
+  datasetId: uuidSchema.messages({
+    'any.required': 'Dataset ID is required',
+  }),
+  filename: Joi.string().min(1).max(255).required().messages({
+    'any.required': 'Filename is required',
+  }),
+  contentType: Joi.string().max(100).required().messages({
+    'any.required': 'Content-Type is required',
+  }),
+  fileSize: Joi.number().integer().positive().required().messages({
+    'any.required': 'File size is required',
+  }),
+});
+
 // ============================================================================
 // LabelSet Schemas
 // ============================================================================

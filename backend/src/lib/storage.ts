@@ -14,6 +14,7 @@ import {
   DeleteObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand,
+  PutBucketCorsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
@@ -128,6 +129,30 @@ export async function ensureBucket(): Promise<void> {
       );
     }
   }
+
+  // Apply CORS policy to allow direct browser uploads
+  try {
+    const corsCommand = new PutBucketCorsCommand({
+      Bucket: R2_BUCKET_NAME,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedHeaders: ['*'],
+            AllowedMethods: ['PUT', 'GET', 'HEAD', 'POST'],
+            AllowedOrigins: isDevelopment
+              ? ['*']
+              : ['http://localhost:5173', 'http://localhost:3000'], // Adjust for prod
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 3000,
+          },
+        ],
+      },
+    });
+    await s3Client.send(corsCommand);
+    logger.info(`✅ CORS configuration applied to bucket "${R2_BUCKET_NAME}"`);
+  } catch (corsErr) {
+    logger.warn(`⚠️ Failed to apply CORS configuration:`, corsErr);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +190,26 @@ export async function getSignedUrl(
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: key,
+  });
+
+  return awsGetSignedUrl(s3Client, command, { expiresIn });
+}
+
+/**
+ * Generate a time-limited signed URL for UPLOADING an object (PUT).
+ * @param key         - The object key in the bucket.
+ * @param contentType - The MIME type of the file.
+ * @param expiresIn   - Seconds until the URL expires (default 5 minutes).
+ */
+export async function getPresignedPutUrl(
+  key: string,
+  contentType: string,
+  expiresIn = 300,
+): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
   });
 
   return awsGetSignedUrl(s3Client, command, { expiresIn });

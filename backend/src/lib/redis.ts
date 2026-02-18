@@ -1,13 +1,23 @@
 import Redis from 'ioredis';
 import logger from './logger';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL;
 
-// Parse Redis URL and create connection
-export const redis = new Redis(REDIS_URL, {
-  maxRetriesPerRequest: 3,
-  lazyConnect: true, // Don't connect until first command
-});
+export const redisConfig = {
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD,
+  db: parseInt(process.env.REDIS_DB || '0'),
+};
+
+// Create connection
+export const redis = REDIS_URL 
+  ? new Redis(REDIS_URL, { maxRetriesPerRequest: 3, lazyConnect: true })
+  : new Redis({
+      ...redisConfig,
+      maxRetriesPerRequest: 3,
+      lazyConnect: true, // Don't connect until first command
+    });
 
 redis.on('connect', () => {
   logger.info('Redis connected successfully');

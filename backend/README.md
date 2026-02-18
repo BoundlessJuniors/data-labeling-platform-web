@@ -11,12 +11,14 @@ Görsel veri etiketleme platformu için RESTful API.
 | **ORM** | Prisma | ^5.22.0 |
 | **Database** | PostgreSQL | 16-alpine |
 | **Cache** | Redis (ioredis) | ^5.9.2 |
+| **Queue** | BullMQ | ^5.x |
+| **Image Proc** | Sharp | ^0.33.x |
 | **Auth** | JWT + bcrypt | ^9.0.3 / ^6.0.0 |
 | **Validation** | Joi | ^18.0.2 |
 | **Security** | Helmet, Rate Limiting | ^8.1.0 / ^8.2.1 |
 | **Logging** | Winston | ^3.19.0 |
 | **Storage** | MinIO (local) / Cloudflare R2 (prod) — AWS S3 SDK | ^3.x |
-| **Upload** | Multer (memoryStorage) | ^1.4.5 |
+| **Upload** | Direct-to-R2 (Presigned URLs) | - |
 
 ## 🚀 Hızlı Kurulum
 
@@ -49,7 +51,7 @@ backend/
 │   │   ├── labelset.controller.ts
 │   │   ├── listing.controller.ts
 │   │   ├── contract.controller.ts
-│   │   ├── proposal.controller.ts  # YENİ: Başvuru yönetimi
+│   │   ├── proposal.controller.ts
 │   │   ├── task.controller.ts
 │   │   ├── annotation.controller.ts
 │   │   └── review.controller.ts
@@ -66,6 +68,9 @@ backend/
 │   │   ├── task.service.ts
 │   │   ├── annotation.service.ts
 │   │   └── review.service.ts
+│   │
+│   ├── workers/           # Background Workers
+│   │   └── asset.worker.ts         # BullMQ worker for image processing
 │   │
 │   ├── routes/            # Express route tanımları
 │   │   ├── index.ts       # Route aggregator
@@ -93,7 +98,12 @@ backend/
 │   │   └── request-logger.middleware.ts
 │   │
 │   ├── validators/        # Joi validation schemas
-│   ├── lib/               # Prisma, Redis, Logger, MinIO/R2 Storage
+│   ├── lib/               # Shared libraries
+│   │   ├── db.ts          # Prisma Client
+│   │   ├── redis.ts       # Redis connection
+│   │   ├── queue.ts       # BullMQ setup
+│   │   ├── storage.ts     # MinIO/R2 Storage Utils
+│   │   └── logger.ts      # Winston logger
 │   ├── utils/             # Custom error classes
 │   └── index.ts           # App entry point
 │
@@ -107,6 +117,7 @@ Proje **Service Layer Pattern** kullanılarak geliştirilmiştir:
 
 - **Controllers:** Sadece HTTP istek/cevap döngüsünden ve validasyondan sorumludur.
 - **Services:** Tüm iş mantığını (business logic) ve veritabanı etkileşimlerini barındırır.
+- **Workers:** Uzun süren işlemleri (görsel işleme vb.) arka planda asenkron olarak yürütür.
 - **Routes:** Endpoint tanımlamalarını ve middleware zincirlerini içerir.
 
 Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test edilebilir ve yeniden kullanılabilir hale getirilmiştir.
