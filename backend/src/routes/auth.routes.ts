@@ -24,6 +24,9 @@ router.post(
   authController.login
 );
 
+// POST /api/auth/logout - Clear auth cookie
+router.post('/logout', authController.logout);
+
 // GET /api/auth/profile - Get current user profile (protected)
 router.get(
   '/profile',

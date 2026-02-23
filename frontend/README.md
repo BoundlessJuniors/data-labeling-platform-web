@@ -176,6 +176,8 @@ frontend/
 
 ## 🔐 Authentication Sistemi
 
+JWT token `httpOnly` cookie ile yönetilir — frontend token'a doğrudan erişmez.
+
 ### Auth Store (`stores/auth.ts`)
 
 Pinia store ile merkezi authentication yönetimi:
@@ -183,13 +185,12 @@ Pinia store ile merkezi authentication yönetimi:
 ```typescript
 // Store özellikleri
 - user: User | null          // Giriş yapmış kullanıcı
-- token: string | null       // JWT token
-- isAuthenticated: boolean   // Giriş durumu
+- isAuthenticated: boolean   // Giriş durumu (!!user)
 
 // Actions
-- login(email, password)     // Giriş yap
-- register(data)             // Kayıt ol
-- logout()                   // Çıkış yap
+- login(email, password)     // Giriş yap (cookie sunucu tarafında set edilir)
+- register(data)             // Kayıt ol (cookie sunucu tarafında set edilir)
+- logout()                   // Çıkış yap (POST /auth/logout ile cookie temizlenir)
 - fetchProfile()             // Profil bilgisi al
 ```
 
@@ -224,10 +225,14 @@ Router seviyesinde güvenlik:
 // Base URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'
 
+// Config
+- withCredentials: true      // httpOnly cookie otomatik gönderilir
+
 // Interceptors
-- Request: JWT token ekleme
 - Response: 401 hata yakalama → logout
 ```
+
+> **Not:** Token artık `localStorage`'da tutulmaz ve `Authorization` header'ı gönderilmez.
 
 ### API Servisleri
 

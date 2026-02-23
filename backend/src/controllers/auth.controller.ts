@@ -5,6 +5,14 @@ import { UserRole } from '@prisma/client';
 
 const authService = new AuthService();
 
+/** Shared cookie options for the JWT token cookie */
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
 export const register = async (
   req: Request,
   res: Response,
@@ -20,9 +28,12 @@ export const register = async (
       displayName,
     });
 
+    // Set token as httpOnly cookie instead of returning in body
+    res.cookie('token', result.token, cookieOptions);
+
     res.status(201).json({
       success: true,
-      data: result,
+      data: { user: result.user },
     });
   } catch (error) {
     next(error);
@@ -39,10 +50,31 @@ export const login = async (
 
     const result = await authService.login({ email, password });
 
+    // Set token as httpOnly cookie instead of returning in body
+    res.cookie('token', result.token, cookieOptions);
+
     res.json({
       success: true,
-      data: result,
+      data: { user: result.user },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+    });
+
+    res.json({ success: true, message: 'Logged out' });
   } catch (error) {
     next(error);
   }

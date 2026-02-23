@@ -13,7 +13,7 @@ const authStore = useAuthStore();
 
 // Session restore on app boot
 onMounted(async () => {
-  if (authStore.token) {
+  if (authStore.user) {
     await authStore.fetchProfile();
   }
 });

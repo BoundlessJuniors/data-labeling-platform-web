@@ -13,7 +13,7 @@ Görsel veri etiketleme platformu için RESTful API.
 | **Cache** | Redis (ioredis) | ^5.9.2 |
 | **Queue** | BullMQ | ^5.x |
 | **Image Proc** | Sharp | ^0.33.x |
-| **Auth** | JWT + bcrypt | ^9.0.3 / ^6.0.0 |
+| **Auth** | JWT (httpOnly cookie) + bcrypt | ^9.0.3 / ^6.0.0 |
 | **Validation** | Joi | ^18.0.2 |
 | **Security** | Helmet, Rate Limiting | ^8.1.0 / ^8.2.1 |
 | **Logging** | Winston | ^3.19.0 |
@@ -128,8 +128,9 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| POST | `/register` | Yeni kullanıcı kaydı |
-| POST | `/login` | Kullanıcı girişi |
+| POST | `/register` | Yeni kullanıcı kaydı (httpOnly cookie set) |
+| POST | `/login` | Kullanıcı girişi (httpOnly cookie set) |
+| POST | `/logout` | Çıkış (cookie temizle) |
 | GET | `/profile` | Profil bilgisi (Auth) |
 
 ### Admin Routes (`/api/v1/admin`)
@@ -272,8 +273,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 ## 🛡️ Middleware Pipeline
 
 ```
-Request → Security (Helmet/CORS) → Rate Limiting → Request Logger 
-       → Auth (JWT) → Role Check → Validation → Controller
+Request → Security (Helmet/CORS) → Cookie Parser → Rate Limiting → Request Logger 
+       → Auth (JWT via httpOnly cookie) → Role Check → Validation → Controller
        → Response / Error Handler
 ```
 
@@ -331,11 +332,14 @@ MINIO_ENDPOINT="http://localhost:9000"
 
 ## 🔐 Authentication
 
-JWT tabanlı authentication sistemi:
+JWT tabanlı authentication sistemi (`httpOnly` cookie):
 
-1. **Register/Login** → JWT token al
-2. **Her istekte** → `Authorization: Bearer <token>` header'ı gönder
-3. **Token expire** → Yeniden login gerekli
+1. **Register/Login** → Sunucu JWT'yi `httpOnly`, `secure`, `SameSite=lax` cookie olarak set eder
+2. **Her istekte** → Tarayıcı cookie'yi otomatik gönderir (frontend `withCredentials: true`)
+3. **Logout** → `POST /api/v1/auth/logout` cookie'yi temizler
+4. **Token expire** → Yeniden login gerekli
+
+> **Not:** Token artık response body'de dönmez ve `localStorage`'da tutulmaz — XSS saldırılarına karşı güvenli.
 
 ## 📊 Rol Tabanlı Erişim
 

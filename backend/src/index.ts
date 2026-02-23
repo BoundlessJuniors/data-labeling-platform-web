@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 // Load environment variables first
 dotenv.config();
@@ -30,6 +31,9 @@ setupSecurity(app);
 // Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Cookie parser (populates req.cookies)
+app.use(cookieParser());
 
 // Request logging
 app.use(requestLogger);

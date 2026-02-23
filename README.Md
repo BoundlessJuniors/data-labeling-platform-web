@@ -81,7 +81,7 @@ npm run dev
 | **ORM** | Prisma 5.22 |
 | **Database** | PostgreSQL 16 |
 | **Cache** | Redis 7 |
-| **Auth** | JWT + bcrypt |
+| **Auth** | JWT (httpOnly cookie) + bcrypt |
 | **Testing** | Vitest (Frontend) |
 
 ## 🗄️ Veritabanı Şeması

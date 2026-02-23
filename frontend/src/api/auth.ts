@@ -24,7 +24,6 @@ export interface AuthResponse {
   success: boolean
   data: {
     user: User
-    token: string
   }
 }
 
@@ -37,4 +36,7 @@ export const authApi = {
   
   getProfile: () => 
     apiClient.get<{ success: boolean; data: User }>('/auth/profile'),
+
+  logout: () =>
+    apiClient.post<{ success: boolean; message: string }>('/auth/logout'),
 }

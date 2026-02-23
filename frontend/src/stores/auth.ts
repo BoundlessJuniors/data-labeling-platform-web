@@ -4,12 +4,11 @@ import { authApi, type User, type LoginRequest, type RegisterRequest } from '@/a
 import { getErrorMessage } from '@/types/api';
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('token'))
   const user = ref<User | null>(JSON.parse(localStorage.getItem('user') || 'null'))
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
   const isClient = computed(() => user.value?.role === 'client')
   const isLabeler = computed(() => user.value?.role === 'labeler')
@@ -19,9 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const response = await authApi.login(credentials)
-      token.value = response.data.data.token
       user.value = response.data.data.user
-      localStorage.setItem('token', token.value)
       localStorage.setItem('user', JSON.stringify(user.value))
       return true
     } catch (err: unknown) {
@@ -37,9 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const response = await authApi.register(data)
-      token.value = response.data.data.token
       user.value = response.data.data.user
-      localStorage.setItem('token', token.value)
       localStorage.setItem('user', JSON.stringify(user.value))
       return true
     } catch (err: unknown) {
@@ -51,7 +46,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchProfile() {
-    if (!token.value) return
     try {
       const response = await authApi.getProfile()
       user.value = response.data.data
@@ -61,10 +55,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function logout() {
-    token.value = null
+  async function logout() {
+    try {
+      await authApi.logout()
+    } catch {
+      // Ignore errors — clear local state regardless
+    }
     user.value = null
-    localStorage.removeItem('token')
     localStorage.removeItem('user')
   }
 
@@ -73,7 +70,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    token,
     user,
     loading,
     error,
