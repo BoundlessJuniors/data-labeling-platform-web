@@ -112,17 +112,17 @@ npm run dev
 
 | Grup | Endpoint | Açıklama |
 |------|----------|----------|
-| Auth | `/api/auth/*` | Kayıt, giriş, profil |
-| Datasets | `/api/datasets/*` | Dataset CRUD |
-| Assets | `/api/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
-| LabelSets | `/api/labelsets/*` | Etiket setleri |
-| Listings | `/api/listings/*` | İlanlar |
-| Proposals | `/api/proposals/*` | İlan başvuruları |
-| Contracts | `/api/contracts/*` | Sözleşmeler |
-| Tasks | `/api/tasks/*` | Görevler |
-| Annotations | `/api/annotations/*` | Etiketlemeler |
-| Reviews | `/api/reviews/*` | QC reviews |
-| Admin | `/api/admin/*` | Admin işlemleri |
+| Auth | `/api/v1/auth/*` | Kayıt, giriş, profil |
+| Datasets | `/api/v1/datasets/*` | Dataset CRUD |
+| Assets | `/api/v1/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
+| LabelSets | `/api/v1/labelsets/*` | Etiket setleri |
+| Listings | `/api/v1/listings/*` | İlanlar |
+| Proposals | `/api/v1/proposals/*` | İlan başvuruları |
+| Contracts | `/api/v1/contracts/*` | Sözleşmeler |
+| Tasks | `/api/v1/tasks/*` | Görevler |
+| Annotations | `/api/v1/annotations/*` | Etiketlemeler |
+| Reviews | `/api/v1/reviews/*` | QC reviews |
+| Admin | `/api/v1/admin/*` | Admin işlemleri |
 
 ## 🐳 Docker Servisleri
 

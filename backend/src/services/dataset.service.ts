@@ -27,7 +27,7 @@ export class DatasetService {
     logger.info(`Dataset created: ${dataset.id} by user ${userId}`);
 
     // Invalidate all dataset list caches so the new entry appears immediately
-    await cacheDeletePattern('cache:/api/datasets*');
+    await cacheDeletePattern('cache:/api/v1/datasets*');
 
     return dataset;
   }
@@ -173,7 +173,7 @@ export class DatasetService {
     });
 
     // Invalidate all dataset-related cache keys
-    await cacheDeletePattern('cache:/api/datasets*');
+    await cacheDeletePattern('cache:/api/v1/datasets*');
 
     logger.info(`Dataset updated: ${dataset.id}`);
 
@@ -226,7 +226,7 @@ export class DatasetService {
     ]);
 
     // Invalidate all dataset-related cache keys
-    await cacheDeletePattern('cache:/api/datasets*');
+    await cacheDeletePattern('cache:/api/v1/datasets*');
 
     logger.info(`Dataset deleted: ${datasetId} (${assets.length} assets cleaned up)`);
   }

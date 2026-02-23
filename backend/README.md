@@ -124,7 +124,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 ## 🔌 API Endpoints
 
-### Auth Routes (`/api/auth`)
+### Auth Routes (`/api/v1/auth`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -132,7 +132,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/login` | Kullanıcı girişi |
 | GET | `/profile` | Profil bilgisi (Auth) |
 
-### Admin Routes (`/api/admin`)
+### Admin Routes (`/api/v1/admin`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -142,7 +142,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | DELETE | `/users/:id` | Kullanıcı sil |
 | GET | `/stats` | Platform istatistikleri |
 
-### Dataset Routes (`/api/datasets`)
+### Dataset Routes (`/api/v1/datasets`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -152,7 +152,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | Dataset güncelle |
 | DELETE | `/:id` | Dataset sil |
 
-### Asset Routes (`/api/assets`)
+### Asset Routes (`/api/v1/assets`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -162,7 +162,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | Asset güncelle |
 | DELETE | `/:id` | Asset sil (MinIO/R2 + DB) |
 
-### LabelSet Routes (`/api/labelsets`)
+### LabelSet Routes (`/api/v1/labelsets`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -172,7 +172,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | LabelSet güncelle |
 | DELETE | `/:id` | LabelSet sil |
 
-### Listing Routes (`/api/listings`)
+### Listing Routes (`/api/v1/listings`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -183,7 +183,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | İlan güncelle |
 | DELETE | `/:id` | İlan sil |
 
-### Proposal Routes (`/api/proposals`) 🆕
+### Proposal Routes (`/api/v1/proposals`) 🆕
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -197,7 +197,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 > **Not:** `acceptProposal` transaction içinde: Proposal kabul → Contract oluştur → Diğer başvuruları reddet → Listing status güncelle
 
-### Contract Routes (`/api/contracts`)
+### Contract Routes (`/api/v1/contracts`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -209,7 +209,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/:id/approve` | Sözleşmeyi onayla |
 | POST | `/:id/reject` | Sözleşmeyi reddet |
 
-### Task Routes (`/api/tasks`)
+### Task Routes (`/api/v1/tasks`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -219,7 +219,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/:id/submit` | Görevi teslim et |
 | PUT | `/:id/status` | Görev durumunu güncelle |
 
-### Annotation Routes (`/api/annotations`)
+### Annotation Routes (`/api/v1/annotations`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
@@ -227,7 +227,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/raw` | Ham annotation kaydet |
 | POST | `/normalized` | Normalize annotation kaydet |
 
-### Review Routes (`/api/reviews`)
+### Review Routes (`/api/v1/reviews`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|

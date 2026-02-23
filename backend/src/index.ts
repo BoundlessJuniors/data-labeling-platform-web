@@ -50,7 +50,7 @@ app.get('/health', async (_req, res) => {
 });
 
 // API routes
-app.use('/api', routes);
+app.use('/api/v1', routes);
 
 // 404 handler for undefined routes
 app.use(notFoundHandler);
@@ -74,7 +74,7 @@ const startServer = async () => {
 
     app.listen(PORT, () => {
       logger.info(`🚀 Server running on http://localhost:${PORT}`);
-      logger.info(`📚 API documentation available at http://localhost:${PORT}/api`);
+      logger.info(`📚 API documentation available at http://localhost:${PORT}/api/v1`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

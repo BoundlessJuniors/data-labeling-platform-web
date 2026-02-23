@@ -279,8 +279,8 @@ export class ProposalService {
     });
 
     // Invalidate cache
-    await cacheDelete(`cache:/api/listings/${result.proposal.listingId}`);
-    await cacheDelete(`cache:/api/listings`);
+    await cacheDelete(`cache:/api/v1/listings/${result.proposal.listingId}`);
+    await cacheDelete(`cache:/api/v1/listings`);
 
     logger.info(`Proposal ${proposalId} accepted, Contract ${result.contract.id} created`);
 

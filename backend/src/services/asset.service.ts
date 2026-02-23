@@ -125,8 +125,8 @@ export class AssetService {
     logger.info(`Asset upload confirmed: ${assetId} -> Queued for processing`);
 
     // Invalidate caches
-    await cacheDeletePattern('cache:/api/assets*');
-    await cacheDeletePattern('cache:/api/datasets*');
+    await cacheDeletePattern('cache:/api/v1/assets*');
+    await cacheDeletePattern('cache:/api/v1/datasets*');
 
     return this.attachSignedUrl(updatedAsset);
   }
@@ -262,7 +262,7 @@ export class AssetService {
     });
 
     // Invalidate cache
-    await cacheDelete(`cache:/api/assets/${assetId}`);
+    await cacheDelete(`cache:/api/v1/assets/${assetId}`);
 
     logger.info(`Asset updated: ${asset.id}`);
 
@@ -303,7 +303,7 @@ export class AssetService {
     });
 
     // Invalidate cache
-    await cacheDelete(`cache:/api/assets/${assetId}`);
+    await cacheDelete(`cache:/api/v1/assets/${assetId}`);
 
     logger.info(`Asset deleted: ${assetId}`);
   }

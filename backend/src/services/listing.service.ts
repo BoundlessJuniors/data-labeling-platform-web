@@ -246,8 +246,8 @@ export class ListingService {
     });
 
     // Invalidate cache
-    await cacheDelete(`cache:/api/listings/${listingId}`);
-    await cacheDelete(`cache:/api/listings`);
+    await cacheDelete(`cache:/api/v1/listings/${listingId}`);
+    await cacheDelete(`cache:/api/v1/listings`);
 
     logger.info(`Listing updated: ${listing.id}`);
 
@@ -292,8 +292,8 @@ export class ListingService {
     });
 
     // Invalidate cache
-    await cacheDelete(`cache:/api/listings/${listingId}`);
-    await cacheDelete(`cache:/api/listings`);
+    await cacheDelete(`cache:/api/v1/listings/${listingId}`);
+    await cacheDelete(`cache:/api/v1/listings`);
 
     logger.info(`Listing deleted: ${listingId}`);
   }

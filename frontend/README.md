@@ -222,7 +222,7 @@ Router seviyesinde güvenlik:
 
 ```typescript
 // Base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'
 
 // Interceptors
 - Request: JWT token ekleme
@@ -233,14 +233,14 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 | Servis | Dosya | Endpoint Base |
 |--------|-------|---------------|
-| Auth | `api/auth.ts` | `/api/auth` |
-| Datasets | `api/datasets.ts` | `/api/datasets` |
-| Assets | `api/assets.ts` | `/api/assets` |
-| LabelSets | `api/labelsets.ts` | `/api/labelsets` |
-| Proposals | `api/proposals.ts` | `/api/proposals` |
-| Listings | `api/listings.ts` | `/api/listings` |
-| Contracts | `api/contracts.ts` | `/api/contracts` |
-| Tasks | `api/tasks.ts` | `/api/tasks` |
+| Auth | `api/auth.ts` | `/api/v1/auth` |
+| Datasets | `api/datasets.ts` | `/api/v1/datasets` |
+| Assets | `api/assets.ts` | `/api/v1/assets` |
+| LabelSets | `api/labelsets.ts` | `/api/v1/labelsets` |
+| Proposals | `api/proposals.ts` | `/api/v1/proposals` |
+| Listings | `api/listings.ts` | `/api/v1/listings` |
+| Contracts | `api/contracts.ts` | `/api/v1/contracts` |
+| Tasks | `api/tasks.ts` | `/api/v1/tasks` |
 
 ## 🧪 Test
 
@@ -281,7 +281,7 @@ npm run test:coverage
 `.env.example` dosyasını `.env` olarak kopyala:
 
 ```env
-VITE_API_URL=http://localhost:3000/api
+VITE_API_URL=http://localhost:3000/api/v1
 ```
 
 ## 📝 Kod Standartları
@@ -330,12 +330,12 @@ Frontend, backend API'ye şu endpoint'ler üzerinden bağlanır:
 
 | Endpoint Group | Base Path | Kullanım Yeri |
 |----------------|-----------|---------------|
-| Auth | `/api/auth` | Login, Register, Profile |
-| Datasets | `/api/datasets` | Client sayfaları |
-| Assets | `/api/assets` | Dataset detay |
-| Listings | `/api/listings` | Client & Labeler |
-| Contracts | `/api/contracts` | Client & Labeler |
-| Tasks | `/api/tasks` | Labeler görevleri |
-| Admin | `/api/admin` | Admin sayfaları |
+| Auth | `/api/v1/auth` | Login, Register, Profile |
+| Datasets | `/api/v1/datasets` | Client sayfaları |
+| Assets | `/api/v1/assets` | Dataset detay |
+| Listings | `/api/v1/listings` | Client & Labeler |
+| Contracts | `/api/v1/contracts` | Client & Labeler |
+| Tasks | `/api/v1/tasks` | Labeler görevleri |
+| Admin | `/api/v1/admin` | Admin sayfaları |
 
 Detaylı API dokümantasyonu için: [Backend README](../backend/README.md)
