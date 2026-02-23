@@ -73,8 +73,9 @@ export class LabelSetService {
             select: { id: true, email: true, displayName: true },
           },
           _count: {
-            select: { labels: true },
+            select: { labels: true, listings: true },
           },
+          labels: true,
         },
       }),
       prisma.labelSet.count({ where }),
@@ -103,6 +104,9 @@ export class LabelSetService {
         },
         labels: {
           orderBy: { createdAt: 'asc' },
+        },
+        _count: {
+          select: { labels: true, listings: true },
         },
       },
     });
@@ -156,6 +160,89 @@ export class LabelSetService {
   }
 
   /**
+   * Update a labelset (name and/or replace all labels)
+   */
+  async updateLabelSet(
+    labelSetId: string,
+    userId: string,
+    userRole: UserRole,
+    data: {
+      name?: string;
+      labels?: { name: string; color: string; attributesSchemaJson?: any }[];
+    }
+  ) {
+    const labelSet = await prisma.labelSet.findUnique({
+      where: { id: labelSetId },
+    });
+
+    if (!labelSet) {
+      throw new NotFoundError('LabelSet');
+    }
+
+    if (userRole !== 'admin' && labelSet.ownerUserId !== userId) {
+      throw new ForbiddenError('You do not have permission to modify this labelset');
+    }
+
+    // Check if labelset is in use by any listing
+    const listingCount = await prisma.listing.count({ where: { labelSetId } });
+    if (listingCount > 0) {
+      throw new ForbiddenError('Bu etiket seti bir ilanda kullanıldığı için değiştirilemez.');
+    }
+
+    // Build transaction operations
+    const operations: any[] = [];
+
+    // Update name if provided
+    if (data.name) {
+      operations.push(
+        prisma.labelSet.update({
+          where: { id: labelSetId },
+          data: { name: data.name },
+        })
+      );
+    }
+
+    // Replace all labels if provided
+    if (data.labels) {
+      operations.push(
+        prisma.label.deleteMany({ where: { labelSetId } }),
+        ...data.labels.map((label) =>
+          prisma.label.create({
+            data: {
+              labelSetId,
+              name: label.name,
+              color: label.color,
+              attributesSchemaJson: label.attributesSchemaJson,
+            },
+          })
+        )
+      );
+    }
+
+    if (operations.length > 0) {
+      await prisma.$transaction(operations);
+    }
+
+    // Return updated labelset
+    const updated = await prisma.labelSet.findUnique({
+      where: { id: labelSetId },
+      include: {
+        owner: {
+          select: { id: true, email: true, displayName: true },
+        },
+        labels: true,
+        _count: {
+          select: { labels: true, listings: true },
+        },
+      },
+    });
+
+    logger.info(`LabelSet updated: ${labelSetId} by user ${userId}`);
+
+    return updated;
+  }
+
+  /**
    * Delete a labelset
    */
   async deleteLabelSet(labelSetId: string, userId: string, userRole: UserRole) {
@@ -170,6 +257,12 @@ export class LabelSetService {
 
     if (userRole !== 'admin' && labelSet.ownerUserId !== userId) {
       throw new ForbiddenError('You do not have permission to delete this labelset');
+    }
+
+    // Check if labelset is in use by any listing
+    const listingCount = await prisma.listing.count({ where: { labelSetId } });
+    if (listingCount > 0) {
+      throw new ForbiddenError('Bu etiket seti bir ilanda kullanıldığı için silinemez.');
     }
 
     // Delete all labels first, then the labelset

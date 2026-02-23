@@ -94,7 +94,7 @@ frontend/
 │   │   ├── ToastContainer.vue
 │   │   └── HelloWorld.vue
 │   │
-│   ├── views/                 # Sayfa bileşenleri (15 sayfa)
+│   ├── views/                 # Sayfa bileşenleri (18 sayfa)
 │   │   ├── HomePage.vue       # Landing page
 │   │   ├── LoginPage.vue      # Giriş sayfası
 │   │   ├── RegisterPage.vue   # Kayıt sayfası
@@ -108,6 +108,7 @@ frontend/
 │   │   ├── client/            # Client sayfaları
 │   │   │   ├── DatasetsPage.vue
 │   │   │   ├── DatasetDetailPage.vue   # Görsel yükleme (R2)
+│   │   │   ├── LabelSetsPage.vue       # Etiket seti yönetimi (CRUD + edit guard)
 │   │   │   ├── ListingsPage.vue        # LabelSet seçimi
 │   │   │   ├── ListingProposalsPage.vue # Başvuru yönetimi
 │   │   │   ├── ContractsPage.vue
@@ -167,6 +168,7 @@ frontend/
 | `/admin/users` | Admin | Kullanıcı listesi & yönetim |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
+| `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
 | `/client/listings` | Client | İlan CRUD işlemleri |
 | `/client/contracts` | Client | Sözleşme yönetimi |
 | `/client/contracts/:id` | Client | Sözleşme detay sayfası |
@@ -321,6 +323,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Vitest test altyapısı
 - [x] Asset upload bileşeni (Cloudflare R2)
 - [x] LabelSet seçimi (ilan oluşturma)
+- [x] LabelSet yönetimi (oluştur, düzenle, sil + kullanım koruması)
 - [x] Proposal (başvuru) yönetim sayfası
 
 ### Geliştirme Bekleyen Özellikler 🔄
@@ -338,6 +341,7 @@ Frontend, backend API'ye şu endpoint'ler üzerinden bağlanır:
 | Auth | `/api/v1/auth` | Login, Register, Profile |
 | Datasets | `/api/v1/datasets` | Client sayfaları |
 | Assets | `/api/v1/assets` | Dataset detay |
+| LabelSets | `/api/v1/labelsets` | Etiket seti yönetimi |
 | Listings | `/api/v1/listings` | Client & Labeler |
 | Contracts | `/api/v1/contracts` | Client & Labeler |
 | Tasks | `/api/v1/tasks` | Labeler görevleri |

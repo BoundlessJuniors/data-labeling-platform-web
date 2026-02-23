@@ -3,8 +3,8 @@ import * as labelsetController from '../controllers/labelset.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { adminOrClient } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { createLabelSetSchema, idParamSchema, addLabelSchema } from '../validators/validation.schemas';
-import { cacheMiddleware } from '../middlewares/cache.middleware';
+import { createLabelSetSchema, updateLabelSetSchema, idParamSchema, addLabelSchema } from '../validators/validation.schemas';
+import { cacheMiddleware, invalidateCache } from '../middlewares/cache.middleware';
 
 const router = Router();
 
@@ -22,6 +22,7 @@ router.post(
   authenticate,
   adminOrClient,
   validate(createLabelSetSchema),
+  invalidateCache(['cache:/api/v1/labelsets*']),
   labelsetController.createLabelSet
 );
 
@@ -40,7 +41,18 @@ router.post(
   authenticate,
   validate(idParamSchema, 'params'),
   validate(addLabelSchema),
+  invalidateCache(['cache:/api/v1/labelsets*']),
   labelsetController.addLabel
+);
+
+// PUT /api/labelsets/:id - Update a labelset
+router.put(
+  '/:id',
+  authenticate,
+  validate(idParamSchema, 'params'),
+  validate(updateLabelSetSchema),
+  invalidateCache(['cache:/api/v1/labelsets*']),
+  labelsetController.updateLabelSet
 );
 
 // DELETE /api/labelsets/:id - Delete a labelset
@@ -48,6 +60,7 @@ router.delete(
   '/:id',
   authenticate,
   validate(idParamSchema, 'params'),
+  invalidateCache(['cache:/api/v1/labelsets*']),
   labelsetController.deleteLabelSet
 );
 

@@ -170,8 +170,11 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/` | Kullanıcının label setleri |
 | GET | `/:id` | LabelSet detayı |
 | POST | `/` | Yeni LabelSet oluştur |
-| PUT | `/:id` | LabelSet güncelle |
+| POST | `/:id/labels` | LabelSet'e etiket ekle |
+| PUT | `/:id` | LabelSet güncelle (isim ve/veya etiketleri değiştir) |
 | DELETE | `/:id` | LabelSet sil |
+
+> **Not:** Bir Listing tarafından kullanılan LabelSet'ler güncellenemez ve silinemez (usage guard).
 
 ### Listing Routes (`/api/v1/listings`)
 

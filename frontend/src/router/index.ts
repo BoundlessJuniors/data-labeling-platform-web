@@ -94,6 +94,12 @@ const router = createRouter({
           meta: { title: 'İlanlar' },
         },
         {
+          path: 'labelsets',
+          name: 'client-labelsets',
+          component: () => import('@/views/client/LabelSetsPage.vue'),
+          meta: { title: 'Etiket Setleri' },
+        },
+        {
           path: 'listings/:id/proposals',
           name: 'client-listing-proposals',
           component: () => import('@/views/client/ListingProposalsPage.vue'),

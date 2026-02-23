@@ -28,6 +28,7 @@ const navItems = computed<NavItem[]>(() => {
   if (role === 'client') {
     return [
       { label: 'Datasets', to: '/client/datasets', icon: 'database' },
+      { label: 'Etiket Setleri', to: '/client/labelsets', icon: 'tag' },
       { label: 'İlanlar', to: '/client/listings', icon: 'megaphone' },
       { label: 'Sözleşmeler', to: '/client/contracts', icon: 'document' },
     ];
@@ -122,6 +123,13 @@ function handleLogout() {
                 stroke-linejoin="round"
                 stroke-width="2"
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+              <path
+                v-else-if="item.icon === 'tag'"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
               />
               <path
                 v-else-if="item.icon === 'task'"

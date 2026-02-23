@@ -436,6 +436,17 @@ function formatDate(dateString: string) {
             required
           />
         </div>
+        <!-- Empty label sets warning -->
+        <p
+          v-if="!labelSetsStore.loading && labelSetsStore.labelSets.length === 0"
+          class="text-sm text-amber-600 dark:text-amber-400 -mt-2"
+        >
+          ⚠️ Henüz etiket setiniz yok. Önce bir
+          <RouterLink
+            to="/client/labelsets"
+            class="font-medium underline hover:text-amber-700 dark:hover:text-amber-300"
+          >etiket seti oluşturun</RouterLink>.
+        </p>
         <div class="grid sm:grid-cols-2 gap-4">
           <BaseSelect
             id="create-format"

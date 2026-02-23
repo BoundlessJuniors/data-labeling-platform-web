@@ -102,6 +102,32 @@ export const addLabel = async (
   }
 };
 
+// Update a labelset (name and/or replace labels)
+export const updateLabelSet = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { name, labels } = req.body;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const labelSet = await labelSetService.updateLabelSet(id, userId, userRole, {
+      name,
+      labels,
+    });
+
+    res.json({
+      success: true,
+      data: labelSet,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Delete a labelset
 export const deleteLabelSet = async (
   req: AuthRequest,

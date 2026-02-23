@@ -149,6 +149,21 @@ export const addLabelSchema = Joi.object({
   attributesSchemaJson: Joi.object().optional(),
 });
 
+export const updateLabelSetSchema = Joi.object({
+  name: Joi.string().min(1).max(255).optional(),
+  labels: Joi.array().items(
+    Joi.object({
+      name: Joi.string().min(1).max(255).required(),
+      color: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).optional().messages({
+        'string.pattern.base': 'Color must be a valid hex color (e.g., #FF5733)',
+      }),
+      attributesSchemaJson: Joi.object().optional(),
+    })
+  ).optional(),
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update',
+});
+
 // ============================================================================
 // Listing Schemas
 // ============================================================================

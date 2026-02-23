@@ -26,7 +26,7 @@ data-labeling-platform-web/
 │   │   ├── router/       # Role-based routing
 │   │   ├── stores/       # 10 Pinia store
 │   │   ├── types/        # 10 TypeScript type dosyası
-│   │   └── views/        # 17 sayfa bileşeni
+│   │   └── views/        # 18 sayfa bileşeni
 │   └── public/           # Static assets
 │
 ├── docker-compose.yml    # PostgreSQL 16 + Redis 7 + MinIO
@@ -115,7 +115,7 @@ npm run dev
 | Auth | `/api/v1/auth/*` | Kayıt, giriş, profil |
 | Datasets | `/api/v1/datasets/*` | Dataset CRUD |
 | Assets | `/api/v1/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
-| LabelSets | `/api/v1/labelsets/*` | Etiket setleri |
+| LabelSets | `/api/v1/labelsets/*` | Etiket setleri (CRUD + edit guard) |
 | Listings | `/api/v1/listings/*` | İlanlar |
 | Proposals | `/api/v1/proposals/*` | İlan başvuruları |
 | Contracts | `/api/v1/contracts/*` | Sözleşmeler |
