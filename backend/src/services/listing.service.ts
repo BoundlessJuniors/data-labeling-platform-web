@@ -126,7 +126,7 @@ export class ListingService {
         orderBy: { createdAt: 'desc' },
         include: {
           dataset: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, _count: { select: { assets: true } } },
           },
           owner: {
             select: { id: true, email: true, displayName: true },

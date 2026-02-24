@@ -57,15 +57,30 @@ async function fetchListings() {
   error.value = null;
 
   try {
-    const response = await apiClient.get('/listings/public', {
+    const response = await apiClient.get('/listings', {
       params: {
+        status: 'open',
         page: page.value,
         limit: limit.value,
         search: searchInput.value || undefined,
       },
     });
 
-    listings.value = response.data.data;
+    // Map nested Prisma response to flat PublicListing shape
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    listings.value = (response.data.data as Record<string, any>[]).map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      datasetName: item.dataset?.name ?? '',
+      clientName: item.owner?.displayName ?? '',
+      priceTotal: item.priceTotal,
+      currency: item.currency,
+      totalAssets: item.dataset?._count?.assets ?? 0,
+      remainingAssets: item.dataset?._count?.assets ?? 0,
+      annotationFormat: item.labelingSpecJson?.annotationFormat ?? '',
+      createdAt: item.createdAt,
+    }));
     total.value = response.data.pagination?.total ?? response.data.data.length;
     totalPages.value = Math.ceil(total.value / limit.value);
   } catch (_err) {
@@ -95,14 +110,13 @@ async function handleApply() {
 
   applyLoading.value = true;
   try {
-    await apiClient.post('/contracts', {
+    await apiClient.post('/proposals', {
       listingId: applyingListing.value.id,
+      priceQuote: applyingListing.value.priceTotal,
     });
     toastStore.success('Başvurunuz alındı! Müşteri onayını bekleyiniz.');
     showApplyModal.value = false;
     applyingListing.value = null;
-    // Refresh to show updated
-    fetchListings();
   } catch (_err) {
     toastStore.error('Başvuru yapılamadı. Bu ilana zaten başvurmuş olabilirsiniz.');
   } finally {

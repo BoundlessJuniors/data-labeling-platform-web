@@ -94,7 +94,7 @@ frontend/
 │   │   ├── ToastContainer.vue
 │   │   └── HelloWorld.vue
 │   │
-│   ├── views/                 # Sayfa bileşenleri (18 sayfa)
+│   ├── views/                 # Sayfa bileşenleri (19 sayfa)
 │   │   ├── HomePage.vue       # Landing page
 │   │   ├── LoginPage.vue      # Giriş sayfası
 │   │   ├── RegisterPage.vue   # Kayıt sayfası
@@ -116,10 +116,11 @@ frontend/
 │   │   │
 │   │   └── labeler/           # Labeler sayfaları
 │   │       ├── AvailableListingsPage.vue
+│   │       ├── MyProposalsPage.vue    # Başvuru takibi (YENİ)
 │   │       ├── MyContractsPage.vue
 │   │       └── TasksPage.vue
 │   │
-│   ├── types/                 # TypeScript type tanımları (9 dosya)
+│   ├── types/                 # TypeScript type tanımları (10 dosya)
 │   │   ├── index.ts           # Export barrel
 │   │   ├── api.ts             # API response types
 │   │   ├── auth.ts            # Auth types
@@ -127,7 +128,8 @@ frontend/
 │   │   ├── asset.ts           # Asset types
 │   │   ├── labelset.ts        # LabelSet types
 │   │   ├── listing.ts         # Listing types
-│   │   ├── contract.ts        # Contract types
+│   │   ├── proposal.ts        # Proposal types
+│   │   ├── contract.ts        # Contract types (agreedPriceTotal, active status)
 │   │   └── task.ts            # Task types
 │   │
 │   ├── composables/           # Vue composables
@@ -170,9 +172,11 @@ frontend/
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
 | `/client/listings` | Client | İlan CRUD işlemleri |
+| `/client/listings/:id/proposals` | Client | İlan başvurularını görüntüle |
 | `/client/contracts` | Client | Sözleşme yönetimi |
 | `/client/contracts/:id` | Client | Sözleşme detay sayfası |
 | `/labeler/listings` | Labeler | Mevcut ilanları görüntüle |
+| `/labeler/proposals` | Labeler | Başvurularımı takip et |
 | `/labeler/contracts` | Labeler | Sözleşmelerimi görüntüle |
 | `/labeler/tasks` | Labeler | Görevlerimi yönet |
 
@@ -324,7 +328,10 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Asset upload bileşeni (Cloudflare R2)
 - [x] LabelSet seçimi (ilan oluşturma)
 - [x] LabelSet yönetimi (oluştur, düzenle, sil + kullanım koruması)
-- [x] Proposal (başvuru) yönetim sayfası
+- [x] Proposal (başvuru) yönetim sayfası (client)
+- [x] Labeler başvuru takip sayfası (`MyProposalsPage.vue`) — durum, fiyat teklifi, geri çekme
+- [x] Proposal → Contract lifecycle (başvur → kabul → sözleşme + görev oluşturma)
+- [x] Contract type refactoring (`totalPayment` → `agreedPriceTotal`, `active` status)
 - [x] Toplam fiyat modeli (`priceTotal`) — ilan oluşturma/düzenleme/listeleme
 - [x] İlan kartlarında dataset adı gösterimi
 - [x] Düzenleme modalında dataset adı salt-okunur gösterim
@@ -345,6 +352,7 @@ Frontend, backend API'ye şu endpoint'ler üzerinden bağlanır:
 | Datasets | `/api/v1/datasets` | Client sayfaları |
 | Assets | `/api/v1/assets` | Dataset detay |
 | LabelSets | `/api/v1/labelsets` | Etiket seti yönetimi |
+| Proposals | `/api/v1/proposals` | Client başvuru yönetimi, Labeler başvuru takibi |
 | Listings | `/api/v1/listings` | Client & Labeler |
 | Contracts | `/api/v1/contracts` | Client & Labeler |
 | Tasks | `/api/v1/tasks` | Labeler görevleri |

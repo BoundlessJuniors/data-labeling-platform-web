@@ -322,7 +322,7 @@ function formatDate(dateString: string) {
             <!-- Actions -->
             <div class="flex gap-1">
               <BaseButton
-                v-if="listing.status === 'published'"
+                v-if="['open', 'published', 'in_progress'].includes(listing.status)"
                 variant="outline"
                 size="sm"
                 @click="router.push({ name: 'client-listing-proposals', params: { id: listing.id } })"
@@ -341,7 +341,7 @@ function formatDate(dateString: string) {
                 Yayınla
               </button>
               <button
-                v-if="listing.status === 'published'"
+                v-if="['open', 'published'].includes(listing.status)"
                 type="button"
                 class="px-3 py-1.5 text-xs font-medium rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 transition-colors"
                 @click="listingsStore.unpublishListing(listing.id)"
@@ -349,7 +349,7 @@ function formatDate(dateString: string) {
                 Yayından Kaldır
               </button>
               <button
-                v-if="listing.status === 'published'"
+                v-if="['open', 'published'].includes(listing.status)"
                 type="button"
                 class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 transition-colors"
                 @click="listingsStore.closeListing(listing.id)"

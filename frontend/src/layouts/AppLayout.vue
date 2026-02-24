@@ -37,6 +37,7 @@ const navItems = computed<NavItem[]>(() => {
   if (role === 'labeler') {
     return [
       { label: 'İş Bul', to: '/labeler/listings', icon: 'search' },
+      { label: 'Başvurularım', to: '/labeler/proposals', icon: 'clipboard' },
       { label: 'Sözleşmelerim', to: '/labeler/contracts', icon: 'document' },
       { label: 'Görevlerim', to: '/labeler/tasks', icon: 'task' },
     ];
@@ -137,6 +138,13 @@ function handleLogout() {
                 stroke-linejoin="round"
                 stroke-width="2"
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+              />
+              <path
+                v-else-if="item.icon === 'clipboard'"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
               />
             </svg>
           </span>

@@ -131,6 +131,12 @@ const router = createRouter({
           meta: { title: 'Mevcut İlanlar' },
         },
         {
+          path: 'proposals',
+          name: 'labeler-proposals',
+          component: () => import('@/views/labeler/MyProposalsPage.vue'),
+          meta: { title: 'Başvurularım' },
+        },
+        {
           path: 'contracts',
           name: 'labeler-contracts',
           component: () => import('@/views/labeler/MyContractsPage.vue'),

@@ -26,7 +26,7 @@ data-labeling-platform-web/
 │   │   ├── router/       # Role-based routing
 │   │   ├── stores/       # 10 Pinia store
 │   │   ├── types/        # 10 TypeScript type dosyası
-│   │   └── views/        # 18 sayfa bileşeni
+│   │   └── views/        # 19 sayfa bileşeni
 │   └── public/           # Static assets
 │
 ├── docker-compose.yml    # PostgreSQL 16 + Redis 7 + MinIO
@@ -138,7 +138,7 @@ npm run dev
 |-----|--------|------------|
 | **Admin** | `/admin/*` | Kullanıcı yönetimi, platform istatistikleri |
 | **Client** | `/client/*` | Dataset, listing, contract yönetimi |
-| **Labeler** | `/labeler/*` | İlanları görüntüleme, görev yapma |
+| **Labeler** | `/labeler/*` | İlanları görüntüleme, başvuru takibi, görev yapma |
 
 ## 📖 Detaylı Dokümantasyon
 

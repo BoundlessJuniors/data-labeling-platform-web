@@ -14,6 +14,13 @@ export interface ProposalListParams {
 
 export const proposalsApi = {
   /**
+   * Create a new proposal (labeler applies to listing)
+   */
+  create(data: { listingId: string; priceQuote: number; coverLetter?: string }) {
+    return apiClient.post<ApiResponse<Proposal>>('/proposals', data);
+  },
+
+  /**
    * Get proposals (filtered by listingId, status, etc.)
    */
   list(params: ProposalListParams = {}) {

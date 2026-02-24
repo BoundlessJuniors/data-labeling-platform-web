@@ -45,11 +45,23 @@ async function fetchContracts() {
   error.value = null;
 
   try {
-    const response = await apiClient.get('/contracts/my', {
+    const response = await apiClient.get('/contracts', {
       params: { page: page.value, limit: limit.value },
     });
 
-    contracts.value = response.data.data;
+    // Map nested backend response to flat MyContract shape
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    contracts.value = (response.data.data as Record<string, any>[]).map((item) => ({
+      id: item.id,
+      listingTitle: item.listing?.title ?? '',
+      clientName: item.client?.displayName ?? item.client?.email ?? '',
+      status: item.status,
+      assignedAssets: item._count?.tasks ?? 0,
+      completedAssets: 0,
+      totalPayment: item.agreedPriceTotal ?? 0,
+      currency: item.currency,
+      createdAt: item.createdAt,
+    }));
     total.value = response.data.pagination?.total ?? response.data.data.length;
   } catch (_err) {
     error.value = 'Sözleşmeler yüklenemedi';
@@ -73,10 +85,9 @@ function viewTasks(contractId: string) {
 
 function getStatusBadge(status: string) {
   const badges: Record<string, string> = {
-    pending: 'badge-warning',
-    accepted: 'badge-info',
-    in_progress: 'badge-info',
+    active: 'badge-info',
     submitted: 'badge-warning',
+    approved: 'badge-success',
     revision_requested: 'badge-warning',
     completed: 'badge-success',
     cancelled: 'badge-error',
@@ -87,10 +98,9 @@ function getStatusBadge(status: string) {
 
 function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
-    pending: 'Onay Bekleniyor',
-    accepted: 'Kabul Edildi',
-    in_progress: 'Devam Ediyor',
+    active: 'Aktif',
     submitted: 'Gönderildi',
+    approved: 'Onaylandı',
     revision_requested: 'Revizyon',
     completed: 'Tamamlandı',
     cancelled: 'İptal Edildi',

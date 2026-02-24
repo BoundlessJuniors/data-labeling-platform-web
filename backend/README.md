@@ -201,7 +201,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PATCH | `/:id/withdraw` | Başvuruyu geri çek (labeler) |
 | GET | `/listings/:id/proposals` | İlanın başvuruları |
 
-> **Not:** `acceptProposal` transaction içinde: Proposal kabul → Contract oluştur → Diğer başvuruları reddet → Listing status güncelle
+> **Not:** `acceptProposal` transaction içinde: Proposal kabul → Contract oluştur → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `in_progress`'e güncelle
 
 ### Contract Routes (`/api/v1/contracts`)
 
@@ -209,11 +209,12 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 |--------|----------|----------|
 | GET | `/` | Kullanıcının sözleşmeleri |
 | GET | `/:id` | Sözleşme detayı |
-| POST | `/` | Sözleşme oluştur |
-| PUT | `/:id/status` | Sözleşme durumunu güncelle |
-| POST | `/:id/submit` | Sözleşmeyi teslim et |
-| POST | `/:id/approve` | Sözleşmeyi onayla |
-| POST | `/:id/reject` | Sözleşmeyi reddet |
+| PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) |
+| PATCH | `/:id/approve` | Sözleşmeyi onayla (client) |
+| PATCH | `/:id/reject` | Sözleşmeyi reddet (client) |
+| PATCH | `/:id/cancel` | Sözleşmeyi iptal et |
+
+> **Not:** Sözleşmeler artık doğrudan oluşturulmaz. Bir başvuru (`Proposal`) kabul edildiğinde otomatik olarak oluşturulur. `agreedPriceTotal` alanı başvurudaki `priceQuote` değerinden gelir.
 
 ### Task Routes (`/api/v1/tasks`)
 
@@ -352,4 +353,4 @@ JWT tabanlı authentication sistemi (`httpOnly` cookie):
 |-----|----------------|
 | **admin** | Tüm endpointlere erişim, kullanıcı yönetimi |
 | **client** | Dataset, listing, contract yönetimi |
-| **labeler** | İlanları görüntüleme, görev yapma |
+| **labeler** | İlanları görüntüleme, başvuru takibi, görev yapma |

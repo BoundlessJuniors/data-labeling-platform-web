@@ -76,9 +76,8 @@ function getStatusBadge(status: string) {
 
 function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
-    pending: 'Beklemede',
-    assigned: 'Atandı',
-    in_progress: 'Devam Ediyor',
+    ready: 'Hazır',
+    leased: 'Atandı',
     submitted: 'Gönderildi',
     revision_requested: 'Revizyon İstendi',
     resubmitted: 'Yeniden Gönderildi',
@@ -124,7 +123,7 @@ function goBack() {
         </div>
         <div class="text-right">
           <div class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{ contractsStore.currentContract.completedAssets }} / {{ contractsStore.currentContract.assignedAssets }}
+            {{ contractsStore.currentContract.tasks?.filter((t: { status: string }) => t.status === 'approved').length ?? 0 }} / {{ contractsStore.currentContract._count?.tasks ?? 0 }}
           </div>
           <div class="text-sm text-gray-500">Tamamlanan</div>
         </div>

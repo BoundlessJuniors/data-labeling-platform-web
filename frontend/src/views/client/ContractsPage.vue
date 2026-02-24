@@ -25,12 +25,12 @@ const router = useRouter();
 // Status filter options
 const statusOptions = [
   { value: '', label: 'Tüm Durumlar' },
-  { value: 'pending', label: 'Beklemede' },
-  { value: 'accepted', label: 'Kabul Edildi' },
-  { value: 'in_progress', label: 'Devam Ediyor' },
+  { value: 'active', label: 'Aktif' },
   { value: 'submitted', label: 'Gönderildi' },
+  { value: 'approved', label: 'Onaylandı' },
   { value: 'completed', label: 'Tamamlandı' },
   { value: 'cancelled', label: 'İptal Edildi' },
+  { value: 'rejected', label: 'Reddedildi' },
 ];
 
 // Fetch on mount
@@ -67,10 +67,9 @@ async function handleConfirm() {
 
 function getStatusBadge(status: string) {
   const badges: Record<string, string> = {
-    pending: 'badge-warning',
-    accepted: 'badge-info',
-    in_progress: 'badge-info',
+    active: 'badge-info',
     submitted: 'badge-warning',
+    approved: 'badge-success',
     revision_requested: 'badge-warning',
     completed: 'badge-success',
     cancelled: 'badge-error',
@@ -81,10 +80,9 @@ function getStatusBadge(status: string) {
 
 function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
-    pending: 'Beklemede',
-    accepted: 'Kabul Edildi',
-    in_progress: 'Devam Ediyor',
+    active: 'Aktif',
     submitted: 'Gönderildi',
+    approved: 'Onaylandı',
     revision_requested: 'Revizyon İstendi',
     completed: 'Tamamlandı',
     cancelled: 'İptal Edildi',
@@ -174,34 +172,18 @@ const currentConfirmMessage = computed(() => {
               <span :class="getStatusBadge(contract.status)">{{ getStatusLabel(contract.status) }}</span>
             </div>
             <div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-              <span>{{ contract.completedAssets }} / {{ contract.assignedAssets }} asset</span>
+              <span>{{ contract._count?.tasks ?? 0 }} görev</span>
               <span>{{ formatDate(contract.createdAt) }}</span>
             </div>
           </div>
           <div class="flex flex-col items-end gap-2">
             <p class="text-lg font-bold text-gray-900 dark:text-white">
-              {{ formatPrice(contract.totalPayment, contract.currency) }}
+              {{ formatPrice(contract.agreedPriceTotal, contract.currency) }}
             </p>
             <!-- Actions -->
             <div class="flex gap-2">
               <button
-                v-if="contract.status === 'pending'"
-                type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
-                @click="openConfirm('accept', contract.id)"
-              >
-                Kabul Et
-              </button>
-              <button
-                v-if="contract.status === 'pending'"
-                type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-                @click="openConfirm('reject', contract.id)"
-              >
-                Reddet
-              </button>
-              <button
-                v-if="['accepted', 'in_progress', 'submitted'].includes(contract.status)"
+                v-if="['active', 'submitted'].includes(contract.status)"
                 type="button"
                 class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                 @click="viewTasks(contract.id)"
