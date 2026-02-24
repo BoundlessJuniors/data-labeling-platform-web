@@ -26,7 +26,7 @@ interface PublicListing {
   description: string | null;
   datasetName: string;
   clientName: string;
-  pricePerAsset: number;
+  priceTotal: number;
   currency: string;
   totalAssets: number;
   remainingAssets: number;
@@ -199,7 +199,7 @@ function formatDate(dateString: string) {
           </div>
           <div class="flex flex-col items-end gap-2">
             <p class="text-xl font-bold text-gray-900 dark:text-white">
-              {{ formatPrice(listing.pricePerAsset, listing.currency) }}/asset
+              {{ formatPrice(listing.priceTotal, listing.currency) }}
             </p>
             <p class="text-sm text-gray-500 dark:text-gray-400">
               {{ listing.remainingAssets }} / {{ listing.totalAssets }} kalan
@@ -227,7 +227,7 @@ function formatDate(dateString: string) {
         <div>
           <h3 class="font-semibold text-gray-900 dark:text-white">{{ applyingListing.title }}</h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {{ applyingListing.remainingAssets }} asset için {{ formatPrice(applyingListing.pricePerAsset, applyingListing.currency) }}/asset
+            {{ applyingListing.remainingAssets }} asset için toplam {{ formatPrice(applyingListing.priceTotal, applyingListing.currency) }}
           </p>
         </div>
         <p class="text-gray-600 dark:text-gray-400">

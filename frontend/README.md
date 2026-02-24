@@ -109,7 +109,7 @@ frontend/
 │   │   │   ├── DatasetsPage.vue
 │   │   │   ├── DatasetDetailPage.vue   # Görsel yükleme (R2)
 │   │   │   ├── LabelSetsPage.vue       # Etiket seti yönetimi (CRUD + edit guard)
-│   │   │   ├── ListingsPage.vue        # LabelSet seçimi
+│   │   │   ├── ListingsPage.vue        # İlan yönetimi (toplam fiyat, dataset gösterimi)
 │   │   │   ├── ListingProposalsPage.vue # Başvuru yönetimi
 │   │   │   ├── ContractsPage.vue
 │   │   │   └── ContractDetailPage.vue
@@ -325,6 +325,9 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] LabelSet seçimi (ilan oluşturma)
 - [x] LabelSet yönetimi (oluştur, düzenle, sil + kullanım koruması)
 - [x] Proposal (başvuru) yönetim sayfası
+- [x] Toplam fiyat modeli (`priceTotal`) — ilan oluşturma/düzenleme/listeleme
+- [x] İlan kartlarında dataset adı gösterimi
+- [x] Düzenleme modalında dataset adı salt-okunur gösterim
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

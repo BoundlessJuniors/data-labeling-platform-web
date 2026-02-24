@@ -187,6 +187,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | İlan güncelle |
 | DELETE | `/:id` | İlan sil |
 
+> **Cache:** Listings için Redis cache (`cacheMiddleware`) kullanılır; `GET /` 30s, `GET /:id` 60s TTL. Her yazma işleminde (create/update/delete) `cacheDeletePattern('cache:/api/v1/listings*')` ile tüm listing cache'leri (sayfalı, filtreli) otomatik silinir.
+
 ### Proposal Routes (`/api/v1/proposals`) 🆕
 
 | Method | Endpoint | Açıklama |
@@ -252,7 +254,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 - **Label** - LabelSet içindeki tek etiket
 
 ### Marketplace Models
-- **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled)
+- **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`)
 - **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 🆕
 - **Contract** - İş sözleşmeleri (active, submitted, approved, rejected)
 - **Submission** - Toplu etiket gönderimi (COCO/YOLO import) 🆕

@@ -171,7 +171,7 @@ function truncateText(text: string, maxLength: number) {
         </div>
         <div class="flex flex-col items-end gap-1">
           <span class="text-lg font-bold text-primary-700 dark:text-primary-300">
-            {{ formatPrice(listing.pricePerAsset, listing.currency) }}/asset
+            {{ formatPrice(listing.priceTotal, listing.currency) }}
           </span>
           <span class="text-xs text-gray-500 dark:text-gray-400">
             {{ proposalsStore.proposals.length }} başvuru

@@ -38,7 +38,7 @@ const formTitle = ref('');
 const formDescription = ref('');
 const formDatasetId = ref('');
 const formLabelSetId = ref('');
-const formPricePerAsset = ref(0);
+const formPriceTotal = ref(0);
 const formAnnotationFormat = ref<AnnotationFormat>('COCO');
 const formInstructions = ref('');
 const editingId = ref<string | null>(null);
@@ -47,8 +47,9 @@ const deletingId = ref<string | null>(null);
 // Edit form state
 const editTitle = ref('');
 const editDescription = ref('');
-const editPricePerAsset = ref(0);
+const editPriceTotal = ref(0);
 const editInstructions = ref('');
+const editDatasetName = ref('');
 
 // Search & Filter
 const searchInput = ref('');
@@ -92,17 +93,18 @@ function openCreateModal() {
   formDescription.value = '';
   formDatasetId.value = '';
   formLabelSetId.value = '';
-  formPricePerAsset.value = 0;
+  formPriceTotal.value = 0;
   formAnnotationFormat.value = 'COCO';
   formInstructions.value = '';
   showCreateModal.value = true;
 }
 
-function openEditModal(listing: { id: string; title: string; description?: string | null; pricePerAsset: number; labelingSpecJson?: { instructions?: string } }) {
+function openEditModal(listing: { id: string; title: string; description?: string | null; priceTotal: number; dataset?: { name: string }; labelingSpecJson?: { instructions?: string } }) {
   editingId.value = listing.id;
   editTitle.value = listing.title;
   editDescription.value = listing.description || '';
-  editPricePerAsset.value = listing.pricePerAsset;
+  editPriceTotal.value = listing.priceTotal;
+  editDatasetName.value = listing.dataset?.name || '';
   editInstructions.value = listing.labelingSpecJson?.instructions || '';
   showEditModal.value = true;
 }
@@ -117,16 +119,11 @@ async function handleCreate() {
 
   // --- Field mapping: Frontend → Backend (Prisma Listing model) ---
 
-  // 1) Get the selected dataset's asset count to compute priceTotal
-  const selectedDataset = datasetsStore.datasets.find((d) => d.id === formDatasetId.value);
-  const totalAssets = selectedDataset?.assetCount ?? 0;
-  const priceTotal = formPricePerAsset.value * (totalAssets > 0 ? totalAssets : 1);
-
-  // 2) Get the selected LabelSet's version
+  // 1) Get the selected LabelSet's version
   const selectedLabelSet = labelSetsStore.getLabelSetById(formLabelSetId.value);
   const labelSetVersion = selectedLabelSet?.version ?? 1;
 
-  // 3) Package instructions and annotationFormat into labelingSpecJson
+  // 2) Package instructions and annotationFormat into labelingSpecJson
   const labelingSpecJson = {
     instructions: formInstructions.value.trim() || undefined,
     format: formAnnotationFormat.value,
@@ -139,7 +136,7 @@ async function handleCreate() {
     labelSetId: formLabelSetId.value,
     labelSetVersion,
     labelingSpecJson,
-    priceTotal,
+    priceTotal: formPriceTotal.value,
     currency: 'TRY',
   });
   if (result) {
@@ -153,7 +150,7 @@ async function handleEdit() {
   const result = await listingsStore.updateListing(editingId.value, {
     title: editTitle.value.trim(),
     description: editDescription.value.trim() || undefined,
-    priceTotal: editPricePerAsset.value,
+    priceTotal: editPriceTotal.value,
   });
   if (result) {
     showEditModal.value = false;
@@ -302,23 +299,25 @@ function formatDate(dateString: string) {
       >
         <div class="flex flex-col sm:flex-row justify-between gap-4">
           <div class="flex-1 min-w-0">
-            <div class="flex items-start gap-3">
+            <div class="flex items-start gap-3 flex-wrap">
               <h2 class="font-semibold text-gray-900 dark:text-white truncate">{{ listing.title }}</h2>
               <span :class="getStatusBadge(listing.status)" class="flex-shrink-0">
                 {{ getStatusLabel(listing.status) }}
+              </span>
+              <span v-if="listing.dataset?.name" class="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded flex-shrink-0">
+                Dataset: {{ listing.dataset.name }}
               </span>
             </div>
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate-2">
               {{ listing.description || 'Açıklama yok' }}
             </p>
             <div class="flex items-center gap-4 mt-3 text-xs text-gray-500 dark:text-gray-400">
-              <span>{{ listing.completedAssets }} / {{ listing.totalAssets }} asset</span>
               <span>{{ formatDate(listing.createdAt) }}</span>
             </div>
           </div>
           <div class="flex flex-col items-end gap-2">
             <p class="text-lg font-bold text-gray-900 dark:text-white">
-              {{ formatPrice(listing.pricePerAsset, listing.currency) }}/asset
+              {{ formatPrice(listing.priceTotal, listing.currency) }}
             </p>
             <!-- Actions -->
             <div class="flex gap-1">
@@ -456,8 +455,8 @@ function formatDate(dateString: string) {
           />
           <BaseInput
             id="create-price"
-            v-model.number="formPricePerAsset"
-            label="Asset Başına Ücret (TRY)"
+            v-model.number="formPriceTotal"
+            label="Toplam İlan Ücreti (TRY)"
             type="number"
             :min="0"
             step="0.01"
@@ -489,6 +488,12 @@ function formatDate(dateString: string) {
     <BaseModal :open="showEditModal" title="İlanı Düzenle" @close="showEditModal = false">
       <form class="space-y-4" @submit.prevent="handleEdit">
         <BaseInput
+          id="edit-dataset"
+          :model-value="editDatasetName"
+          label="Dataset"
+          disabled
+        />
+        <BaseInput
           id="edit-title"
           v-model="editTitle"
           label="Başlık"
@@ -509,8 +514,8 @@ function formatDate(dateString: string) {
         </div>
         <BaseInput
           id="edit-price"
-          v-model.number="editPricePerAsset"
-          label="Asset Başına Ücret (TRY)"
+          v-model.number="editPriceTotal"
+          label="Toplam İlan Ücreti (TRY)"
           type="number"
           :min="0"
           step="0.01"

@@ -2,7 +2,7 @@ import { ListingStatus, Prisma, QcMode } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
-import { cacheDelete } from '../lib/redis';
+import { cacheDeletePattern } from '../lib/redis';
 import logger from '../lib/logger';
 
 export class ListingService {
@@ -80,6 +80,9 @@ export class ListingService {
     });
 
     logger.info(`Listing created: ${listing.id} by user ${userId}`);
+
+    // Invalidate listings cache so the new listing appears immediately
+    await cacheDeletePattern('cache:/api/v1/listings*');
 
     return listing;
   }
@@ -245,9 +248,8 @@ export class ListingService {
       },
     });
 
-    // Invalidate cache
-    await cacheDelete(`cache:/api/v1/listings/${listingId}`);
-    await cacheDelete(`cache:/api/v1/listings`);
+    // Invalidate cache (wildcard covers paginated/filtered variants)
+    await cacheDeletePattern('cache:/api/v1/listings*');
 
     logger.info(`Listing updated: ${listing.id}`);
 
@@ -291,9 +293,8 @@ export class ListingService {
       });
     });
 
-    // Invalidate cache
-    await cacheDelete(`cache:/api/v1/listings/${listingId}`);
-    await cacheDelete(`cache:/api/v1/listings`);
+    // Invalidate cache (wildcard covers paginated/filtered variants)
+    await cacheDeletePattern('cache:/api/v1/listings*');
 
     logger.info(`Listing deleted: ${listingId}`);
   }

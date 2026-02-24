@@ -41,7 +41,7 @@ export interface ContractWithDetails extends Contract {
   listing: {
     id: string;
     title: string;
-    pricePerAsset: number;
+    priceTotal: number;
     annotationFormat: string;
     instructions: string | null;
   };

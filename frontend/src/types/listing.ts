@@ -17,7 +17,7 @@ export interface Listing {
   clientId: string;
   labelSetId: string;
   status: ListingStatus;
-  pricePerAsset: number;
+  priceTotal: number;
   currency: string;
   annotationFormat: AnnotationFormat;
   instructions: string | null;
@@ -25,6 +25,7 @@ export interface Listing {
   maxLabelers?: number | null;
   totalAssets: number;
   completedAssets: number;
+  dataset?: { id: string; name: string };
   createdAt: string;
   updatedAt: string;
 }
