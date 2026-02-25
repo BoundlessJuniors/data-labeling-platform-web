@@ -277,7 +277,14 @@ function formatDate(dateString: string) {
           <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
-              class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              class="p-1.5 rounded transition-colors"
+              :class="[
+                (dataset.listingCount ?? 0) > 0 
+                  ? 'opacity-50 cursor-not-allowed text-gray-400 dark:text-gray-500' 
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              ]"
+              :disabled="(dataset.listingCount ?? 0) > 0"
+              :title="(dataset.listingCount ?? 0) > 0 ? 'Bu dataset bir ilanda kullanıldığı için düzenlenemez/silinemez.' : 'Düzenle'"
               aria-label="Düzenle"
               @click.stop="openEditModal(dataset.id, dataset.name, dataset.description)"
             >
@@ -287,7 +294,14 @@ function formatDate(dateString: string) {
             </button>
             <button
               type="button"
-              class="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
+              class="p-1.5 rounded transition-colors"
+              :class="[
+                (dataset.listingCount ?? 0) > 0 
+                  ? 'opacity-50 cursor-not-allowed text-gray-400 dark:text-gray-500' 
+                  : 'hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'
+              ]"
+              :disabled="(dataset.listingCount ?? 0) > 0"
+              :title="(dataset.listingCount ?? 0) > 0 ? 'Bu dataset bir ilanda kullanıldığı için düzenlenemez/silinemez.' : 'Sil'"
               aria-label="Sil"
               @click.stop="openDeleteModal(dataset.id)"
             >

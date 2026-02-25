@@ -13,6 +13,7 @@ export interface Dataset {
   ownerId: string;
   status: DatasetStatus;
   assetCount: number;
+  listingCount?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -83,6 +83,8 @@ export class ListingService {
 
     // Invalidate listings cache so the new listing appears immediately
     await cacheDeletePattern('cache:/api/v1/listings*');
+    await cacheDeletePattern('cache:/api/v1/datasets*');
+    await cacheDeletePattern('cache:/api/v1/labelsets*');
 
     return listing;
   }
@@ -250,6 +252,8 @@ export class ListingService {
 
     // Invalidate cache (wildcard covers paginated/filtered variants)
     await cacheDeletePattern('cache:/api/v1/listings*');
+    await cacheDeletePattern('cache:/api/v1/datasets*');
+    await cacheDeletePattern('cache:/api/v1/labelsets*');
 
     logger.info(`Listing updated: ${listing.id}`);
 
@@ -295,6 +299,8 @@ export class ListingService {
 
     // Invalidate cache (wildcard covers paginated/filtered variants)
     await cacheDeletePattern('cache:/api/v1/listings*');
+    await cacheDeletePattern('cache:/api/v1/datasets*');
+    await cacheDeletePattern('cache:/api/v1/labelsets*');
 
     logger.info(`Listing deleted: ${listingId}`);
   }

@@ -35,6 +35,7 @@ const datasetId = computed(() => route.params.id as string);
 
 // Upload
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const isDatasetInUse = computed(() => (datasetsStore.currentDataset?.listingCount ?? 0) > 0);
 
 // Preview modal
 const showPreviewModal = ref(false);
@@ -107,6 +108,72 @@ function getAssetImageUrl(asset: DisplayableAsset): string {
 function goBack() {
   router.push({ name: 'client-datasets' });
 }
+
+// Selection Mode State
+const isSelectionMode = ref(false);
+const selectedAssetIds = ref<Set<string>>(new Set());
+const showBulkDeleteModal = ref(false);
+const deletingAssetId = ref<string | null>(null);
+
+function toggleSelectionMode() {
+  isSelectionMode.value = !isSelectionMode.value;
+  if (!isSelectionMode.value) {
+    selectedAssetIds.value.clear();
+  }
+}
+
+function toggleSelection(id: string) {
+  if (selectedAssetIds.value.has(id)) {
+    selectedAssetIds.value.delete(id);
+  } else {
+    selectedAssetIds.value.add(id);
+  }
+}
+
+function selectAllAssets() {
+  const currentAssetIds = assetsStore.assets.map(a => a.id as string).filter(Boolean);
+  const allSelected = currentAssetIds.every(id => selectedAssetIds.value.has(id));
+
+  if (allSelected) {
+    currentAssetIds.forEach(id => selectedAssetIds.value.delete(id));
+  } else {
+    currentAssetIds.forEach(id => selectedAssetIds.value.add(id));
+  }
+}
+
+function promptDelete(assetId?: string) {
+  if (assetId) {
+    deletingAssetId.value = assetId;
+  }
+  showBulkDeleteModal.value = true;
+}
+
+function closeDeleteModal() {
+  showBulkDeleteModal.value = false;
+  deletingAssetId.value = null;
+}
+
+async function executeDelete() {
+  const idsToDelete = deletingAssetId.value 
+    ? [deletingAssetId.value] 
+    : Array.from(selectedAssetIds.value);
+
+  if (idsToDelete.length === 0) return;
+
+  const results = await Promise.allSettled(
+    idsToDelete.map(id => assetsStore.deleteAsset(id))
+  );
+
+  const succeededCount = results.filter(r => r.status === 'fulfilled').length;
+  // Let the store handle its own toasts, but maybe log or alert summary
+  if (succeededCount > 0) {
+    await assetsStore.fetchAssets(datasetId.value);
+  }
+
+  isSelectionMode.value = false;
+  selectedAssetIds.value.clear();
+  closeDeleteModal();
+}
 </script>
 
 <template>
@@ -138,18 +205,56 @@ function goBack() {
             {{ datasetsStore.currentDataset.description || 'Açıklama yok' }}
           </p>
         </div>
-        <div class="flex items-center gap-3">
+        
+        <!-- Action Bar: Selection Mode -->
+        <div v-if="isSelectionMode" class="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300 px-2">
+            {{ selectedAssetIds.size }} görsel seçildi
+          </span>
+          <BaseButton variant="secondary" size="sm" @click="selectAllAssets">
+            Tümünü Seç
+          </BaseButton>
+          <BaseButton variant="secondary" size="sm" @click="toggleSelectionMode">
+            İptal
+          </BaseButton>
+          <BaseButton 
+            variant="danger" 
+            size="sm" 
+            :disabled="selectedAssetIds.size === 0"
+            @click="promptDelete()"
+          >
+            Seçilenleri Sil
+          </BaseButton>
+        </div>
+
+        <!-- Action Bar: Normal Mode -->
+        <div v-else class="flex items-center gap-3">
           <span :class="getStatusBadge(datasetsStore.currentDataset.status)">
             {{ datasetsStore.currentDataset.status }}
           </span>
           <span class="text-sm text-gray-500 dark:text-gray-400">
             {{ assetsStore.total }} asset
           </span>
+          
+          <!-- Select Mode Toggle Button -->
+          <BaseButton
+            v-if="!isDatasetInUse && assetsStore.assets.length > 0"
+            variant="secondary"
+            :disabled="assetsStore.uploading"
+            @click="toggleSelectionMode"
+          >
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Seç
+          </BaseButton>
+
           <!-- Upload Button -->
           <BaseButton
             variant="primary"
             :loading="assetsStore.uploading"
-            :disabled="assetsStore.uploading"
+            :disabled="assetsStore.uploading || isDatasetInUse"
+            :title="isDatasetInUse ? 'Bu dataset bir ilanda kullanıldığı için yeni görsel eklenemez.' : 'Görsel Yükle'"
             @click="triggerFileSelect"
           >
             <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -215,7 +320,12 @@ function goBack() {
       description="Bu dataset'e henüz asset eklenmemiş. 'Görsel Yükle' butonunu kullanarak görsel yükleyebilirsiniz."
     >
       <template #action>
-        <BaseButton variant="primary" @click="triggerFileSelect">
+        <BaseButton 
+          variant="primary" 
+          :disabled="isDatasetInUse"
+          :title="isDatasetInUse ? 'Bu dataset bir ilanda kullanıldığı için yeni görsel eklenemez.' : ''"
+          @click="triggerFileSelect"
+        >
           <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
@@ -230,8 +340,13 @@ function goBack() {
         v-for="asset in assetsStore.assets"
         :key="asset.id"
         type="button"
-        class="group relative aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border-2 border-transparent hover:border-primary-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-        @click="openPreview(asset)"
+        class="group relative aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+        :class="[
+          isSelectionMode && selectedAssetIds.has(asset.id as string) 
+            ? 'border-primary-500 ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900' 
+            : 'border-transparent hover:border-primary-500'
+        ]"
+        @click="isSelectionMode ? toggleSelection(asset.id as string) : openPreview(asset)"
       >
         <!-- Thumbnail -->
         <img
@@ -247,9 +362,43 @@ function goBack() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
           </svg>
         </div>
+
+        <!-- Selection Checkbox (Visible in Selection Mode or when selected) -->
+        <div 
+          v-if="isSelectionMode || selectedAssetIds.has(asset.id as string)"
+          class="absolute top-2 left-2 w-6 h-6 rounded-md border flex items-center justify-center transition-colors shadow-sm z-10"
+          :class="[
+            selectedAssetIds.has(asset.id as string)
+              ? 'bg-primary-600 border-primary-600 text-white'
+              : 'bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-500 text-transparent'
+          ]"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+
+        <!-- Individual Delete Button (Visible on hover in normal mode) -->
+        <div 
+          v-if="!isSelectionMode"
+          class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        >
+          <button
+            type="button"
+            class="p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-red-600 dark:text-red-400 shadow-sm hover:bg-red-50 dark:hover:bg-red-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isDatasetInUse"
+            :title="isDatasetInUse ? 'Bu dataset kullanımda olduğu için silinemez.' : 'Sil'"
+            @click.stop="promptDelete(asset.id as string)"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+
         <!-- Overlay -->
         <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-          <div class="text-white text-xs truncate w-full">
+          <div class="text-white text-xs truncate w-full pr-1">
             {{ getAssetDisplayName(asset) }}
           </div>
         </div>
@@ -289,6 +438,34 @@ function goBack() {
       </div>
       <template #footer>
         <BaseButton variant="secondary" @click="closePreview">Kapat</BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- Bulk / Single Delete Modal -->
+    <BaseModal 
+      :open="showBulkDeleteModal" 
+      :title="deletingAssetId ? 'Görseli Sil' : 'Seçilen Görselleri Sil'" 
+      size="sm" 
+      @close="closeDeleteModal"
+    >
+      <div class="p-1">
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          <template v-if="deletingAssetId">
+            Bu görseli silmek istediğinize emin misiniz?
+          </template>
+          <template v-else>
+            Seçilen <strong>{{ selectedAssetIds.size }}</strong> görseli silmek istediğinize emin misiniz?
+          </template>
+        </p>
+        <p class="text-xs text-red-600 dark:text-red-400 mt-2">
+          Bu işlem geri alınamaz.
+        </p>
+      </div>
+      <template #footer>
+        <BaseButton variant="secondary" :disabled="assetsStore.loading" @click="closeDeleteModal">İptal</BaseButton>
+        <BaseButton variant="danger" :loading="assetsStore.loading" @click="executeDelete">
+          Sil
+        </BaseButton>
       </template>
     </BaseModal>
   </AppLayout>

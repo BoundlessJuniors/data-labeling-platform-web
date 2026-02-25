@@ -174,7 +174,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | LabelSet güncelle (isim ve/veya etiketleri değiştir) |
 | DELETE | `/:id` | LabelSet sil |
 
-> **Not:** Bir Listing tarafından kullanılan LabelSet'ler güncellenemez ve silinemez (usage guard).
+> **Not:** Bir Listing tarafından kullanılan Dataset'ler, Asset'ler ve LabelSet'ler güncellenemez ve silinemez (usage guard).
 
 ### Listing Routes (`/api/v1/listings`)
 
@@ -187,7 +187,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | İlan güncelle |
 | DELETE | `/:id` | İlan sil |
 
-> **Cache:** Listings için Redis cache (`cacheMiddleware`) kullanılır; `GET /` 30s, `GET /:id` 60s TTL. Her yazma işleminde (create/update/delete) `cacheDeletePattern('cache:/api/v1/listings*')` ile tüm listing cache'leri (sayfalı, filtreli) otomatik silinir.
+> **Cache:** Listings için Redis cache (`cacheMiddleware`) kullanılır; `GET /` 30s, `GET /:id` 60s TTL. Her yazma işleminde (create/update/delete) `cacheDeletePattern` ile listings, datasets ve labelsets önbellekleri silinerek verilerin anında güncellenmesi sağlanır.
 
 ### Proposal Routes (`/api/v1/proposals`) 🆕
 

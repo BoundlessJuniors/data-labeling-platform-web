@@ -148,6 +148,9 @@ export class DatasetService {
     // Check if dataset exists and user has access
     const existingDataset = await prisma.dataset.findUnique({
       where: { id: datasetId },
+      include: {
+        _count: { select: { listings: true } },
+      },
     });
 
     if (!existingDataset) {
@@ -156,6 +159,10 @@ export class DatasetService {
 
     if (userRole !== 'admin' && existingDataset.ownerUserId !== userId) {
       throw new ForbiddenError('You do not have permission to update this dataset');
+    }
+
+    if (existingDataset._count.listings > 0) {
+      throw new BadRequestError('Bu dataset bir ilanda kullanıldığı için güncellenemez.');
     }
 
     const dataset = await prisma.dataset.update({

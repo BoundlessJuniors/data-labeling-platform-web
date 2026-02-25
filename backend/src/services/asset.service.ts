@@ -50,6 +50,7 @@ export class AssetService {
     // Verify dataset exists and user has access
     const dataset = await prisma.dataset.findUnique({
       where: { id: datasetId },
+      include: { _count: { select: { listings: true } } },
     });
 
     if (!dataset) {
@@ -58,6 +59,10 @@ export class AssetService {
 
     if (userRole !== 'admin' && dataset.ownerUserId !== userId) {
       throw new ForbiddenError('Bu datasete asset ekleme yetkiniz yok.');
+    }
+
+    if (dataset._count.listings > 0) {
+      throw new BadRequestError('Bu dataset bir ilanda kullanıldığı için yeni görsel yüklenemez.');
     }
 
     // Build a unique object key
@@ -278,7 +283,7 @@ export class AssetService {
       where: { id: assetId },
       include: {
         dataset: {
-          select: { ownerUserId: true },
+          select: { ownerUserId: true, _count: { select: { listings: true } } },
         },
       },
     });
@@ -289,6 +294,10 @@ export class AssetService {
 
     if (userRole !== 'admin' && existingAsset.dataset.ownerUserId !== userId) {
       throw new ForbiddenError('Bu aseti silme yetkiniz yok.');
+    }
+
+    if (existingAsset.dataset._count.listings > 0) {
+      throw new BadRequestError('Bu görsel, bir ilanda kullanılan bir datasete ait olduğu için silinemez.');
     }
 
     // Delete from R2 first

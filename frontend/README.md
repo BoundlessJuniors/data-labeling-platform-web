@@ -328,6 +328,8 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Asset upload bileşeni (Cloudflare R2)
 - [x] LabelSet seçimi (ilan oluşturma)
 - [x] LabelSet yönetimi (oluştur, düzenle, sil + kullanım koruması)
+- [x] Dataset kullanım koruması (düzenle/sil engelleri, upload kilitleri)
+- [x] Dataset Asset yönetimi detay (Toplu görsel silme / Bulk delete özelliği)
 - [x] Proposal (başvuru) yönetim sayfası (client)
 - [x] Labeler başvuru takip sayfası (`MyProposalsPage.vue`) — durum, fiyat teklifi, geri çekme
 - [x] Proposal → Contract lifecycle (başvur → kabul → sözleşme + görev oluşturma)
