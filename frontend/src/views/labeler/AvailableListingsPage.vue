@@ -8,10 +8,10 @@ import { useToastStore } from '@/stores/toast';
 import apiClient from '@/api/client';
 import AppLayout from '@/layouts/AppLayout.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
-import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
 import BasePagination from '@/components/ui/BasePagination.vue';
 import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import ListingCard from '@/components/listings/ListingCard.vue';
 
 useSeo({
   title: 'Mevcut İlanlar',
@@ -135,9 +135,6 @@ function formatPrice(price: number, currency: string) {
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(price);
 }
 
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('tr-TR');
-}
 </script>
 
 <template>
@@ -151,11 +148,11 @@ function formatDate(dateString: string) {
           v-model="searchInput"
           type="search"
           placeholder="İlan ara..."
-          class="input pl-10"
+          class="bg-gray-50 border-none rounded-xl py-3 pl-10 pr-4 w-full max-w-md text-gray-900 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:bg-gray-800 dark:text-white"
           aria-label="İlan ara"
         />
         <svg
-          class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+          class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -167,16 +164,24 @@ function formatDate(dateString: string) {
     </div>
 
     <!-- Loading -->
-    <div v-if="loading && listings.length === 0" class="space-y-4">
-      <div v-for="i in 4" :key="i" class="card">
-        <BaseSkeleton variant="text" class="w-1/3 mb-2" />
-        <BaseSkeleton variant="text" class="w-2/3 mb-2" />
-        <BaseSkeleton variant="text" class="w-1/4" />
+    <div v-if="loading && listings.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-for="i in 6" :key="i" class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-[28px] p-5 shadow-sm">
+        <div class="h-40 bg-gray-50 dark:bg-gray-700 rounded-2xl mb-4 animate-pulse"></div>
+        <div class="h-3 w-1/4 bg-gray-200 dark:bg-gray-600 rounded mb-2 animate-pulse"></div>
+        <div class="h-5 w-3/4 bg-gray-200 dark:bg-gray-600 rounded mb-2 animate-pulse"></div>
+        <div class="h-4 w-1/2 bg-gray-200 dark:bg-gray-600 rounded mt-2 animate-pulse"></div>
+        <div class="flex justify-between items-center mt-6 pt-4 border-t border-gray-50 dark:border-gray-700">
+          <div class="space-y-1 w-1/3">
+            <div class="h-3 w-full bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+            <div class="h-5 w-full bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+          </div>
+          <div class="h-10 w-24 bg-gray-200 dark:bg-gray-600 rounded-xl animate-pulse"></div>
+        </div>
       </div>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="card text-center py-12">
+    <div v-else-if="error" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm text-center py-12 p-6">
       <p class="text-red-600 dark:text-red-400 mb-4">{{ error }}</p>
       <BaseButton variant="secondary" @click="fetchListings">Tekrar Dene</BaseButton>
     </div>
@@ -190,40 +195,13 @@ function formatDate(dateString: string) {
     />
 
     <!-- Listings -->
-    <div v-else class="space-y-4">
-      <article
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <ListingCard
         v-for="listing in listings"
         :key="listing.id"
-        class="card hover:shadow-lg transition-shadow"
-      >
-        <div class="flex flex-col lg:flex-row justify-between gap-4">
-          <div class="flex-1 min-w-0">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white truncate">
-              {{ listing.title }}
-            </h2>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate-2">
-              {{ listing.description || 'Açıklama yok' }}
-            </p>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-gray-500 dark:text-gray-400">
-              <span>Müşteri: {{ listing.clientName }}</span>
-              <span>Dataset: {{ listing.datasetName }}</span>
-              <span>Format: {{ listing.annotationFormat }}</span>
-              <span>{{ formatDate(listing.createdAt) }}</span>
-            </div>
-          </div>
-          <div class="flex flex-col items-end gap-2">
-            <p class="text-xl font-bold text-gray-900 dark:text-white">
-              {{ formatPrice(listing.priceTotal, listing.currency) }}
-            </p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              {{ listing.remainingAssets }} / {{ listing.totalAssets }} kalan
-            </p>
-            <BaseButton variant="primary" @click="openApplyModal(listing)">
-              Başvur
-            </BaseButton>
-          </div>
-        </div>
-      </article>
+        :listing="listing"
+        @apply="openApplyModal"
+      />
     </div>
 
     <!-- Pagination -->
@@ -231,7 +209,7 @@ function formatDate(dateString: string) {
       :current-page="page"
       :total-pages="totalPages"
       :loading="loading"
-      class="mt-6"
+      class="mt-8"
       @page-change="goToPage"
     />
 

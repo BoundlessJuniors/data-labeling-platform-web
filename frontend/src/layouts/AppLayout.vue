@@ -57,14 +57,14 @@ function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6 flex gap-6 shrink-0">
     <!-- Sidebar -->
     <aside
-      class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col"
+      class="w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-sm flex flex-col overflow-hidden shrink-0"
       aria-label="Sidebar navigation"
     >
       <!-- Logo -->
-      <div class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700">
+      <div class="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700">
         <RouterLink
           to="/dashboard"
           class="text-xl font-bold text-primary-600 dark:text-primary-400"
@@ -74,13 +74,13 @@ function handleLogout() {
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 px-4 py-6 space-y-1">
+      <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
           :class="[
-            'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors',
+            'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors',
             isActive(item.to)
               ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
               : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700',
@@ -153,10 +153,10 @@ function handleLogout() {
       </nav>
 
       <!-- User section -->
-      <div class="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
+      <div class="px-4 py-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
         <div class="flex items-center gap-3">
           <div
-            class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
+            class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center shrink-0"
           >
             <span class="text-primary-600 dark:text-primary-300 font-medium">
               {{ authStore.user?.displayName?.[0] || authStore.user?.email[0]?.toUpperCase() }}
@@ -166,13 +166,13 @@ function handleLogout() {
             <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
               {{ authStore.user?.displayName || authStore.user?.email }}
             </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">
+            <p class="text-xs text-gray-500 dark:text-gray-400 capitalize truncate">
               {{ authStore.user?.role }}
             </p>
           </div>
           <button
             type="button"
-            class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 shrink-0"
             aria-label="Çıkış yap"
             @click="handleLogout"
           >
@@ -190,9 +190,9 @@ function handleLogout() {
     </aside>
 
     <!-- Main content -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden min-w-0">
       <!-- Top bar -->
-      <header class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center">
+      <header class="h-16 px-6 flex items-center border-b border-gray-100 dark:border-gray-700 shrink-0">
         <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
           <slot name="header" />
         </h1>

@@ -91,6 +91,11 @@ frontend/
 │   │   │   ├── BaseToast.vue
 │   │   │   ├── index.ts
 │   │   │   └── __tests__/     # Bileşen testleri
+│   │   ├── listings/          # İlan kartı bileşenleri
+│   │   │   ├── ListingCard.vue
+│   │   │   └── ClientListingCard.vue
+│   │   ├── proposals/         # Başvuru kartı bileşenleri
+│   │   │   └── ProposalCard.vue
 │   │   ├── ToastContainer.vue
 │   │   └── HelloWorld.vue
 │   │
@@ -337,6 +342,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Toplam fiyat modeli (`priceTotal`) — ilan oluşturma/düzenleme/listeleme
 - [x] İlan kartlarında dataset adı gösterimi
 - [x] Düzenleme modalında dataset adı salt-okunur gösterim
+- [x] İlan ve başvuru listeleri için modüler/reuseable kart bileşenlerinin oluşturulması (`ListingCard`, `ClientListingCard`, `ProposalCard`)
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
