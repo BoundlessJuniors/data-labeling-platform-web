@@ -100,7 +100,8 @@ export class ListingService {
     userId: string | undefined,
     userRole: UserRole | undefined,
     status?: string,
-    ownOnly?: boolean
+    ownOnly?: boolean,
+    search?: string
   ) {
     const skip = (page - 1) * limit;
 
@@ -120,6 +121,10 @@ export class ListingService {
         { status: ListingStatus.open },
         ...(userId ? [{ ownerUserId: userId }] : []),
       ];
+    }
+
+    if (search) {
+      where.title = { contains: search, mode: 'insensitive' };
     }
 
     const [listings, total] = await Promise.all([

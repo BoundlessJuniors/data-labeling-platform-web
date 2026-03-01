@@ -347,6 +347,8 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] `Contract` type fix: `createdAt` kaldırıldı, `startedAt` non-nullable yapıldı, `tasks[]` eklendi
 - [x] Labeler TasksPage `useTasksStore` entegrasyonuna geçirildi (404 hatası düzeltildi)
 - [x] `ContractDetailPage.vue` silindi, `client-contract-detail` route kaldırıldı
+- [x] Backend arama desteği: Dataset (`name`) ve Listing (`title`) için `?search=` query parametresi (case-insensitive)
+- [x] Frontend enum düzeltmeleri: `ListingsPage` status filtreleri `ListingStatus` enum'una, `ContractsPage` status filtreleri `ContractStatus` enum'una uyumlu hale getirildi
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

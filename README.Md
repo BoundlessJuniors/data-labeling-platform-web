@@ -113,10 +113,10 @@ npm run dev
 | Grup | Endpoint | Açıklama |
 |------|----------|----------|
 | Auth | `/api/v1/auth/*` | Kayıt, giriş, profil |
-| Datasets | `/api/v1/datasets/*` | Dataset CRUD |
+| Datasets | `/api/v1/datasets/*` | Dataset CRUD (`?search=` ile isim araması) |
 | Assets | `/api/v1/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
 | LabelSets | `/api/v1/labelsets/*` | Etiket setleri (CRUD + edit guard) |
-| Listings | `/api/v1/listings/*` | İlanlar |
+| Listings | `/api/v1/listings/*` | İlanlar (`?search=` ile başlık araması) |
 | Proposals | `/api/v1/proposals/*` | İlan başvuruları |
 | Contracts | `/api/v1/contracts/*` | Sözleşmeler |
 | Tasks | `/api/v1/tasks/*` | Görevler |

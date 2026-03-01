@@ -147,7 +147,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/` | Kullanıcının datasetleri |
+| GET | `/` | Kullanıcının datasetleri (`?search=` ile isim araması destekler) |
 | GET | `/:id` | Dataset detayı |
 | POST | `/` | Yeni dataset oluştur |
 | PUT | `/:id` | Dataset güncelle |
@@ -180,7 +180,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/` | Tüm açık ilanlar |
+| GET | `/` | Tüm açık ilanlar (`?search=` ile başlık araması destekler) |
 | GET | `/my` | Kullanıcının ilanları |
 | GET | `/:id` | İlan detayı |
 | POST | `/` | Yeni ilan oluştur |
@@ -257,7 +257,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 ### Marketplace Models
 - **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom)
 - **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 🆕
-- **Contract** - İş sözleşmeleri (active, submitted, approved, rejected)
+- **Contract** - İş sözleşmeleri (active, submitted, approved, rejected, cancelled)
 - **Submission** - Toplu etiket gönderimi (COCO/YOLO import) 🆕
 
 ### Task Models

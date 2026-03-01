@@ -39,7 +39,8 @@ export class DatasetService {
     page: number,
     limit: number,
     userId: string | undefined,
-    userRole: UserRole | undefined
+    userRole: UserRole | undefined,
+    search?: string
   ) {
     const skip = (page - 1) * limit;
 
@@ -55,6 +56,10 @@ export class DatasetService {
       // Actually controller said: if (req.user) where = { ownerUserId } else where = { status: ready }
       // Assuming this service is called by authenticated users mostly, but keeping logic.
       where = { status: DatasetStatus.ready };
+    }
+
+    if (search) {
+      where.name = { contains: search, mode: 'insensitive' };
     }
 
     const [rawDatasets, total] = await Promise.all([

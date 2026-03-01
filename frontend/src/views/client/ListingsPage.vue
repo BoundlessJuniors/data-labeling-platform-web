@@ -61,10 +61,9 @@ let searchTimeout: ReturnType<typeof setTimeout>;
 const statusOptions = [
   { value: '', label: 'Tüm Durumlar' },
   { value: 'open', label: 'Açık' },
-  { value: 'draft', label: 'Taslak' },
-  { value: 'published', label: 'Yayında' },
-  { value: 'closed', label: 'Kapalı' },
+  { value: 'in_progress', label: 'Devam Ediyor' },
   { value: 'completed', label: 'Tamamlandı' },
+  { value: 'cancelled', label: 'İptal Edildi' },
 ];
 
 const formatOptions = [

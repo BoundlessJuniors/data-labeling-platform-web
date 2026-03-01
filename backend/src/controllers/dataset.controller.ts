@@ -41,8 +41,9 @@ export const getDatasets = async (
     const limit = parseInt(req.query.limit as string) || 20;
     const userId = req.user?.id;
     const userRole = req.user?.role;
+    const search = req.query.search as string | undefined;
 
-    const result = await datasetService.getDatasets(page, limit, userId, userRole);
+    const result = await datasetService.getDatasets(page, limit, userId, userRole, search);
 
     res.json({
       success: true,

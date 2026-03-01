@@ -26,9 +26,8 @@ const statusOptions = [
   { value: 'active', label: 'Aktif' },
   { value: 'submitted', label: 'Gönderildi' },
   { value: 'approved', label: 'Onaylandı' },
-  { value: 'completed', label: 'Tamamlandı' },
-  { value: 'cancelled', label: 'İptal Edildi' },
   { value: 'rejected', label: 'Reddedildi' },
+  { value: 'cancelled', label: 'İptal Edildi' },
 ];
 
 // Fetch on mount
@@ -68,8 +67,6 @@ function getStatusBadge(status: string) {
     active: 'badge-info',
     submitted: 'badge-warning',
     approved: 'badge-success',
-    revision_requested: 'badge-warning',
-    completed: 'badge-success',
     cancelled: 'badge-error',
     rejected: 'badge-error',
   };
@@ -81,8 +78,6 @@ function getStatusLabel(status: string) {
     active: 'Aktif',
     submitted: 'Gönderildi',
     approved: 'Onaylandı',
-    revision_requested: 'Revizyon İstendi',
-    completed: 'Tamamlandı',
     cancelled: 'İptal Edildi',
     rejected: 'Reddedildi',
   };

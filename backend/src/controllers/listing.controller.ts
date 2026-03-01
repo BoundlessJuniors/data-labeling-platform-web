@@ -61,6 +61,7 @@ export const getListings = async (
     const limit = parseInt(req.query.limit as string) || 20;
     const status = req.query.status as string | undefined;
     const ownOnly = req.query.ownOnly === 'true';
+    const search = req.query.search as string | undefined;
 
     const result = await listingService.getListings(
       page,
@@ -68,7 +69,8 @@ export const getListings = async (
       req.user?.id,
       req.user?.role,
       status,
-      ownOnly
+      ownOnly,
+      search
     );
 
     res.json({
