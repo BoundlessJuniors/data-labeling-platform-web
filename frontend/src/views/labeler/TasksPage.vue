@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /**
  * TasksPage - Labeler's tasks with status and QC feedback
+ * Uses tasksStore (Pinia) instead of direct API calls.
  */
-import { ref, onMounted, computed, watch } from 'vue';
+import { onMounted, computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useSeo } from '@/composables/useSeo';
 import { useToastStore } from '@/stores/toast';
+import { useTasksStore } from '@/stores/tasks';
+import type { Task } from '@/types/task';
 import apiClient from '@/api/client';
 import AppLayout from '@/layouts/AppLayout.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -21,72 +24,29 @@ useSeo({
 
 const route = useRoute();
 const toastStore = useToastStore();
-
-interface MyTask {
-  id: string;
-  contractId: string;
-  assetFileName: string;
-  assetThumbnailUrl: string | null;
-  status: string;
-  priority: number;
-  qcComment: string | null;
-  submittedAt: string | null;
-  reviewedAt: string | null;
-}
-
-// State
-const tasks = ref<MyTask[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
-const page = ref(1);
-const total = ref(0);
-const limit = ref(20);
-const totalPages = computed(() => Math.ceil(total.value / limit.value));
+const tasksStore = useTasksStore();
 
 // Filter by contract
 const contractId = computed(() => route.query.contractId as string | undefined);
 
 // Detail modal
 const showDetailModal = ref(false);
-const selectedTask = ref<MyTask | null>(null);
+const selectedTask = ref<Task | null>(null);
 
 async function fetchTasks() {
-  loading.value = true;
-  error.value = null;
-
-  try {
-    const response = await apiClient.get('/tasks/my', {
-      params: {
-        page: page.value,
-        limit: limit.value,
-        contractId: contractId.value || undefined,
-      },
-    });
-
-    tasks.value = response.data.data;
-    total.value = response.data.pagination?.total ?? response.data.data.length;
-  } catch (_err) {
-    error.value = 'Görevler yüklenemedi';
-  } finally {
-    loading.value = false;
+  if (contractId.value) {
+    await tasksStore.fetchTasks(contractId.value);
   }
 }
 
 onMounted(fetchTasks);
 
 watch(contractId, () => {
-  page.value = 1;
+  tasksStore.page = 1;
   fetchTasks();
 });
 
-function goToPage(newPage: number) {
-  if (newPage >= 1 && newPage <= totalPages.value) {
-    page.value = newPage;
-    fetchTasks();
-  }
-}
-
-function openDetail(task: MyTask) {
+function openDetail(task: Task) {
   selectedTask.value = task;
   showDetailModal.value = true;
 }
@@ -99,6 +59,19 @@ async function startTask(taskId: string) {
   } catch (_err) {
     toastStore.error('Görev başlatılamadı');
   }
+}
+
+/** Extract file name from asset objectKey or fallback */
+function getAssetName(task: Task): string {
+  const asset = (task as Task & { asset?: { fileName?: string; objectKey?: string } }).asset;
+  return asset?.fileName ?? asset?.objectKey ?? 'Dosya';
+}
+
+/** Extract latest QC comment from reviews array (if present on response) */
+function getLatestComment(task: Task): string | null {
+  const reviews = (task as Task & { reviews?: { comment?: string | null }[] }).reviews;
+  if (!Array.isArray(reviews) || reviews.length === 0) return null;
+  return reviews[reviews.length - 1]?.comment ?? null;
 }
 
 function getStatusBadge(status: string) {
@@ -149,21 +122,21 @@ function getStatusLabel(status: string) {
     </div>
 
     <!-- Loading -->
-    <div v-if="loading && tasks.length === 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+    <div v-if="tasksStore.loading && tasksStore.tasks.length === 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
       <div v-for="i in 12" :key="i" class="aspect-square">
         <BaseSkeleton variant="rectangular" class="w-full h-full rounded-lg" />
       </div>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="card text-center py-12">
-      <p class="text-red-600 dark:text-red-400 mb-4">{{ error }}</p>
+    <div v-else-if="tasksStore.error" class="card text-center py-12">
+      <p class="text-red-600 dark:text-red-400 mb-4">{{ tasksStore.error }}</p>
       <BaseButton variant="secondary" @click="fetchTasks">Tekrar Dene</BaseButton>
     </div>
 
     <!-- Empty -->
     <BaseEmptyState
-      v-else-if="tasks.length === 0"
+      v-else-if="tasksStore.tasks.length === 0"
       icon="database"
       title="Henüz görev yok"
       description="Sözleşmeler kabul edildiğinde görevleriniz burada görünecektir."
@@ -178,22 +151,15 @@ function getStatusLabel(status: string) {
     <!-- Tasks Grid -->
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
       <button
-        v-for="task in tasks"
+        v-for="task in tasksStore.tasks"
         :key="task.id"
         type="button"
         class="group relative aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border-2 transition-all"
         :class="task.status === 'revision_requested' ? 'border-yellow-500' : 'border-transparent hover:border-primary-500'"
         @click="openDetail(task)"
       >
-        <!-- Thumbnail -->
-        <img
-          v-if="task.assetThumbnailUrl"
-          :src="task.assetThumbnailUrl"
-          :alt="task.assetFileName"
-          class="w-full h-full object-cover"
-          loading="lazy"
-        />
-        <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
+        <!-- Placeholder (no thumbnail on list endpoint) -->
+        <div class="w-full h-full flex items-center justify-center text-gray-400">
           <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
@@ -207,11 +173,11 @@ function getStatusLabel(status: string) {
         <!-- Overlay on hover -->
         <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
           <div class="text-white text-xs truncate w-full">
-            {{ task.assetFileName }}
+            {{ getAssetName(task) }}
           </div>
         </div>
         <!-- Revision indicator -->
-        <div v-if="task.qcComment" class="absolute top-2 left-2">
+        <div v-if="getLatestComment(task)" class="absolute top-2 left-2">
           <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
           </svg>
@@ -221,15 +187,15 @@ function getStatusLabel(status: string) {
 
     <!-- Pagination -->
     <BasePagination
-      :current-page="page"
-      :total-pages="totalPages"
-      :loading="loading"
+      :current-page="tasksStore.page"
+      :total-pages="tasksStore.totalPages"
+      :loading="tasksStore.loading"
       class="mt-6"
-      @page-change="goToPage"
+      @page-change="tasksStore.goToPage"
     />
 
     <!-- Task Detail Modal -->
-    <BaseModal :open="showDetailModal" :title="selectedTask?.assetFileName ?? 'Görev'" size="lg" @close="showDetailModal = false">
+    <BaseModal :open="showDetailModal" :title="selectedTask ? getAssetName(selectedTask) : 'Görev'" size="lg" @close="showDetailModal = false">
       <div v-if="selectedTask" class="space-y-4">
         <!-- Status -->
         <div class="flex items-center gap-2">
@@ -237,9 +203,9 @@ function getStatusLabel(status: string) {
         </div>
 
         <!-- QC Comment -->
-        <div v-if="selectedTask.qcComment" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+        <div v-if="getLatestComment(selectedTask)" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
           <h4 class="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">QC Yorumu</h4>
-          <p class="text-sm text-yellow-700 dark:text-yellow-400">{{ selectedTask.qcComment }}</p>
+          <p class="text-sm text-yellow-700 dark:text-yellow-400">{{ getLatestComment(selectedTask) }}</p>
         </div>
 
         <!-- Labeling disabled notice -->

@@ -25,10 +25,9 @@ interface MyContract {
   clientName: string;
   status: string;
   assignedAssets: number;
-  completedAssets: number;
   totalPayment: number;
   currency: string;
-  createdAt: string;
+  startedAt: string;
 }
 
 // State
@@ -57,10 +56,9 @@ async function fetchContracts() {
       clientName: item.client?.displayName ?? item.client?.email ?? '',
       status: item.status,
       assignedAssets: item._count?.tasks ?? 0,
-      completedAssets: 0,
       totalPayment: item.agreedPriceTotal ?? 0,
       currency: item.currency,
-      createdAt: item.createdAt,
+      startedAt: item.startedAt,
     }));
     total.value = response.data.pagination?.total ?? response.data.data.length;
   } catch (_err) {
@@ -116,11 +114,6 @@ function formatPrice(amount: number, currency: string) {
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString('tr-TR');
 }
-
-function getProgressPercent(completed: number, total: number) {
-  if (total === 0) return 0;
-  return Math.round((completed / total) * 100);
-}
 </script>
 
 <template>
@@ -161,8 +154,7 @@ function getProgressPercent(completed: number, total: number) {
       <article
         v-for="contract in contracts"
         :key="contract.id"
-        class="card hover:shadow-lg transition-shadow cursor-pointer"
-        @click="viewTasks(contract.id)"
+        class="card hover:shadow-lg transition-shadow"
       >
         <div class="flex flex-col sm:flex-row justify-between gap-4">
           <div class="flex-1 min-w-0">
@@ -173,26 +165,19 @@ function getProgressPercent(completed: number, total: number) {
               <span :class="getStatusBadge(contract.status)">{{ getStatusLabel(contract.status) }}</span>
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400">
-              Müşteri: {{ contract.clientName }} • {{ formatDate(contract.createdAt) }}
+              Müşteri: {{ contract.clientName }} • {{ formatDate(contract.startedAt) }}
             </p>
-            <!-- Progress bar -->
-            <div class="mt-3">
-              <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                <span>{{ contract.completedAssets }} / {{ contract.assignedAssets }} tamamlandı</span>
-                <span>{{ getProgressPercent(contract.completedAssets, contract.assignedAssets) }}%</span>
-              </div>
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div
-                  class="bg-primary-600 h-2 rounded-full transition-all"
-                  :style="{ width: getProgressPercent(contract.completedAssets, contract.assignedAssets) + '%' }"
-                ></div>
-              </div>
-            </div>
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {{ contract.assignedAssets }} görev
+            </p>
           </div>
           <div class="flex flex-col items-end gap-2">
             <p class="text-lg font-bold text-gray-900 dark:text-white">
               {{ formatPrice(contract.totalPayment, contract.currency) }}
             </p>
+            <BaseButton variant="primary" size="sm" @click="viewTasks(contract.id)">
+              Görevlere Git
+            </BaseButton>
           </div>
         </div>
       </article>

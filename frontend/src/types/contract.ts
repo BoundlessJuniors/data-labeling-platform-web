@@ -21,9 +21,8 @@ export interface Contract {
   status: ContractStatus;
   agreedPriceTotal: number;
   currency: string;
-  startedAt: string | null;
+  startedAt: string;
   completedAt: string | null;
-  createdAt: string;
   updatedAt: string;
   // Nested relations from backend include
   listing?: {
@@ -44,6 +43,7 @@ export interface Contract {
     tasks: number;
     payments?: number;
   };
+  tasks?: { status: string }[];
 }
 
 /** Contract with full details (from GET /api/contracts/:id) */

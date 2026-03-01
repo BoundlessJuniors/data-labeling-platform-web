@@ -214,7 +214,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PATCH | `/:id/reject` | Sözleşmeyi reddet (client) |
 | PATCH | `/:id/cancel` | Sözleşmeyi iptal et |
 
-> **Not:** Sözleşmeler artık doğrudan oluşturulmaz. Bir başvuru (`Proposal`) kabul edildiğinde otomatik olarak oluşturulur. `agreedPriceTotal` alanı başvurudaki `priceQuote` değerinden gelir.
+> **Not:** Sözleşmeler artık doğrudan oluşturulmaz. Bir başvuru (`Proposal`) kabul edildiğinde otomatik olarak oluşturulur. `agreedPriceTotal` alanı başvurudaki `priceQuote` değerinden gelir. `GET /` endpoint'i artık her sözleşme için `tasks: [{ status }]` dizisini de döner — client tarafında ilerleme çubuğu hesaplaması için kullanılır.
 
 ### Task Routes (`/api/v1/tasks`)
 

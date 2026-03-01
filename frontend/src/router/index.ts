@@ -111,12 +111,6 @@ const router = createRouter({
           component: () => import('@/views/client/ContractsPage.vue'),
           meta: { title: 'Sözleşmeler' },
         },
-        {
-          path: 'contracts/:id',
-          name: 'client-contract-detail',
-          component: () => import('@/views/client/ContractDetailPage.vue'),
-          meta: { title: 'Sözleşme Detay' },
-        },
       ],
     },
     // Labeler routes

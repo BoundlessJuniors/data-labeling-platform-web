@@ -12,7 +12,6 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
 import BasePagination from '@/components/ui/BasePagination.vue';
 import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
-import { useRouter } from 'vue-router';
 
 useSeo({
   title: 'Sözleşmeler',
@@ -20,7 +19,6 @@ useSeo({
 });
 
 const contractsStore = useContractsStore();
-const router = useRouter();
 
 // Status filter options
 const statusOptions = [
@@ -99,8 +97,15 @@ function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString('tr-TR');
 }
 
-function viewTasks(contractId: string) {
-  router.push({ name: 'client-contract-detail', params: { id: contractId } });
+function getProgressPercent(contract: { tasks?: { status: string }[]; _count?: { tasks: number } }) {
+  const total = contract._count?.tasks ?? 0;
+  if (total === 0) return 0;
+  const completed = (contract.tasks ?? []).filter(t => t.status === 'accepted' || t.status === 'approved').length;
+  return Math.round((completed / total) * 100);
+}
+
+function getCompletedCount(contract: { tasks?: { status: string }[] }) {
+  return (contract.tasks ?? []).filter(t => t.status === 'accepted' || t.status === 'approved').length;
 }
 
 const confirmMessages: Record<string, { title: string; message: string; buttonText: string; buttonVariant: 'primary' | 'danger' | 'secondary' }> = {
@@ -173,7 +178,20 @@ const currentConfirmMessage = computed(() => {
             </div>
             <div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
               <span>{{ contract._count?.tasks ?? 0 }} görev</span>
-              <span>{{ formatDate(contract.createdAt) }}</span>
+              <span>{{ formatDate(contract.startedAt) }}</span>
+            </div>
+            <!-- Progress bar -->
+            <div class="mt-3">
+              <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                <span>{{ getCompletedCount(contract) }} / {{ contract._count?.tasks ?? 0 }} tamamlandı</span>
+                <span>{{ getProgressPercent(contract) }}%</span>
+              </div>
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  class="bg-primary-600 h-2 rounded-full transition-all"
+                  :style="{ width: getProgressPercent(contract) + '%' }"
+                ></div>
+              </div>
             </div>
           </div>
           <div class="flex flex-col items-end gap-2">
@@ -182,14 +200,6 @@ const currentConfirmMessage = computed(() => {
             </p>
             <!-- Actions -->
             <div class="flex gap-2">
-              <button
-                v-if="['active', 'submitted'].includes(contract.status)"
-                type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                @click="viewTasks(contract.id)"
-              >
-                Görevleri Gör
-              </button>
               <button
                 v-if="contract.status === 'submitted'"
                 type="button"

@@ -116,6 +116,9 @@ export class ContractService {
           labeler: {
             select: { id: true, email: true, displayName: true },
           },
+          tasks: {
+            select: { status: true },
+          },
           _count: {
             select: { tasks: true },
           },

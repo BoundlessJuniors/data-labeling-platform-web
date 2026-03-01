@@ -99,7 +99,7 @@ frontend/
 │   │   ├── ToastContainer.vue
 │   │   └── HelloWorld.vue
 │   │
-│   ├── views/                 # Sayfa bileşenleri (19 sayfa)
+│   ├── views/                 # Sayfa bileşenleri (18 sayfa)
 │   │   ├── HomePage.vue       # Landing page
 │   │   ├── LoginPage.vue      # Giriş sayfası
 │   │   ├── RegisterPage.vue   # Kayıt sayfası
@@ -116,8 +116,7 @@ frontend/
 │   │   │   ├── LabelSetsPage.vue       # Etiket seti yönetimi (CRUD + edit guard)
 │   │   │   ├── ListingsPage.vue        # İlan yönetimi (toplam fiyat, dataset gösterimi)
 │   │   │   ├── ListingProposalsPage.vue # Başvuru yönetimi
-│   │   │   ├── ContractsPage.vue
-│   │   │   └── ContractDetailPage.vue
+│   │   │   └── ContractsPage.vue        # Sözleşme yönetimi + progress bar
 │   │   │
 │   │   └── labeler/           # Labeler sayfaları
 │   │       ├── AvailableListingsPage.vue
@@ -134,7 +133,7 @@ frontend/
 │   │   ├── labelset.ts        # LabelSet types
 │   │   ├── listing.ts         # Listing types (`AnnotationFormat` enum, `CreateListingRequest`, `UpdateListingRequest`)
 │   │   ├── proposal.ts        # Proposal types
-│   │   ├── contract.ts        # Contract types (agreedPriceTotal, active status)
+│   │   ├── contract.ts        # Contract types (agreedPriceTotal, startedAt, tasks[])
 │   │   └── task.ts            # Task types
 │   │
 │   ├── composables/           # Vue composables
@@ -178,8 +177,7 @@ frontend/
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
 | `/client/listings` | Client | İlan CRUD işlemleri |
 | `/client/listings/:id/proposals` | Client | İlan başvurularını görüntüle |
-| `/client/contracts` | Client | Sözleşme yönetimi |
-| `/client/contracts/:id` | Client | Sözleşme detay sayfası |
+| `/client/contracts` | Client | Sözleşme yönetimi + ilerleme çubuğu |
 | `/labeler/listings` | Labeler | Mevcut ilanları görüntüle |
 | `/labeler/proposals` | Labeler | Başvurularımı takip et |
 | `/labeler/contracts` | Labeler | Sözleşmelerimi görüntüle |
@@ -345,6 +343,10 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] İlan ve başvuru listeleri için modüler/reuseable kart bileşenlerinin oluşturulması (`ListingCard`, `ClientListingCard`, `ProposalCard`)
 - [x] `annotationFormat` first-class DB column refactoring (COCO/YOLO/VOC/Custom) — oluşturma ve düzenleme desteği
 - [x] `remainingAssets` mock verisi ve progress bar UI borcu temizliği (`ListingCard`, `AvailableListingsPage`)
+- [x] Role-based UI refactoring: Client ContractsPage'e progress bar eklendi, Labeler MyContractsPage'den kaldırıldı
+- [x] `Contract` type fix: `createdAt` kaldırıldı, `startedAt` non-nullable yapıldı, `tasks[]` eklendi
+- [x] Labeler TasksPage `useTasksStore` entegrasyonuna geçirildi (404 hatası düzeltildi)
+- [x] `ContractDetailPage.vue` silindi, `client-contract-detail` route kaldırıldı
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
