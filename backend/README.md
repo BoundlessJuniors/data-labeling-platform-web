@@ -15,7 +15,7 @@ Görsel veri etiketleme platformu için RESTful API.
 | **Image Proc** | Sharp | ^0.33.x |
 | **Auth** | JWT (httpOnly cookie) + bcrypt | ^9.0.3 / ^6.0.0 |
 | **Validation** | Joi | ^18.0.2 |
-| **Security** | Helmet, Rate Limiting | ^8.1.0 / ^8.2.1 |
+| **Security** | Helmet, Rate Limiting | ^8.1.0 / ^6.11.2 |
 | **Logging** | Winston | ^3.19.0 |
 | **Storage** | MinIO (local) / Cloudflare R2 (prod) — AWS S3 SDK | ^3.x |
 | **Upload** | Direct-to-R2 (Presigned URLs) | - |

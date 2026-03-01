@@ -25,6 +25,9 @@ import { startAssetWorker } from './workers/asset.worker';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust reverse proxy for rate limiting (Nginx/Cloudflare etc)
+app.set('trust proxy', 1);
+
 // Security middleware (Helmet, CORS)
 setupSecurity(app);
 
