@@ -10,7 +10,6 @@ export interface PublicListing {
   priceTotal: number;
   currency: string;
   totalAssets: number;
-  remainingAssets: number;
   annotationFormat: string;
   createdAt: string;
 }
@@ -29,9 +28,16 @@ function formatPrice(price: number, currency: string) {
 </script>
 
 <template>
-  <article class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-[28px] p-5 shadow-sm hover:shadow-md transition group">
+  <article class="relative overflow-hidden rounded-[28px] bg-white/80 dark:bg-gray-900/50 border border-gray-200/60 dark:border-white/10 p-5 shadow-sm ring-1 ring-black/5 dark:ring-white/5 hover:shadow-lg hover:-translate-y-0.5 transition duration-300 group">
+    <!-- Subtle gradient halo -->
+    <div aria-hidden="true" class="pointer-events-none absolute -inset-1 opacity-0 group-hover:opacity-100 transition duration-300">
+      <div class="absolute inset-0 bg-gradient-to-br from-primary-500/15 via-transparent to-fuchsia-500/10 blur-2xl" />
+    </div>
+
     <!-- Visual Block (Top) -->
-    <div class="h-40 bg-gray-50 dark:bg-gray-700/50 rounded-2xl relative flex justify-center items-center mb-4 overflow-hidden">
+    <div class="relative h-40 rounded-2xl mb-4 overflow-hidden flex items-center justify-center bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 ring-1 ring-black/5 dark:ring-white/10">
+      <div aria-hidden="true" class="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-primary-500/10 blur-2xl" />
+      <div aria-hidden="true" class="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-fuchsia-500/10 blur-2xl" />
       <svg
         class="w-16 h-16 text-gray-300 dark:text-gray-500 transform group-hover:scale-110 transition duration-500"
         fill="none"
@@ -45,38 +51,41 @@ function formatPrice(price: number, currency: string) {
 
     <!-- Header Data -->
     <div>
-      <p class="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">
-        {{ listing.annotationFormat || 'BELİRTİLMEDİ' }}
-      </p>
-      <h2 class="text-base font-extrabold text-gray-800 dark:text-white mt-1 truncate" :title="listing.title">
+      <span v-if="listing.annotationFormat" class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200 ring-1 ring-black/5 dark:ring-white/10">
+        {{ listing.annotationFormat }}
+      </span>
+      <h2 class="mt-2 text-[15px] leading-5 font-extrabold text-gray-900 dark:text-white line-clamp-2" :title="listing.title">
         {{ listing.title }}
       </h2>
     </div>
 
     <!-- Meta Data -->
-    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-2 line-clamp-2">
-      Dataset: {{ listing.datasetName }} • Müşteri: {{ listing.clientName }}
-    </p>
+    <div class="mt-3 space-y-1">
+      <p class="text-xs font-medium text-gray-600 dark:text-gray-300 line-clamp-1">
+        <span class="text-gray-400 dark:text-gray-500">Dataset:</span> {{ listing.datasetName }}
+      </p>
+      <p class="text-xs font-medium text-gray-600 dark:text-gray-300 line-clamp-1">
+        <span class="text-gray-400 dark:text-gray-500">Müşteri:</span> {{ listing.clientName }}
+      </p>
+      <p class="text-xs font-medium text-gray-600 dark:text-gray-300 line-clamp-1">
+        <span class="text-gray-400 dark:text-gray-500">Toplam Görsel:</span> {{ listing.totalAssets }}
+      </p>
+    </div>
 
     <!-- Bottom Row (Price & Action) -->
     <div class="flex justify-between items-center mt-6 pt-4 border-t border-gray-50 dark:border-gray-700/50">
       <div class="flex flex-col">
         <span class="text-[10px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider mb-0.5">Fiyat</span>
-        <span class="text-lg font-extrabold text-primary-600 dark:text-primary-400">
+        <span class="text-[18px] leading-6 font-extrabold text-primary-600 dark:text-primary-400">
           {{ formatPrice(listing.priceTotal, listing.currency) }}
         </span>
       </div>
-      <div class="flex flex-col items-end gap-1.5">
-        <span class="text-xs text-gray-400 dark:text-gray-500 font-medium">
-          {{ listing.remainingAssets }} / {{ listing.totalAssets }} kalan
-        </span>
-        <BaseButton
-          variant="primary"
-          @click="emit('apply', listing)"
-        >
-          Başvur
-        </BaseButton>
-      </div>
+      <BaseButton
+        variant="primary"
+        @click="emit('apply', listing)"
+      >
+        Başvur
+      </BaseButton>
     </div>
   </article>
 </template>

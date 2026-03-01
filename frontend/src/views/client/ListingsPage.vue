@@ -49,6 +49,7 @@ const deletingId = ref<string | null>(null);
 const editTitle = ref('');
 const editDescription = ref('');
 const editPriceTotal = ref(0);
+const editAnnotationFormat = ref<AnnotationFormat>('COCO');
 const editInstructions = ref('');
 const editDatasetName = ref('');
 
@@ -100,11 +101,12 @@ function openCreateModal() {
   showCreateModal.value = true;
 }
 
-function openEditModal(listing: { id: string; title: string; description?: string | null; priceTotal: number; dataset?: { name: string }; labelingSpecJson?: { instructions?: string } }) {
+function openEditModal(listing: { id: string; title: string; description?: string | null; priceTotal: number; annotationFormat?: AnnotationFormat; dataset?: { name: string }; labelingSpecJson?: { instructions?: string } }) {
   editingId.value = listing.id;
   editTitle.value = listing.title;
   editDescription.value = listing.description || '';
   editPriceTotal.value = listing.priceTotal;
+  editAnnotationFormat.value = listing.annotationFormat || 'COCO';
   editDatasetName.value = listing.dataset?.name || '';
   editInstructions.value = listing.labelingSpecJson?.instructions || '';
   showEditModal.value = true;
@@ -124,10 +126,9 @@ async function handleCreate() {
   const selectedLabelSet = labelSetsStore.getLabelSetById(formLabelSetId.value);
   const labelSetVersion = selectedLabelSet?.version ?? 1;
 
-  // 2) Package instructions and annotationFormat into labelingSpecJson
+  // 2) Package instructions into labelingSpecJson (format is now top-level)
   const labelingSpecJson = {
     instructions: formInstructions.value.trim() || undefined,
-    format: formAnnotationFormat.value,
   };
 
   const result = await listingsStore.createListing({
@@ -137,6 +138,7 @@ async function handleCreate() {
     labelSetId: formLabelSetId.value,
     labelSetVersion,
     labelingSpecJson,
+    annotationFormat: formAnnotationFormat.value,
     priceTotal: formPriceTotal.value,
     currency: 'TRY',
   });
@@ -152,6 +154,7 @@ async function handleEdit() {
     title: editTitle.value.trim(),
     description: editDescription.value.trim() || undefined,
     priceTotal: editPriceTotal.value,
+    annotationFormat: editAnnotationFormat.value,
   });
   if (result) {
     showEditModal.value = false;
@@ -398,6 +401,12 @@ async function handleDelete() {
           type="number"
           :min="0"
           step="0.01"
+        />
+        <BaseSelect
+          id="edit-format"
+          v-model="editAnnotationFormat"
+          label="Annotation Formatı"
+          :options="formatOptions"
         />
         <div>
           <label for="edit-instructions" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

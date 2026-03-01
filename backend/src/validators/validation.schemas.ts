@@ -194,6 +194,9 @@ export const createListingSchema = Joi.object({
     'string.length': 'Currency must be a 3-letter code (e.g., USD)',
   }),
   deadlineAt: Joi.date().iso().greater('now').optional(),
+  annotationFormat: Joi.string().valid('COCO', 'YOLO', 'VOC', 'Custom').required().messages({
+    'any.required': 'Annotation format is required',
+  }),
 });
 
 export const updateListingSchema = Joi.object({
@@ -203,6 +206,7 @@ export const updateListingSchema = Joi.object({
   priceTotal: Joi.number().positive().precision(2).optional(),
   deadlineAt: Joi.date().iso().greater('now').optional().allow(null),
   status: Joi.string().valid('open', 'in_progress', 'completed', 'cancelled').optional(),
+  annotationFormat: Joi.string().valid('COCO', 'YOLO', 'VOC', 'Custom').optional(),
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
 });

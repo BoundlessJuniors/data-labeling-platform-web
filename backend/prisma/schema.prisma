@@ -91,6 +91,13 @@ enum SubmissionStatus {
   failed
 }
 
+enum AnnotationFormat {
+  COCO
+  YOLO
+  VOC
+  Custom
+}
+
 // ============================================================================
 // 1. USERS
 // Hem müşteri hem etiketleyici tek tabloda. Rol alanıyla ayrılır.
@@ -107,19 +114,19 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  datasets               Dataset[]
-  labelSets              LabelSet[]
-  listingsOwned          Listing[]              @relation("ListingOwner")
-  contractsAsClient      Contract[]             @relation("ContractClient")
-  contractsAsLabeler     Contract[]             @relation("ContractLabeler")
-  taskLeases             TaskLease[]
-  annotationsRaw         AnnotationRaw[]
-  annotationsNormalized  AnnotationNormalized[]
-  payments               Payment[]
-  auditLogs              AuditLog[]
-  reviews                Review[]
-  proposals              Proposal[]
-  submissions            Submission[]
+  datasets              Dataset[]
+  labelSets             LabelSet[]
+  listingsOwned         Listing[]              @relation("ListingOwner")
+  contractsAsClient     Contract[]             @relation("ContractClient")
+  contractsAsLabeler    Contract[]             @relation("ContractLabeler")
+  taskLeases            TaskLease[]
+  annotationsRaw        AnnotationRaw[]
+  annotationsNormalized AnnotationNormalized[]
+  payments              Payment[]
+  auditLogs             AuditLog[]
+  reviews               Review[]
+  proposals             Proposal[]
+  submissions           Submission[]
 
   @@map("users")
 }
@@ -147,7 +154,6 @@ model Dataset {
   @@index([status])
   @@map("datasets")
 }
-
 
 enum AssetStatus {
   pending
@@ -233,21 +239,22 @@ model Label {
 // ============================================================================
 
 model Listing {
-  id              String        @id @default(uuid()) @db.Uuid
-  datasetId       String        @map("dataset_id") @db.Uuid
-  ownerUserId     String        @map("owner_user_id") @db.Uuid
-  title           String
-  description     String?
-  labelSetId      String        @map("label_set_id") @db.Uuid
-  labelSetVersion Int           @map("label_set_version")
-  labelingSpecJson Json         @map("labeling_spec_json") @db.JsonB
-  qcMode          QcMode        @default(none) @map("qc_mode")
-  priceTotal      Decimal       @map("price_total") @db.Decimal(12, 2)
-  currency        String        @db.VarChar(3)
-  deadlineAt      DateTime?     @map("deadline_at") @db.Timestamptz
-  status          ListingStatus @default(open)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  id               String           @id @default(uuid()) @db.Uuid
+  datasetId        String           @map("dataset_id") @db.Uuid
+  ownerUserId      String           @map("owner_user_id") @db.Uuid
+  title            String
+  description      String?
+  labelSetId       String           @map("label_set_id") @db.Uuid
+  labelSetVersion  Int              @map("label_set_version")
+  labelingSpecJson Json             @map("labeling_spec_json") @db.JsonB
+  annotationFormat AnnotationFormat @default(COCO) @map("annotation_format")
+  qcMode           QcMode           @default(none) @map("qc_mode")
+  priceTotal       Decimal          @map("price_total") @db.Decimal(12, 2)
+  currency         String           @db.VarChar(3)
+  deadlineAt       DateTime?        @map("deadline_at") @db.Timestamptz
+  status           ListingStatus    @default(open)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   dataset   Dataset    @relation(fields: [datasetId], references: [id])
@@ -314,12 +321,12 @@ model Task {
   updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  contract              Contract               @relation(fields: [contractId], references: [id])
-  asset                 Asset                  @relation(fields: [assetId], references: [id])
-  taskLease             TaskLease?
-  annotationsRaw        AnnotationRaw[]
-  annotationNormalized  AnnotationNormalized?
-  reviews               Review[]
+  contract             Contract              @relation(fields: [contractId], references: [id])
+  asset                Asset                 @relation(fields: [assetId], references: [id])
+  taskLease            TaskLease?
+  annotationsRaw       AnnotationRaw[]
+  annotationNormalized AnnotationNormalized?
+  reviews              Review[]
 
   @@unique([contractId, assetId])
   @@index([contractId, status])
@@ -518,7 +525,7 @@ model Submission {
   id            String           @id @default(uuid()) @db.Uuid
   contractId    String           @map("contract_id") @db.Uuid
   labelerUserId String           @map("labeler_user_id") @db.Uuid
-  format        String           // "COCO", "YOLO_ZIP", "CUSTOM_JSON"
+  format        String // "COCO", "YOLO_ZIP", "CUSTOM_JSON"
   s3Key         String           @map("s3_key")
   status        SubmissionStatus @default(pending)
   errorMessage  String?          @map("error_message")

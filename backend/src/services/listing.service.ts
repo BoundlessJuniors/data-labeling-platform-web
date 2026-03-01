@@ -1,4 +1,4 @@
-import { ListingStatus, Prisma, QcMode } from '@prisma/client';
+import { AnnotationFormat, ListingStatus, Prisma, QcMode } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
@@ -19,6 +19,7 @@ export class ListingService {
       labelSetId: string;
       labelSetVersion: number;
       labelingSpecJson?: unknown;
+      annotationFormat: AnnotationFormat;
       qcMode?: QcMode;
       priceTotal: number;
       currency: string;
@@ -60,6 +61,7 @@ export class ListingService {
         labelSetId: data.labelSetId,
         labelSetVersion: data.labelSetVersion,
         labelingSpecJson: data.labelingSpecJson as Prisma.InputJsonValue,
+      annotationFormat: data.annotationFormat,
         qcMode: data.qcMode || QcMode.none,
         priceTotal: data.priceTotal,
         currency: data.currency,
@@ -203,6 +205,7 @@ export class ListingService {
       description?: string;
       qcMode?: QcMode;
       priceTotal?: number;
+      annotationFormat?: AnnotationFormat;
       deadlineAt?: string | null;
       status?: string;
     }
@@ -232,6 +235,7 @@ export class ListingService {
         ...(data.description !== undefined && { description: data.description }),
         ...(data.qcMode && { qcMode: data.qcMode }),
         ...(data.priceTotal && { priceTotal: data.priceTotal }),
+      ...(data.annotationFormat && { annotationFormat: data.annotationFormat }),
         ...(data.deadlineAt !== undefined && {
           deadlineAt: data.deadlineAt ? new Date(data.deadlineAt) : null,
         }),

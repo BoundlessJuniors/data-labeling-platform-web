@@ -132,7 +132,7 @@ frontend/
 │   │   ├── dataset.ts         # Dataset types
 │   │   ├── asset.ts           # Asset types
 │   │   ├── labelset.ts        # LabelSet types
-│   │   ├── listing.ts         # Listing types
+│   │   ├── listing.ts         # Listing types (`AnnotationFormat` enum, `CreateListingRequest`, `UpdateListingRequest`)
 │   │   ├── proposal.ts        # Proposal types
 │   │   ├── contract.ts        # Contract types (agreedPriceTotal, active status)
 │   │   └── task.ts            # Task types
@@ -343,6 +343,8 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] İlan kartlarında dataset adı gösterimi
 - [x] Düzenleme modalında dataset adı salt-okunur gösterim
 - [x] İlan ve başvuru listeleri için modüler/reuseable kart bileşenlerinin oluşturulması (`ListingCard`, `ClientListingCard`, `ProposalCard`)
+- [x] `annotationFormat` first-class DB column refactoring (COCO/YOLO/VOC/Custom) — oluşturma ve düzenleme desteği
+- [x] `remainingAssets` mock verisi ve progress bar UI borcu temizliği (`ListingCard`, `AvailableListingsPage`)
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

@@ -38,6 +38,7 @@ export interface CreateListingRequest {
   labelSetId: string;
   labelSetVersion: number;
   labelingSpecJson: Record<string, unknown>;
+  annotationFormat: AnnotationFormat;
   priceTotal: number;
   currency: string;
   qcMode?: string;
@@ -52,6 +53,7 @@ export interface UpdateListingRequest {
   qcMode?: string;
   deadlineAt?: string;
   status?: string;
+  annotationFormat?: AnnotationFormat;
   labelingSpecJson?: Record<string, unknown>;
 }
 

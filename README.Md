@@ -95,7 +95,7 @@ npm run dev
 | `assets` | Dataset içindeki görseller |
 | `label_sets` | Etiket sınıfları seti |
 | `labels` | LabelSet içindeki etiketler |
-| `listings` | Etiketleme ilanları |
+| `listings` | Etiketleme ilanları (`annotationFormat` enum: COCO/YOLO/VOC/Custom) |
 | `proposals` | İlan başvuruları (Listing Proposals) |
 | `contracts` | Labeler-Client sözleşmeleri |
 | `submissions` | Toplu etiket gönderimi (Dataset Import) |

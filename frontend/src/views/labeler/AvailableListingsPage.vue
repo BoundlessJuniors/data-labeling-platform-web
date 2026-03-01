@@ -29,7 +29,6 @@ interface PublicListing {
   priceTotal: number;
   currency: string;
   totalAssets: number;
-  remainingAssets: number;
   annotationFormat: string;
   createdAt: string;
 }
@@ -77,8 +76,7 @@ async function fetchListings() {
       priceTotal: item.priceTotal,
       currency: item.currency,
       totalAssets: item.dataset?._count?.assets ?? 0,
-      remainingAssets: item.dataset?._count?.assets ?? 0,
-      annotationFormat: item.labelingSpecJson?.annotationFormat ?? '',
+      annotationFormat: item.annotationFormat,
       createdAt: item.createdAt,
     }));
     total.value = response.data.pagination?.total ?? response.data.data.length;
@@ -219,7 +217,7 @@ function formatPrice(price: number, currency: string) {
         <div>
           <h3 class="font-semibold text-gray-900 dark:text-white">{{ applyingListing.title }}</h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {{ applyingListing.remainingAssets }} asset için toplam {{ formatPrice(applyingListing.priceTotal, applyingListing.currency) }}
+            {{ applyingListing.totalAssets }} asset için toplam {{ formatPrice(applyingListing.priceTotal, applyingListing.currency) }}
           </p>
         </div>
         <p class="text-gray-600 dark:text-gray-400">

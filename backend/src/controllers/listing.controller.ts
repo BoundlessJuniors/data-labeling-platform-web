@@ -18,6 +18,7 @@ export const createListing = async (
       labelSetId,
       labelSetVersion,
       labelingSpecJson,
+      annotationFormat,
       qcMode,
       priceTotal,
       currency,
@@ -33,6 +34,7 @@ export const createListing = async (
       labelSetId,
       labelSetVersion,
       labelingSpecJson,
+      annotationFormat,
       qcMode,
       priceTotal,
       currency,
@@ -107,7 +109,7 @@ export const updateListing = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, description, qcMode, priceTotal, deadlineAt, status } = req.body;
+    const { title, description, qcMode, priceTotal, annotationFormat, deadlineAt, status } = req.body;
     const userId = req.user!.id;
     const userRole = req.user!.role;
 
@@ -116,6 +118,7 @@ export const updateListing = async (
       description,
       qcMode,
       priceTotal,
+      annotationFormat,
       deadlineAt,
       status,
     });

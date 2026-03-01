@@ -255,7 +255,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 - **Label** - LabelSet içindeki tek etiket
 
 ### Marketplace Models
-- **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`)
+- **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom)
 - **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 🆕
 - **Contract** - İş sözleşmeleri (active, submitted, approved, rejected)
 - **Submission** - Toplu etiket gönderimi (COCO/YOLO import) 🆕
