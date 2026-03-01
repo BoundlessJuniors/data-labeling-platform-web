@@ -174,47 +174,50 @@ async function handleDelete() {
 
 <template>
   <AppLayout>
-    <template #header>İlanlar</template>
-
-    <!-- Toolbar -->
-    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-      <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-        <!-- Search -->
-        <div class="relative flex-1 sm:w-64">
-          <input
-            v-model="searchInput"
-            type="search"
-            placeholder="İlan ara..."
-            class="input pl-10"
-            aria-label="İlan ara"
-          />
-          <svg
-            class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+    <template #header>
+      <div class="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex flex-col md:flex-row md:items-center gap-6 flex-1">
+          <h1 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">İlanlar</h1>
+          <div class="flex flex-1 gap-3 max-w-2xl">
+            <!-- Search -->
+            <div class="relative flex-1 sm:w-64">
+              <BaseInput
+                id="search-input"
+                v-model="searchInput"
+                type="search"
+                placeholder="İlan ara..."
+                class="pl-10"
+              />
+              <svg
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <!-- Status Filter -->
+            <BaseSelect
+              id="status-filter"
+              size="sm"
+              :model-value="listingsStore.statusFilter"
+              :options="statusOptions"
+              class="sm:w-48"
+              aria-label="Durum filtrele"
+              @update:model-value="(v) => listingsStore.setStatusFilter(v as ListingStatus | '')"
+            />
+          </div>
         </div>
-        <!-- Status Filter -->
-        <BaseSelect
-          id="status-filter"
-          :model-value="listingsStore.statusFilter"
-          :options="statusOptions"
-          class="sm:w-48"
-          aria-label="Durum filtrele"
-          @update:model-value="(v) => listingsStore.setStatusFilter(v as ListingStatus | '')"
-        />
+        <BaseButton variant="primary" @click="openCreateModal">
+          <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Yeni İlan
+        </BaseButton>
       </div>
-      <BaseButton variant="primary" @click="openCreateModal">
-        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        Yeni İlan
-      </BaseButton>
-    </div>
+    </template>
 
     <!-- Loading state -->
     <div v-if="listingsStore.loading && listingsStore.listings.length === 0" class="space-y-4">

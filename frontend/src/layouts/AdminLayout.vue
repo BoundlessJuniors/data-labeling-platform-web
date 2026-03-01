@@ -15,9 +15,9 @@ function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="h-screen h-[100dvh] flex bg-gray-100 overflow-hidden">
     <!-- Sidebar -->
-    <aside class="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
+    <aside class="w-64 bg-white shadow-lg flex-shrink-0 flex flex-col z-10">
       <div class="flex items-center justify-center h-16 border-b">
         <RouterLink to="/" class="flex items-center space-x-2">
           <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
@@ -27,7 +27,7 @@ function handleLogout() {
         </RouterLink>
       </div>
       
-      <nav class="mt-6 px-4">
+      <nav class="mt-6 px-4 flex-1 overflow-y-auto pb-4">
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Admin Panel
         </p>
@@ -51,7 +51,7 @@ function handleLogout() {
     </aside>
 
     <!-- Main content -->
-    <div class="ml-64">
+    <div class="flex-1 flex flex-col min-w-0">
       <!-- Topbar -->
       <header class="bg-white shadow-sm h-16 flex items-center justify-between px-6">
         <h1 class="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
@@ -66,7 +66,7 @@ function handleLogout() {
       </header>
 
       <!-- Page content -->
-      <main class="p-6">
+      <main class="flex-1 p-6 overflow-y-auto">
         <RouterView />
       </main>
     </div>

@@ -118,19 +118,21 @@ const currentConfirmMessage = computed(() => {
 
 <template>
   <AppLayout>
-    <template #header>Sözleşmeler</template>
-
-    <!-- Toolbar -->
-    <div class="flex justify-between items-center gap-4 mb-6">
-      <BaseSelect
-        id="status-filter"
-        :model-value="contractsStore.statusFilter"
-        :options="statusOptions"
-        class="w-48"
-        aria-label="Durum filtrele"
-        @update:model-value="(v) => contractsStore.setStatusFilter(v as ContractStatus | '')"
-      />
-    </div>
+    <template #header>
+      <div class="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">Sözleşmeler</h1>
+        <div class="w-full sm:w-48 md:ml-auto">
+          <BaseSelect
+            id="status-filter"
+            size="sm"
+            :model-value="contractsStore.statusFilter"
+            :options="statusOptions"
+            aria-label="Durum filtrele"
+            @update:model-value="(v) => contractsStore.setStatusFilter(v as ContractStatus | '')"
+          />
+        </div>
+      </div>
+    </template>
 
     <!-- Loading -->
     <div v-if="contractsStore.loading && contractsStore.contracts.length === 0" class="space-y-4">

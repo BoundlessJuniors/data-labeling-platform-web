@@ -137,29 +137,30 @@ function formatPrice(price: number, currency: string) {
 
 <template>
   <AppLayout>
-    <template #header>Mevcut İlanlar</template>
-
-    <!-- Toolbar -->
-    <div class="flex justify-between items-center gap-4 mb-6">
-      <div class="relative flex-1 max-w-md">
-        <input
-          v-model="searchInput"
-          type="search"
-          placeholder="İlan ara..."
-          class="bg-gray-50 border-none rounded-xl py-3 pl-10 pr-4 w-full max-w-md text-gray-900 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:bg-gray-800 dark:text-white"
-          aria-label="İlan ara"
-        />
-        <svg
-          class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+    <template #header>
+      <div class="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">Mevcut İlanlar</h1>
+        <div class="relative flex-1 max-w-md">
+          <input
+            v-model="searchInput"
+            type="search"
+            size="sm"
+            placeholder="İlan ara..."
+            class="input pl-10"
+            aria-label="İlan ara"
+          />
+          <svg
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
       </div>
-    </div>
+    </template>
 
     <!-- Loading -->
     <div v-if="loading && listings.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

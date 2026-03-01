@@ -57,7 +57,7 @@ function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6 flex gap-6 shrink-0">
+  <div class="h-screen h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-900 p-4 md:p-6 flex gap-6 shrink-0">
     <!-- Sidebar -->
     <aside
       class="w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-sm flex flex-col overflow-hidden shrink-0"
@@ -192,14 +192,17 @@ function handleLogout() {
     <!-- Main content -->
     <div class="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden min-w-0">
       <!-- Top bar -->
-      <header class="h-16 px-6 flex items-center border-b border-gray-100 dark:border-gray-700 shrink-0">
-        <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <header 
+        v-if="$slots.header" 
+        class="h-16 px-6 py-2 flex items-center border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 z-20 text-lg font-semibold text-gray-900 dark:text-white"
+      >
+        <div class="w-full">
           <slot name="header" />
-        </h1>
+        </div>
       </header>
 
       <!-- Page content -->
-      <main class="flex-1 p-6 overflow-auto">
+      <main class="flex-1 p-6 overflow-auto relative">
         <slot />
       </main>
     </div>

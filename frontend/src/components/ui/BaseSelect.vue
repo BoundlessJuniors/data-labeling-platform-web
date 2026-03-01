@@ -20,10 +20,7 @@ export interface SelectProps {
   required?: boolean;
 }
 
-const props = withDefaults(defineProps<SelectProps>(), {
-  disabled: false,
-  required: false,
-});
+defineProps<SelectProps>();
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];

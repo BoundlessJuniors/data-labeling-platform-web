@@ -1,0 +1,335 @@
+﻿diff --git a/frontend/src/components/ui/BaseButton.vue b/frontend/src/components/ui/BaseButton.vue
+index fc1e59e..8662210 100644
+--- a/frontend/src/components/ui/BaseButton.vue
++++ b/frontend/src/components/ui/BaseButton.vue
+@@ -79,4 +79,4 @@ defineEmits<{
+     </svg>
+     <slot />
+   </button>
+-</template>
++</template>
+\ No newline at end of file
+diff --git a/frontend/src/components/ui/BaseInput.vue b/frontend/src/components/ui/BaseInput.vue
+index 2824005..8395c94 100644
+--- a/frontend/src/components/ui/BaseInput.vue
++++ b/frontend/src/components/ui/BaseInput.vue
+@@ -86,4 +86,4 @@ function handleInput(event: Event) {
+       {{ hint }}
+     </p>
+   </div>
+-</template>
++</template>
+\ No newline at end of file
+diff --git a/frontend/src/components/ui/BaseSelect.vue b/frontend/src/components/ui/BaseSelect.vue
+index 136ff45..e6691cf 100644
+--- a/frontend/src/components/ui/BaseSelect.vue
++++ b/frontend/src/components/ui/BaseSelect.vue
+@@ -20,10 +20,7 @@ export interface SelectProps {
+   required?: boolean;
+ }
+ 
+-const props = withDefaults(defineProps<SelectProps>(), {
+-  disabled: false,
+-  required: false,
+-});
++defineProps<SelectProps>();
+ 
+ const emit = defineEmits<{
+   'update:modelValue': [value: string];
+@@ -106,4 +103,4 @@ function handleChange(event: Event) {
+       {{ error }}
+     </p>
+   </div>
+-</template>
++</template>
+\ No newline at end of file
+diff --git a/frontend/src/layouts/AdminLayout.vue b/frontend/src/layouts/AdminLayout.vue
+index 2a2ddc9..2fb6c29 100644
+--- a/frontend/src/layouts/AdminLayout.vue
++++ b/frontend/src/layouts/AdminLayout.vue
+@@ -15,9 +15,9 @@ function handleLogout() {
+ </script>
+ 
+ <template>
+-  <div class="min-h-screen bg-gray-100">
++  <div class="h-screen h-[100dvh] flex bg-gray-100 overflow-hidden">
+     <!-- Sidebar -->
+-    <aside class="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
++    <aside class="w-64 bg-white shadow-lg flex-shrink-0 flex flex-col z-10">
+       <div class="flex items-center justify-center h-16 border-b">
+         <RouterLink to="/" class="flex items-center space-x-2">
+           <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+@@ -27,7 +27,7 @@ function handleLogout() {
+         </RouterLink>
+       </div>
+       
+-      <nav class="mt-6 px-4">
++      <nav class="mt-6 px-4 flex-1 overflow-y-auto pb-4">
+         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+           Admin Panel
+         </p>
+@@ -51,7 +51,7 @@ function handleLogout() {
+     </aside>
+ 
+     <!-- Main content -->
+-    <div class="ml-64">
++    <div class="flex-1 flex flex-col min-w-0">
+       <!-- Topbar -->
+       <header class="bg-white shadow-sm h-16 flex items-center justify-between px-6">
+         <h1 class="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
+@@ -66,7 +66,7 @@ function handleLogout() {
+       </header>
+ 
+       <!-- Page content -->
+-      <main class="p-6">
++      <main class="flex-1 p-6 overflow-y-auto">
+         <RouterView />
+       </main>
+     </div>
+diff --git a/frontend/src/layouts/AppLayout.vue b/frontend/src/layouts/AppLayout.vue
+index 8c92768..3b706d3 100644
+--- a/frontend/src/layouts/AppLayout.vue
++++ b/frontend/src/layouts/AppLayout.vue
+@@ -57,7 +57,7 @@ function handleLogout() {
+ </script>
+ 
+ <template>
+-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6 flex gap-6 shrink-0">
++  <div class="h-screen h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-900 p-4 md:p-6 flex gap-6 shrink-0">
+     <!-- Sidebar -->
+     <aside
+       class="w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-sm flex flex-col overflow-hidden shrink-0"
+@@ -192,14 +192,17 @@ function handleLogout() {
+     <!-- Main content -->
+     <div class="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden min-w-0">
+       <!-- Top bar -->
+-      <header class="h-16 px-6 flex items-center border-b border-gray-100 dark:border-gray-700 shrink-0">
+-        <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
++      <header 
++        v-if="$slots.header" 
++        class="h-16 px-6 py-2 flex items-center border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 z-20 text-lg font-semibold text-gray-900 dark:text-white"
++      >
++        <div class="w-full">
+           <slot name="header" />
+-        </h1>
++        </div>
+       </header>
+ 
+       <!-- Page content -->
+-      <main class="flex-1 p-6 overflow-auto">
++      <main class="flex-1 p-6 overflow-auto relative">
+         <slot />
+       </main>
+     </div>
+diff --git a/frontend/src/style.css b/frontend/src/style.css
+index 73d9b0b..4664afb 100644
+--- a/frontend/src/style.css
++++ b/frontend/src/style.css
+@@ -224,4 +224,4 @@
+   .dark .scrollbar-thin {
+     scrollbar-color: theme('colors.gray.600') transparent;
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/frontend/src/views/HomePage.vue b/frontend/src/views/HomePage.vue
+index 0328545..1d0b462 100644
+--- a/frontend/src/views/HomePage.vue
++++ b/frontend/src/views/HomePage.vue
+@@ -207,4 +207,4 @@ useSeo({
+       </div>
+     </footer>
+   </div>
+-</template>
++</template>
+\ No newline at end of file
+diff --git a/frontend/src/views/client/ContractsPage.vue b/frontend/src/views/client/ContractsPage.vue
+index db866e0..78b812e 100644
+--- a/frontend/src/views/client/ContractsPage.vue
++++ b/frontend/src/views/client/ContractsPage.vue
+@@ -118,19 +118,21 @@ const currentConfirmMessage = computed(() => {
+ 
+ <template>
+   <AppLayout>
+-    <template #header>S├Âzle┼şmeler</template>
+-
+-    <!-- Toolbar -->
+-    <div class="flex justify-between items-center gap-4 mb-6">
+-      <BaseSelect
+-        id="status-filter"
+-        :model-value="contractsStore.statusFilter"
+-        :options="statusOptions"
+-        class="w-48"
+-        aria-label="Durum filtrele"
+-        @update:model-value="(v) => contractsStore.setStatusFilter(v as ContractStatus | '')"
+-      />
+-    </div>
++    <template #header>
++      <div class="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
++        <h1 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">S├Âzle┼şmeler</h1>
++        <div class="w-full sm:w-48 md:ml-auto">
++          <BaseSelect
++            id="status-filter"
++            size="sm"
++            :model-value="contractsStore.statusFilter"
++            :options="statusOptions"
++            aria-label="Durum filtrele"
++            @update:model-value="(v) => contractsStore.setStatusFilter(v as ContractStatus | '')"
++          />
++        </div>
++      </div>
++    </template>
+ 
+     <!-- Loading -->
+     <div v-if="contractsStore.loading && contractsStore.contracts.length === 0" class="space-y-4">
+diff --git a/frontend/src/views/client/ListingsPage.vue b/frontend/src/views/client/ListingsPage.vue
+index cdd62f1..8ae966a 100644
+--- a/frontend/src/views/client/ListingsPage.vue
++++ b/frontend/src/views/client/ListingsPage.vue
+@@ -174,47 +174,50 @@ async function handleDelete() {
+ 
+ <template>
+   <AppLayout>
+-    <template #header>─░lanlar</template>
+-
+-    <!-- Toolbar -->
+-    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+-      <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+-        <!-- Search -->
+-        <div class="relative flex-1 sm:w-64">
+-          <input
+-            v-model="searchInput"
+-            type="search"
+-            placeholder="─░lan ara..."
+-            class="input pl-10"
+-            aria-label="─░lan ara"
+-          />
+-          <svg
+-            class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+-            fill="none"
+-            stroke="currentColor"
+-            viewBox="0 0 24 24"
+-            aria-hidden="true"
+-          >
+-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+-          </svg>
++    <template #header>
++      <div class="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
++        <div class="flex flex-col md:flex-row md:items-center gap-6 flex-1">
++          <h1 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">─░lanlar</h1>
++          <div class="flex flex-1 gap-3 max-w-2xl">
++            <!-- Search -->
++            <div class="relative flex-1 sm:w-64">
++              <BaseInput
++                id="search-input"
++                v-model="searchInput"
++                type="search"
++                placeholder="─░lan ara..."
++                class="pl-10"
++              />
++              <svg
++                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
++                fill="none"
++                stroke="currentColor"
++                viewBox="0 0 24 24"
++                aria-hidden="true"
++              >
++                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
++              </svg>
++            </div>
++            <!-- Status Filter -->
++            <BaseSelect
++              id="status-filter"
++              size="sm"
++              :model-value="listingsStore.statusFilter"
++              :options="statusOptions"
++              class="sm:w-48"
++              aria-label="Durum filtrele"
++              @update:model-value="(v) => listingsStore.setStatusFilter(v as ListingStatus | '')"
++            />
++          </div>
+         </div>
+-        <!-- Status Filter -->
+-        <BaseSelect
+-          id="status-filter"
+-          :model-value="listingsStore.statusFilter"
+-          :options="statusOptions"
+-          class="sm:w-48"
+-          aria-label="Durum filtrele"
+-          @update:model-value="(v) => listingsStore.setStatusFilter(v as ListingStatus | '')"
+-        />
++        <BaseButton variant="primary" @click="openCreateModal">
++          <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
++            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
++          </svg>
++          Yeni ─░lan
++        </BaseButton>
+       </div>
+-      <BaseButton variant="primary" @click="openCreateModal">
+-        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+-        </svg>
+-        Yeni ─░lan
+-      </BaseButton>
+-    </div>
++    </template>
+ 
+     <!-- Loading state -->
+     <div v-if="listingsStore.loading && listingsStore.listings.length === 0" class="space-y-4">
+diff --git a/frontend/src/views/labeler/AvailableListingsPage.vue b/frontend/src/views/labeler/AvailableListingsPage.vue
+index e5eb50e..57d1bea 100644
+--- a/frontend/src/views/labeler/AvailableListingsPage.vue
++++ b/frontend/src/views/labeler/AvailableListingsPage.vue
+@@ -137,29 +137,30 @@ function formatPrice(price: number, currency: string) {
+ 
+ <template>
+   <AppLayout>
+-    <template #header>Mevcut ─░lanlar</template>
+-
+-    <!-- Toolbar -->
+-    <div class="flex justify-between items-center gap-4 mb-6">
+-      <div class="relative flex-1 max-w-md">
+-        <input
+-          v-model="searchInput"
+-          type="search"
+-          placeholder="─░lan ara..."
+-          class="bg-gray-50 border-none rounded-xl py-3 pl-10 pr-4 w-full max-w-md text-gray-900 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:bg-gray-800 dark:text-white"
+-          aria-label="─░lan ara"
+-        />
+-        <svg
+-          class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+-          fill="none"
+-          stroke="currentColor"
+-          viewBox="0 0 24 24"
+-          aria-hidden="true"
+-        >
+-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+-        </svg>
++    <template #header>
++      <div class="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
++        <h1 class="text-xl font-bold text-gray-900 dark:text-white shrink-0">Mevcut ─░lanlar</h1>
++        <div class="relative flex-1 max-w-md">
++          <input
++            v-model="searchInput"
++            type="search"
++            size="sm"
++            placeholder="─░lan ara..."
++            class="input pl-10"
++            aria-label="─░lan ara"
++          />
++          <svg
++            class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
++            fill="none"
++            stroke="currentColor"
++            viewBox="0 0 24 24"
++            aria-hidden="true"
++          >
++            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
++          </svg>
++        </div>
+       </div>
+-    </div>
++    </template>
+ 
+     <!-- Loading -->
+     <div v-if="loading && listings.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
