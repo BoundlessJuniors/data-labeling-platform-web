@@ -1,12 +1,21 @@
-import { Prisma, UserRole } from '@prisma/client';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import prisma from '../lib/db';
-import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
-import { cacheDelete, cacheDeletePattern } from '../lib/redis';
-import { uploadToR2, getSignedUrl, deleteFromR2, getPresignedPutUrl } from '../lib/storage';
-import { addAssetJob } from '../lib/queue';
-import logger from '../lib/logger';
+import { Prisma, UserRole } from "@prisma/client";
+import path from "path";
+import { randomUUID } from "crypto";
+import prisma from "../lib/db";
+import {
+  NotFoundError,
+  ForbiddenError,
+  BadRequestError,
+} from "../utils/errors";
+import { cacheDelete, cacheDeletePattern } from "../lib/redis";
+import {
+  uploadToR2,
+  getSignedUrl,
+  deleteFromR2,
+  getPresignedPutUrl,
+} from "../lib/storage";
+import { addAssetJob } from "../lib/queue";
+import logger from "../lib/logger";
 
 // Interface for Multer file (since we don't import 'express' here)
 interface UploadedFile {
@@ -20,7 +29,9 @@ export class AssetService {
   /**
    * Helper: Attach a signed URL to a single asset record
    */
-  private async attachSignedUrl<T extends { objectKey: string }>(asset: T): Promise<T & { signedUrl: string }> {
+  private async attachSignedUrl<T extends { objectKey: string }>(
+    asset: T,
+  ): Promise<T & { signedUrl: string }> {
     const signedUrl = await getSignedUrl(asset.objectKey);
     return { ...asset, signedUrl };
   }
@@ -28,7 +39,9 @@ export class AssetService {
   /**
    * Helper: Attach signed URLs to a list of asset records
    */
-  private async attachSignedUrls<T extends { objectKey: string }>(assets: T[]): Promise<(T & { signedUrl: string })[]> {
+  private async attachSignedUrls<T extends { objectKey: string }>(
+    assets: T[],
+  ): Promise<(T & { signedUrl: string })[]> {
     return Promise.all(assets.map((a) => this.attachSignedUrl(a)));
   }
 
@@ -44,7 +57,7 @@ export class AssetService {
     contentType: string,
   ) {
     if (!datasetId) {
-      throw new BadRequestError('Dataset ID zorunludur.');
+      throw new BadRequestError("Dataset ID zorunludur.");
     }
 
     // Verify dataset exists and user has access
@@ -54,19 +67,21 @@ export class AssetService {
     });
 
     if (!dataset) {
-      throw new NotFoundError('Dataset');
+      throw new NotFoundError("Dataset");
     }
 
-    if (userRole !== 'admin' && dataset.ownerUserId !== userId) {
-      throw new ForbiddenError('Bu datasete asset ekleme yetkiniz yok.');
+    if (userRole !== "admin" && dataset.ownerUserId !== userId) {
+      throw new ForbiddenError("Bu datasete asset ekleme yetkiniz yok.");
     }
 
     if (dataset._count.listings > 0) {
-      throw new BadRequestError('Bu dataset bir ilanda kullanıldığı için yeni görsel yüklenemez.');
+      throw new BadRequestError(
+        "Bu dataset bir ilanda kullanıldığı için yeni görsel yüklenemez.",
+      );
     }
 
     // Build a unique object key
-    const ext = path.extname(filename) || '';
+    const ext = path.extname(filename) || "";
     const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
 
     // Create pending asset record
@@ -75,7 +90,7 @@ export class AssetService {
         datasetId,
         objectKey,
         mimeType: contentType,
-        status: 'pending',
+        status: "pending",
       },
     });
 
@@ -102,36 +117,36 @@ export class AssetService {
     });
 
     if (!asset) {
-      throw new NotFoundError('Asset');
+      throw new NotFoundError("Asset");
     }
 
-    if (userRole !== 'admin' && asset.dataset.ownerUserId !== userId) {
-      throw new ForbiddenError('Bu işlem için yetkiniz yok.');
+    if (userRole !== "admin" && asset.dataset.ownerUserId !== userId) {
+      throw new ForbiddenError("Bu işlem için yetkiniz yok.");
     }
 
     // Update status to 'uploaded' (processing will start)
     const updatedAsset = await prisma.asset.update({
       where: { id: assetId },
-      data: { status: 'uploaded' },
+      data: { status: "uploaded" },
     });
 
     // Add to queue
     await addAssetJob(asset.id, asset.objectKey);
 
-     // Update dataset status → ready (if not already)
-     // Note: In a real bulk scenario, this might be too frequent, but safe for now.
-     if (asset.dataset) {
+    // Update dataset status → ready (if not already)
+    // Note: In a real bulk scenario, this might be too frequent, but safe for now.
+    if (asset.dataset) {
       await prisma.dataset.updateMany({
-        where: { id: asset.datasetId, status: { in: ['draft', 'uploading'] } },
-        data: { status: 'ready' },
+        where: { id: asset.datasetId, status: { in: ["draft", "uploading"] } },
+        data: { status: "ready" },
       });
-     }
+    }
 
     logger.info(`Asset upload confirmed: ${assetId} -> Queued for processing`);
 
     // Invalidate caches
-    await cacheDeletePattern('cache:/api/v1/assets*');
-    await cacheDeletePattern('cache:/api/v1/datasets*');
+    await cacheDeletePattern("cache:/api/v1/assets*");
+    await cacheDeletePattern("cache:/api/v1/datasets*");
 
     return this.attachSignedUrl(updatedAsset);
   }
@@ -144,7 +159,7 @@ export class AssetService {
     limit: number,
     userId: string | undefined,
     userRole: UserRole | undefined,
-    datasetId?: string
+    datasetId?: string,
   ) {
     const skip = (page - 1) * limit;
 
@@ -155,7 +170,7 @@ export class AssetService {
     }
 
     // If not admin, only show assets from owned datasets
-    if (userRole !== 'admin') {
+    if (userRole !== "admin") {
       where.dataset = {
         ownerUserId: userId,
       };
@@ -166,7 +181,7 @@ export class AssetService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           dataset: {
             select: { id: true, name: true },
@@ -193,7 +208,11 @@ export class AssetService {
   /**
    * Get a single asset by ID
    */
-  async getAssetById(assetId: string, userId: string | undefined, userRole: UserRole | undefined) {
+  async getAssetById(
+    assetId: string,
+    userId: string | undefined,
+    userRole: UserRole | undefined,
+  ) {
     const rawAsset = await prisma.asset.findUnique({
       where: { id: assetId },
       include: {
@@ -204,12 +223,34 @@ export class AssetService {
     });
 
     if (!rawAsset) {
-      throw new NotFoundError('Asset');
+      throw new NotFoundError("Asset");
     }
 
-    // Check access rights
-    if (userRole !== 'admin' && rawAsset.dataset.ownerUserId !== userId) {
-      throw new ForbiddenError('Bu asete erişim yetkiniz yok.');
+    // Check access rights (Yetki Kontrolü)
+    let hasAccess = false;
+
+    if (userRole === "admin") {
+      hasAccess = true; // Admin her şeyi görebilir
+    } else if (rawAsset.dataset.ownerUserId === userId) {
+      hasAccess = true; // Müşteri kendi yüklediği resmi görebilir
+    } else if (userRole === "labeler" && userId) {
+      // Labeler (Etiketleyici) sadece üzerine atanmış sözleşmedeki resimleri görebilir
+      const hasTask = await prisma.task.findFirst({
+        where: {
+          assetId: assetId,
+          contract: {
+            labelerUserId: userId,
+          },
+        },
+      });
+
+      if (hasTask) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
+      throw new ForbiddenError("Bu asete erişim yetkiniz yok.");
     }
 
     return this.attachSignedUrl(rawAsset);
@@ -229,7 +270,7 @@ export class AssetService {
       height?: number;
       sizeBytes?: number;
       checksum?: string;
-    }
+    },
   ) {
     // Check if asset exists and user has access
     const existingAsset = await prisma.asset.findUnique({
@@ -242,11 +283,11 @@ export class AssetService {
     });
 
     if (!existingAsset) {
-      throw new NotFoundError('Asset');
+      throw new NotFoundError("Asset");
     }
 
-    if (userRole !== 'admin' && existingAsset.dataset.ownerUserId !== userId) {
-      throw new ForbiddenError('Bu aseti güncelleme yetkiniz yok.');
+    if (userRole !== "admin" && existingAsset.dataset.ownerUserId !== userId) {
+      throw new ForbiddenError("Bu aseti güncelleme yetkiniz yok.");
     }
 
     const asset = await prisma.asset.update({
@@ -289,22 +330,26 @@ export class AssetService {
     });
 
     if (!existingAsset) {
-      throw new NotFoundError('Asset');
+      throw new NotFoundError("Asset");
     }
 
-    if (userRole !== 'admin' && existingAsset.dataset.ownerUserId !== userId) {
-      throw new ForbiddenError('Bu aseti silme yetkiniz yok.');
+    if (userRole !== "admin" && existingAsset.dataset.ownerUserId !== userId) {
+      throw new ForbiddenError("Bu aseti silme yetkiniz yok.");
     }
 
     if (existingAsset.dataset._count.listings > 0) {
-      throw new BadRequestError('Bu görsel, bir ilanda kullanılan bir datasete ait olduğu için silinemez.');
+      throw new BadRequestError(
+        "Bu görsel, bir ilanda kullanılan bir datasete ait olduğu için silinemez.",
+      );
     }
 
     // Delete from R2 first
     try {
       await deleteFromR2(existingAsset.objectKey);
     } catch (r2Err) {
-      logger.warn(`Failed to delete object from R2 (key: ${existingAsset.objectKey}): ${r2Err}`);
+      logger.warn(
+        `Failed to delete object from R2 (key: ${existingAsset.objectKey}): ${r2Err}`,
+      );
     }
 
     await prisma.asset.delete({
