@@ -7,6 +7,13 @@ import logger from '../lib/logger';
 export class ContractService {
   /**
    * Create a new contract (labeler applies to a listing)
+   *
+   * MVP Design Decision:
+   *   Contract starts as 'active' immediately — no pending → active approval flow.
+   *   In a full marketplace, createContract would set status to 'pending' and a separate
+   *   approveContract call would transition to 'active' + listing to 'in_progress'.
+   *   The existing /contracts/:id/approve endpoint is used for approving the
+   *   final *submitted* labeling work, not the initial contract creation.
    */
   async createContract(labelerId: string, labelerRole: UserRole, listingId: string) {
     // Verify user is a labeler
@@ -203,8 +210,8 @@ export class ContractService {
       throw new ForbiddenError('Only the labeler can submit this contract');
     }
 
-    // Can only submit active contracts
-    if (contract.status !== ContractStatus.active) {
+    // Can only submit active or revision_requested contracts
+    if (contract.status !== ContractStatus.active && contract.status !== ContractStatus.revision_requested) {
       throw new BadRequestError(`Cannot submit contract with status: ${contract.status}`);
     }
 
@@ -310,7 +317,10 @@ export class ContractService {
     const updatedContract = await prisma.contract.update({
       where: { id: contractId },
       data: {
-        status: ContractStatus.rejected,
+        status: ContractStatus.revision_requested,
+        revisionReason: reason || null,
+        revisionRequestedAt: new Date(),
+        revisionCount: { increment: 1 },
       },
       include: {
         listing: { select: { id: true, title: true } },
@@ -319,7 +329,13 @@ export class ContractService {
       },
     });
 
-    logger.info(`Contract rejected: ${contractId}, reason: ${reason || 'No reason provided'}`);
+    logger.info(`Contract revision requested: ${contractId}, reason: ${reason || 'No reason provided'}`);
+
+    // Ensure listing remains in_progress during revision cycle
+    await prisma.listing.update({
+      where: { id: contract.listingId },
+      data: { status: ListingStatus.in_progress },
+    });
 
     return updatedContract;
   }

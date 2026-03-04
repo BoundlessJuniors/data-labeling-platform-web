@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as contractController from '../controllers/contract.controller';
 import { authenticate } from '../middlewares/auth.middleware';
-import { labelerOnly, adminOrClient } from '../middlewares/role.middleware';
+import { adminOrLabeler, adminOrClient } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { 
   createContractSchema, 
@@ -35,9 +35,10 @@ router.get(
   contractController.getContractById
 );
 
-// PATCH /api/contracts/:id/submit - Submit contract (labeler)
+// PATCH /api/contracts/:id/submit - Submit contract (labeler or admin)
 router.patch(
   '/:id/submit',
+  adminOrLabeler,
   validate(idParamSchema, 'params'),
   contractController.submitContract
 );
@@ -45,6 +46,7 @@ router.patch(
 // PATCH /api/contracts/:id/approve - Approve contract (client)
 router.patch(
   '/:id/approve',
+  adminOrClient,
   validate(idParamSchema, 'params'),
   contractController.approveContract
 );
@@ -52,6 +54,7 @@ router.patch(
 // PATCH /api/contracts/:id/reject - Reject contract (client)
 router.patch(
   '/:id/reject',
+  adminOrClient,
   validate(idParamSchema, 'params'),
   validate(rejectContractSchema),
   contractController.rejectContract

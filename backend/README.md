@@ -139,9 +139,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 |--------|----------|----------|
 | GET | `/users` | Tüm kullanıcıları listele |
 | GET | `/users/:id` | Kullanıcı detayı |
-| PUT | `/users/:id` | Kullanıcı güncelle |
+| PATCH | `/users/:id` | Kullanıcı güncelle |
 | DELETE | `/users/:id` | Kullanıcı sil |
-| GET | `/stats` | Platform istatistikleri |
 
 ### Dataset Routes (`/api/v1/datasets`)
 
@@ -151,15 +150,17 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/:id` | Dataset detayı |
 | POST | `/` | Yeni dataset oluştur |
 | PUT | `/:id` | Dataset güncelle |
+| PATCH | `/:id` | Dataset güncelle |
 | DELETE | `/:id` | Dataset sil |
 
 ### Asset Routes (`/api/v1/assets`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/` | Assetleri listele (datasetId query) |
+| GET | `/` | Assetleri listele |
 | GET | `/:id` | Asset detayı (signed URL ile) |
-| POST | `/` | Görsel yükle (multipart/form-data → MinIO/R2) |
+| POST | `/initiate` | Görsel yükleme başlat ( URL dön ) |
+| POST | `/:id/confirm` | Yüklemeyi onayla ve işlemeye al |
 | PUT | `/:id` | Asset güncelle |
 | DELETE | `/:id` | Asset sil (MinIO/R2 + DB) |
 
@@ -181,13 +182,15 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
 | GET | `/` | Tüm açık ilanlar (`?search=` ile başlık araması destekler) |
-| GET | `/my` | Kullanıcının ilanları |
 | GET | `/:id` | İlan detayı |
 | POST | `/` | Yeni ilan oluştur |
 | PUT | `/:id` | İlan güncelle |
+| PATCH | `/:id` | İlan güncelle |
 | DELETE | `/:id` | İlan sil |
+| POST | `/:id/generate-tasks` | İlan için görevleri (tasks) oluştur |
+| GET | `/:listingId/proposals` | İlanın başvuruları |
 
-> **Cache:** Listings için Redis cache (`cacheMiddleware`) kullanılır; `GET /` 30s, `GET /:id` 60s TTL. Her yazma işleminde (create/update/delete) `cacheDeletePattern` ile listings, datasets ve labelsets önbellekleri silinerek verilerin anında güncellenmesi sağlanır.
+> **Cache:** Listings için Redis cache (`cacheMiddleware`) kullanılır.
 
 ### Proposal Routes (`/api/v1/proposals`) 🆕
 
@@ -199,7 +202,6 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PATCH | `/:id/accept` | Başvuruyu kabul et → Contract oluşur |
 | PATCH | `/:id/reject` | Başvuruyu reddet |
 | PATCH | `/:id/withdraw` | Başvuruyu geri çek (labeler) |
-| GET | `/listings/:id/proposals` | İlanın başvuruları |
 
 > **Not:** `acceptProposal` transaction içinde: Proposal kabul → Contract oluştur → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `in_progress`'e güncelle
 
@@ -208,38 +210,41 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
 | GET | `/` | Kullanıcının sözleşmeleri |
+| POST | `/` | Yeni Contract oluştur |
 | GET | `/:id` | Sözleşme detayı |
 | PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) |
 | PATCH | `/:id/approve` | Sözleşmeyi onayla (client) |
-| PATCH | `/:id/reject` | Sözleşmeyi reddet (client) |
+| PATCH | `/:id/reject` | Sözleşmeyi revision_requested'a çevir (client) — revizyon döngüsü başlatır |
 | PATCH | `/:id/cancel` | Sözleşmeyi iptal et |
-
-> **Not:** Sözleşmeler artık doğrudan oluşturulmaz. Bir başvuru (`Proposal`) kabul edildiğinde otomatik olarak oluşturulur. `agreedPriceTotal` alanı başvurudaki `priceQuote` değerinden gelir. `GET /` endpoint'i artık her sözleşme için `tasks: [{ status }]` dizisini de döner — client tarafında ilerleme çubuğu hesaplaması için kullanılır.
 
 ### Task Routes (`/api/v1/tasks`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/contract/:contractId` | Sözleşme görevleri |
+| GET | `/` | Tüm görevleri (tasks) listele |
+| POST | `/lease-batch` | Toplu görev kilitle (Desktop App, active/revision_requested contract) |
 | GET | `/:id` | Görev detayı |
 | POST | `/:id/lease` | Görevi kilitle |
 | POST | `/:id/submit` | Görevi teslim et |
-| PUT | `/:id/status` | Görev durumunu güncelle |
+| PATCH | `/:id/accept` | Görevi onayla (QC) |
+| PATCH | `/:id/reject` | Görevi reddet (QC) |
+| POST | `/release-expired` | Süresi dolan kilitleri kaldır (admin) |
 
 ### Annotation Routes (`/api/v1/annotations`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/task/:taskId` | Task annotationları |
 | POST | `/raw` | Ham annotation kaydet |
-| POST | `/normalized` | Normalize annotation kaydet |
+| POST | `/normalize` | Normalize annotation kaydet |
 
 ### Review Routes (`/api/v1/reviews`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/task/:taskId` | Task reviewları |
+| GET | `/` | Tüm review'ları getir |
 | POST | `/` | Yeni review oluştur |
+| GET | `/:id` | Review detayı |
+| PATCH | `/:id/resolve` | Review çöz/güncelle |
 
 ## 🗄️ Veritabanı Şeması
 
@@ -248,20 +253,20 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 ### Core Models
 - **User** - Kullanıcılar (client, labeler, admin rolleri)
 - **Dataset** - Müşteri veri setleri (draft, uploading, ready, archived)
-- **Asset** - Dataset içindeki görseller
+- **Asset** - Dataset içindeki görseller (pending, uploaded, processing, ready, error)
 
 ### Labeling Models
 - **LabelSet** - Etiket sınıfları seti (versiyonlanabilir)
 - **Label** - LabelSet içindeki tek etiket
 
 ### Marketplace Models
-- **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom)
-- **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 🆕
-- **Contract** - İş sözleşmeleri (active, submitted, approved, rejected, cancelled)
-- **Submission** - Toplu etiket gönderimi (COCO/YOLO import) 🆕
+- **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom), `qcMode` (none, client_approval, internal_reviewer)
+- **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 
+- **Contract** - İş sözleşmeleri (active, submitted, approved, revision_requested, cancelled) — `revisionReason`, `revisionRequestedAt`, `revisionCount` alanları ile revizyon takibi
+- **Submission** - Toplu etiket gönderimi (COCO/YOLO import) (pending, processing, completed, failed) 
 
 ### Task Models
-- **Task** - En küçük iş birimi (1 asset = 1 task)
+- **Task** - En küçük iş birimi (1 asset = 1 task) (ready, leased, submitted, accepted, rejected)
 - **TaskLease** - Görev kilitleme sistemi
 
 ### Annotation Models
@@ -269,19 +274,25 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 - **AnnotationNormalized** - Normalize edilmiş COCO/YOLO uyumlu format
 
 ### Payment Models
-- **Payment** - Ödeme kayıtları
-- **EscrowLedger** - Para hareketi muhasebesi
+- **Payment** - Ödeme kayıtları (pending, paid, failed, refunded)
+- **EscrowLedger** - Para hareketi muhasebesi (hold, release_to_labeler, refund_to_client, platform_fee)
 
 ### System Models
 - **AuditLog** - Denetim logları
-- **Review** - QC review kayıtları
+- **Review** - QC review kayıtları (accept, reject)
 
 ## 🛡️ Middleware Pipeline
 
-```
-Request → Security (Helmet/CORS) → Cookie Parser → Rate Limiting → Request Logger 
-       → Auth (JWT via httpOnly cookie) → Role Check → Validation → Controller
-       → Response / Error Handler
+```text
+Request 
+  → Trust Proxy (if set) 
+  → Security (Helmet/CORS) 
+  → Body Parsers (JSON/Urlencoded) 
+  → Cookie Parser 
+  → Request Logger 
+  → Rate Limiting 
+  → API Routes (Auth (JWT via httpOnly cookie) → Role Check → Validation → Controller) 
+  → Error Handler (Not Found / Global Error)
 ```
 
 ## 📜 NPM Komutları

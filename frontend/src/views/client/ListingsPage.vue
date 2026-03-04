@@ -181,12 +181,13 @@ async function handleDelete() {
           <div class="flex flex-1 gap-3 max-w-2xl">
             <!-- Search -->
             <div class="relative flex-1 sm:w-64">
-              <BaseInput
+              <input
                 id="search-input"
                 v-model="searchInput"
                 type="search"
                 placeholder="İlan ara..."
-                class="pl-10"
+                class="input pl-10"
+                aria-label="İlan ara"
               />
               <svg
                 class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"

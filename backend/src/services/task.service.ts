@@ -1,4 +1,4 @@
-import { TaskStatus, Prisma } from '@prisma/client';
+import { TaskStatus, ContractStatus, Prisma } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
@@ -309,9 +309,21 @@ export class TaskService {
       throw new ForbiddenError('Invalid or expired lease token');
     }
 
-    // NOTE: Lease expiry check removed intentionally.
-    // Contract is user-specific, so late submissions should still be accepted
-    // rather than discarding the labeler's work.
+    // Grace period: accept late submissions from the same labeler within 24h of lease expiry.
+    // This prevents discarding offline work while still enforcing a reasonable time window.
+    const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const now = new Date();
+    if (task.taskLease.leasedUntil < now) {
+      const elapsed = now.getTime() - task.taskLease.leasedUntil.getTime();
+      if (elapsed > GRACE_PERIOD_MS) {
+        throw new ForbiddenError('Lease has expired beyond the 24-hour grace period');
+      }
+      // Within grace — check that the submitter is the original leasee
+      if (task.taskLease.labelerUserId !== labelerId) {
+        throw new ForbiddenError('Lease has expired and you are not the original leasee');
+      }
+      logger.warn(`Task ${taskId} submitted within grace period (lease expired ${elapsed}ms ago)`);
+    }
 
     // Save raw annotation
     await prisma.annotationRaw.create({
@@ -457,7 +469,10 @@ export class TaskService {
 
   /**
    * Lease multiple tasks at once (for Desktop App bulk download)
-   * Uses transaction for atomic bulk locking
+   * Uses transaction for atomic bulk locking with retry for race conditions.
+   * Prisma does not support SELECT FOR UPDATE SKIP LOCKED, so concurrent
+   * callers may pick the same tasks.  If createMany fails on the taskLease
+   * unique constraint the whole transaction is retried (max 3 attempts).
    */
   async leaseTaskBatch(
     contractId: string,
@@ -467,6 +482,7 @@ export class TaskService {
   ) {
     const count = Math.min(amount, 100); // Max 100
     const leaseDurationMinutes = 120; // Desktop app needs more time (2 hours)
+    const MAX_RETRIES = 3;
 
     // Verify contract ownership
     const contract = await prisma.contract.findUnique({
@@ -481,65 +497,85 @@ export class TaskService {
       throw new ForbiddenError('You are not the labeler for this contract');
     }
 
-    if (contract.status !== 'active') {
-      throw new BadRequestError('Contract is not active');
+    if (contract.status !== ContractStatus.active && contract.status !== ContractStatus.revision_requested) {
+      throw new BadRequestError('Contract must be active or in revision_requested status');
     }
 
-    // Transaction for bulk locking
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Find 'count' available tasks
-      const availableTasks = await tx.task.findMany({
-        where: {
-          contractId,
-          status: TaskStatus.ready,
-        },
-        take: count,
-        select: { id: true },
-      });
+    // Retry loop for race-condition safety
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          // 1. Find 'count' available tasks (ordered by updatedAt to reduce
+          //    collision when concurrent callers hit the same deterministic set)
+          const availableTasks = await tx.task.findMany({
+            where: {
+              contractId,
+              status: { in: [TaskStatus.ready, TaskStatus.rejected] },
+            },
+            orderBy: { updatedAt: 'asc' },
+            take: count,
+            select: { id: true },
+          });
 
-      if (availableTasks.length === 0) {
-        return [];
+          if (availableTasks.length === 0) {
+            return [];
+          }
+
+          const taskIds = availableTasks.map((t) => t.id);
+          const leasedUntil = new Date(Date.now() + leaseDurationMinutes * 60 * 1000);
+
+          // 2. Bulk update task status
+          await tx.task.updateMany({
+            where: { id: { in: taskIds } },
+            data: { status: TaskStatus.leased },
+          });
+
+          // 3. Create lease records with unique tokens per task
+          const leases = taskIds.map((taskId) => ({
+            taskId,
+            labelerUserId: labelerId,
+            leaseToken: crypto.randomUUID(),
+            leasedUntil,
+          }));
+
+          await tx.taskLease.createMany({
+            data: leases,
+          });
+
+          // 4. Return the tasks with their assets and new tokens
+          const finalTasks = await tx.task.findMany({
+            where: { id: { in: taskIds } },
+            include: {
+              asset: {
+                select: { id: true, objectKey: true, mimeType: true, width: true, height: true },
+              },
+              taskLease: {
+                select: { leaseToken: true, leasedUntil: true },
+              },
+            },
+          });
+
+          return finalTasks;
+        });
+
+        logger.info(`Batch leased ${result.length} tasks for contract ${contractId} by ${labelerId}`);
+        return result;
+      } catch (err: unknown) {
+        const isUniqueViolation =
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002';
+
+        if (isUniqueViolation && attempt < MAX_RETRIES) {
+          logger.warn(
+            `Lease-batch attempt ${attempt} failed (unique constraint race), retrying...`
+          );
+          continue;
+        }
+        throw err; // Non-retryable or max retries reached
       }
+    }
 
-      const taskIds = availableTasks.map((t) => t.id);
-      const leasedUntil = new Date(Date.now() + leaseDurationMinutes * 60 * 1000);
-
-      // 2. Bulk update task status
-      await tx.task.updateMany({
-        where: { id: { in: taskIds } },
-        data: { status: TaskStatus.leased },
-      });
-
-      // 3. Create lease records with unique tokens per task
-      const leases = taskIds.map((taskId) => ({
-        taskId,
-        labelerUserId: labelerId,
-        leaseToken: crypto.randomUUID(),
-        leasedUntil,
-      }));
-
-      await tx.taskLease.createMany({
-        data: leases,
-      });
-
-      // 4. Return the tasks with their assets and new tokens
-      const finalTasks = await tx.task.findMany({
-        where: { id: { in: taskIds } },
-        include: {
-          asset: {
-            select: { id: true, objectKey: true, mimeType: true, width: true, height: true },
-          },
-          taskLease: {
-            select: { leaseToken: true, leasedUntil: true },
-          },
-        },
-      });
-
-      return finalTasks;
-    });
-
-    logger.info(`Batch leased ${result.length} tasks for contract ${contractId} by ${labelerId}`);
-
-    return result;
+    // Fallback (should not reach here)
+    return [];
   }
 }

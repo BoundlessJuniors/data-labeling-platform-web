@@ -32,8 +32,8 @@ app.set('trust proxy', 1);
 setupSecurity(app);
 
 // Body parsers
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Cookie parser (populates req.cookies)
 app.use(cookieParser());

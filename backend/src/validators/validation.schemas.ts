@@ -253,11 +253,28 @@ export const leaseTaskBatchSchema = Joi.object({
   }),
 });
 
+// Shared annotation payload shape — enforced in both task submit and raw annotation
+const annotationPayloadSchema = Joi.object({
+  type: Joi.string()
+    .valid('bbox', 'polygon', 'polyline', 'keypoint', 'circle', 'export')
+    .required()
+    .messages({
+      'any.required': 'Annotation type is required',
+      'any.only': 'Annotation type must be one of: bbox, polygon, polyline, keypoint, circle, export',
+    }),
+  data: Joi.alternatives()
+    .try(Joi.object().unknown(true), Joi.array())
+    .required()
+    .messages({
+      'any.required': 'Annotation data payload is required',
+    }),
+}).required();
+
 export const submitTaskSchema = Joi.object({
   leaseToken: Joi.string().uuid().required().messages({
     'any.required': 'Lease token is required',
   }),
-  annotationData: Joi.object().required().messages({
+  annotationData: annotationPayloadSchema.messages({
     'any.required': 'Annotation data is required',
   }),
 });
@@ -274,7 +291,7 @@ export const createAnnotationRawSchema = Joi.object({
   taskId: uuidSchema.messages({
     'any.required': 'Task ID is required',
   }),
-  payloadJson: Joi.object().required().messages({
+  payloadJson: annotationPayloadSchema.messages({
     'any.required': 'Payload JSON is required',
   }),
 });
