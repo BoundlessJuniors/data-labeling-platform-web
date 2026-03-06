@@ -214,3 +214,26 @@ export const leaseTaskBatch = async (
     next(error);
   }
 };
+
+// Get task QC view (Client/Labeler/Admin)
+export const getTaskQcView = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const result = await taskService.getTaskQcView(id, userId, userRole);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

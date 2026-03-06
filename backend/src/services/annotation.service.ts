@@ -2,11 +2,24 @@ import { Prisma, UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
 import logger from '../lib/logger';
+import crypto from 'crypto';
+import stableStringify from 'fast-json-stable-stringify';
 
 export class AnnotationService {
   /**
-   * Create a raw annotation for a task
-   * Validates that the user holds the active lease / is the contract labeler
+   * Compute a stable SHA-256 hash of a JSON payload.
+   */
+  private computePayloadHash(payload: unknown): string {
+    const canonical = stableStringify(payload);
+    return crypto.createHash('sha256').update(canonical).digest('hex');
+  }
+
+  /**
+   * Create a raw annotation for a task (admin-only debug/reprocess endpoint).
+   *
+   * - Generates payloadHash for DB constraint compliance.
+   * - Does NOT set leaseToken so normalize worker ignores these rows
+   *   (worker filters lease_token IS NOT NULL).
    */
   async createRawAnnotation(taskId: string, labelerId: string, labelerRole: UserRole, payloadJson: unknown) {
     // Verify task exists
@@ -24,10 +37,15 @@ export class AnnotationService {
       throw new ForbiddenError('You are not the labeler for this task');
     }
 
+    const payloadHash = this.computePayloadHash(payloadJson);
+
     const annotation = await prisma.annotationRaw.create({
       data: {
         taskId,
         labelerUserId: labelerId,
+        payloadHash,
+        // leaseToken intentionally omitted — admin debug rows are excluded
+        // from the normalize pipeline (worker filters lease_token IS NOT NULL)
         payloadJson: payloadJson as Prisma.InputJsonValue,
       },
       include: {
@@ -40,7 +58,7 @@ export class AnnotationService {
       },
     });
 
-    logger.info(`Raw annotation created for task ${taskId}`);
+    logger.info(`Raw annotation created for task ${taskId} (admin debug)`);
 
     return annotation;
   }
@@ -69,11 +87,12 @@ export class AnnotationService {
     }
 
     // Create or update normalized annotation
+    // IMPORTANT: labelerUserId must always be the contract's labeler, not the calling user
     const normalized = await prisma.annotationNormalized.upsert({
       where: { taskId },
       create: {
         taskId,
-        labelerUserId: userId,
+        labelerUserId: task.contract.labelerUserId,
         normalizedJson: normalizedJson as Prisma.InputJsonValue,
       },
       update: {

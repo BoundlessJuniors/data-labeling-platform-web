@@ -67,6 +67,13 @@ router.patch(
   taskController.rejectTask
 );
 
+// GET /api/tasks/:id/qc-view - Get task QC view (client/labeler/admin)
+router.get(
+  '/:id/qc-view',
+  validate(idParamSchema, 'params'),
+  taskController.getTaskQcView
+);
+
 // POST /api/tasks/release-expired - Release expired leases (admin only)
 router.post(
   '/release-expired',
@@ -75,3 +82,4 @@ router.post(
 );
 
 export default router;
+

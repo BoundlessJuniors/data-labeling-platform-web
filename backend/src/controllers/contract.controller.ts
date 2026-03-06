@@ -170,3 +170,49 @@ export const submitContract = async (
     next(error);
   }
 };
+
+// Get QC sample for a contract (Client/Admin)
+export const getQcSample = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const size = parseInt(req.query.size as string) || 100;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const result = await contractService.getQcSample(id, userId, userRole, size);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Retry normalize job (Admin only)
+export const retryNormalize = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const result = await contractService.retryNormalize(id, userId, userRole);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

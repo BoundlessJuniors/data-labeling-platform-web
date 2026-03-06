@@ -12,6 +12,8 @@ Görsel veri etiketleme platformu için RESTful API.
 | **Database** | PostgreSQL | 16-alpine |
 | **Cache** | Redis (ioredis) | ^5.9.2 |
 | **Queue** | BullMQ | ^5.x |
+| **Hashing** | fast-json-stable-stringify | ^2.x |
+| **Concurrency** | p-limit | ^6.x |
 | **Image Proc** | Sharp | ^0.33.x |
 | **Auth** | JWT (httpOnly cookie) + bcrypt | ^9.0.3 / ^6.0.0 |
 | **Validation** | Joi | ^18.0.2 |
@@ -70,7 +72,8 @@ backend/
 │   │   └── review.service.ts
 │   │
 │   ├── workers/           # Background Workers
-│   │   └── asset.worker.ts         # BullMQ worker for image processing
+│   │   ├── asset.worker.ts         # BullMQ worker for image processing
+│   │   └── normalize.worker.ts     # BullMQ worker for annotation normalization
 │   │
 │   ├── routes/            # Express route tanımları
 │   │   ├── index.ts       # Route aggregator
@@ -104,7 +107,9 @@ backend/
 │   │   ├── queue.ts       # BullMQ setup
 │   │   ├── storage.ts     # MinIO/R2 Storage Utils
 │   │   └── logger.ts      # Winston logger
-│   ├── utils/             # Custom error classes
+│   ├── utils/             # Utility functions & custom error classes
+│   │   ├── errors.ts      # Custom error classes
+│   │   └── normalize.util.ts  # Normalize raw → normalized transform (MVP: identity)
 │   └── index.ts           # App entry point
 │
 ├── package.json
@@ -212,10 +217,12 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/` | Kullanıcının sözleşmeleri |
 | POST | `/` | Yeni Contract oluştur |
 | GET | `/:id` | Sözleşme detayı |
-| PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) |
-| PATCH | `/:id/approve` | Sözleşmeyi onayla (client) |
-| PATCH | `/:id/reject` | Sözleşmeyi revision_requested'a çevir (client) — revizyon döngüsü başlatır |
+| GET | `/:id/qc-sample` | QC sample task seti al (client/admin, `?size=100`) |
+| PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) → normalize job enqueue |
+| PATCH | `/:id/approve` | Sözleşmeyi onayla (client) — normalize completed gerektirir |
+| PATCH | `/:id/reject` | Sözleşmeyi revision_requested'a çevir (client) — task statülerini sıfırlar |
 | PATCH | `/:id/cancel` | Sözleşmeyi iptal et |
+| POST | `/:id/normalize-retry` | Normalize job'ı tekrar enqueue et (admin only) |
 
 ### Task Routes (`/api/v1/tasks`)
 
@@ -224,18 +231,21 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/` | Tüm görevleri (tasks) listele |
 | POST | `/lease-batch` | Toplu görev kilitle (Desktop App, active/revision_requested contract) |
 | GET | `/:id` | Görev detayı |
-| POST | `/:id/lease` | Görevi kilitle |
-| POST | `/:id/submit` | Görevi teslim et |
+| GET | `/:id/qc-view` | QC inceleme görünümü (asset + raw + normalized + labelSet) |
+| POST | `/:id/lease` | Görevi kilitle (race-safe, DB constraint ile) |
+| POST | `/:id/submit` | Görevi teslim et (atomic transaction, idempotent via payloadHash) |
 | PATCH | `/:id/accept` | Görevi onayla (QC) |
 | PATCH | `/:id/reject` | Görevi reddet (QC) |
 | POST | `/release-expired` | Süresi dolan kilitleri kaldır (admin) |
 
-### Annotation Routes (`/api/v1/annotations`)
+### Annotation Routes (`/api/v1/annotations`) 🔒 Admin Only
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| POST | `/raw` | Ham annotation kaydet |
-| POST | `/normalize` | Normalize annotation kaydet |
+| POST | `/raw` | Ham annotation kaydet (debug/reprocess — admin only) |
+| POST | `/normalize` | Normalize annotation kaydet (debug — admin only) |
+
+> **Not:** Normal labeler akışı `/tasks/:id/submit` üzerinden geçer. Annotation endpoint'leri sadece admin debug/reprocess içindir. Admin raw kayıtları normalize pipeline'ını etkilemez (`leaseToken` null olarak yazılır).
 
 ### Review Routes (`/api/v1/reviews`)
 
@@ -262,16 +272,16 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 ### Marketplace Models
 - **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom), `qcMode` (none, client_approval, internal_reviewer)
 - **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 
-- **Contract** - İş sözleşmeleri (active, submitted, approved, revision_requested, cancelled) — `revisionReason`, `revisionRequestedAt`, `revisionCount` alanları ile revizyon takibi
-- **Submission** - Toplu etiket gönderimi (COCO/YOLO import) (pending, processing, completed, failed) 
+- **Contract** - İş sözleşmeleri (active, submitted, approved, revision_requested, cancelled) — `revisionReason`, `revisionRequestedAt`, `revisionCount` alanları ile revizyon takibi. Submit → async normalize → QC → approve/reject pipeline'ı
+- **Submission** - Normalize pipeline tracking (pending, processing, completed, failed) — contract submit'te oluşturulur, normalize worker tarafından güncellenir
 
 ### Task Models
 - **Task** - En küçük iş birimi (1 asset = 1 task) (ready, leased, submitted, accepted, rejected)
 - **TaskLease** - Görev kilitleme sistemi
 
 ### Annotation Models
-- **AnnotationRaw** - Ham annotation verisi (JSON)
-- **AnnotationNormalized** - Normalize edilmiş COCO/YOLO uyumlu format
+- **AnnotationRaw** - Ham annotation verisi (JSON) — `payloadHash` (NOT NULL, SHA-256) ile idempotency, `leaseToken` ile audit trail, `@@unique([taskId, payloadHash])` constraint
+- **AnnotationNormalized** - Normalize edilmiş format — `version` ile versiyonlama, `updatedAt` ile güncelleme takibi
 
 ### Payment Models
 - **Payment** - Ödeme kayıtları (pending, paid, failed, refunded)

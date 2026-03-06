@@ -369,6 +369,8 @@ model AnnotationRaw {
   id            String   @id @default(uuid()) @db.Uuid
   taskId        String   @map("task_id") @db.Uuid
   labelerUserId String   @map("labeler_user_id") @db.Uuid
+  leaseToken    String?  @map("lease_token")
+  payloadHash   String   @map("payload_hash")
   payloadJson   Json     @map("payload_json") @db.JsonB
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -376,6 +378,7 @@ model AnnotationRaw {
   task    Task @relation(fields: [taskId], references: [id])
   labeler User @relation(fields: [labelerUserId], references: [id])
 
+  @@unique([taskId, payloadHash])
   @@index([taskId])
   @@index([labelerUserId])
   @@map("annotations_raw")
@@ -394,6 +397,7 @@ model AnnotationNormalized {
   normalizedJson Json     @map("normalized_json") @db.JsonB
   version        Int      @default(1)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   task    Task @relation(fields: [taskId], references: [id])

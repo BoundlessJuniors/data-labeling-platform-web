@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import * as contractController from '../controllers/contract.controller';
 import { authenticate } from '../middlewares/auth.middleware';
-import { adminOrLabeler, adminOrClient } from '../middlewares/role.middleware';
+import { adminOrLabeler, adminOrClient, adminOnly } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { 
   createContractSchema, 
   idParamSchema,
   rejectContractSchema,
-  cancelContractSchema 
+  cancelContractSchema,
+  qcSampleQuerySchema
 } from '../validators/validation.schemas';
 
 const router = Router();
@@ -33,6 +34,15 @@ router.get(
   '/:id',
   validate(idParamSchema, 'params'),
   contractController.getContractById
+);
+
+// GET /api/contracts/:id/qc-sample - Get QC sample task set (client/admin)
+router.get(
+  '/:id/qc-sample',
+  adminOrClient,
+  validate(idParamSchema, 'params'),
+  validate(qcSampleQuerySchema, 'query'),
+  contractController.getQcSample
 );
 
 // PATCH /api/contracts/:id/submit - Submit contract (labeler or admin)
@@ -68,4 +78,13 @@ router.patch(
   contractController.cancelContract
 );
 
+// POST /api/contracts/:id/normalize-retry - Retry normalize job (admin only)
+router.post(
+  '/:id/normalize-retry',
+  adminOnly,
+  validate(idParamSchema, 'params'),
+  contractController.retryNormalize
+);
+
 export default router;
+

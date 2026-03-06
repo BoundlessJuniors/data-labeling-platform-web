@@ -363,3 +363,14 @@ export const updateProposalStatusSchema = Joi.object({
   }),
 });
 
+// ============================================================================
+// QC Sampling Schemas
+// ============================================================================
+
+export const qcSampleQuerySchema = Joi.object({
+  size: Joi.number().integer().min(1).max(500).optional().default(100).messages({
+    'number.min': 'Sample size must be at least 1',
+    'number.max': 'Sample size cannot exceed 500',
+  }),
+});
+

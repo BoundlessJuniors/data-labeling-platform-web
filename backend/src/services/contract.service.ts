@@ -1,8 +1,9 @@
-import { ContractStatus, ListingStatus, Prisma } from '@prisma/client';
+import { ContractStatus, ListingStatus, Prisma, SubmissionStatus, TaskStatus } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
 import logger from '../lib/logger';
+import { addNormalizeJob } from '../lib/queue';
 
 export class ContractService {
   /**
@@ -10,10 +11,6 @@ export class ContractService {
    *
    * MVP Design Decision:
    *   Contract starts as 'active' immediately — no pending → active approval flow.
-   *   In a full marketplace, createContract would set status to 'pending' and a separate
-   *   approveContract call would transition to 'active' + listing to 'in_progress'.
-   *   The existing /contracts/:id/approve endpoint is used for approving the
-   *   final *submitted* labeling work, not the initial contract creation.
    */
   async createContract(labelerId: string, labelerRole: UserRole, listingId: string) {
     // Verify user is a labeler
@@ -194,7 +191,8 @@ export class ContractService {
   }
 
   /**
-   * Submit a contract (labeler submits completed work)
+   * Submit a contract (labeler submits completed work).
+   * Creates a Submission record and enqueues a normalize job.
    */
   async submitContract(contractId: string, userId: string, userRole: UserRole) {
     const contract = await prisma.contract.findUnique({
@@ -229,6 +227,30 @@ export class ContractService {
       throw new BadRequestError('Cannot submit contract. All tasks must be submitted or accepted before handing over.');
     }
 
+    // Validate every task has at least 1 valid raw annotation.
+    // "Valid" = leaseToken IS NOT NULL (not admin debug) AND labelerUserId matches contract.
+    // This aligns with the normalize worker's lease_token IS NOT NULL filter.
+    const tasksWithoutValidRaw = await prisma.task.findMany({
+      where: {
+        contractId,
+        annotationsRaw: {
+          none: {
+            leaseToken: { not: null },
+            labelerUserId: contract.labelerUserId,
+          },
+        },
+      },
+      select: { id: true },
+      take: 1,
+    });
+
+    if (tasksWithoutValidRaw.length > 0) {
+      throw new BadRequestError(
+        `Cannot submit contract. Every task must have at least one valid raw annotation (lease_token != null, correct labeler). First failing task: ${tasksWithoutValidRaw[0].id}`
+      );
+    }
+
+    // Update contract status to submitted
     const updatedContract = await prisma.contract.update({
       where: { id: contractId },
       data: {
@@ -241,13 +263,56 @@ export class ContractService {
       },
     });
 
+    // --- Submission + Normalize Job (idempotent) ---
+    // Find the latest submission for this contract (any status)
+    const existingSubmission = await prisma.submission.findFirst({
+      where: {
+        contractId,
+        format: 'CUSTOM_JSON',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existingSubmission && (existingSubmission.status === 'processing' || existingSubmission.status === 'completed')) {
+      // Already in-flight or done — do not enqueue again
+      logger.info(`Normalize submission already exists for contract ${contractId} (status: ${existingSubmission.status})`);
+    } else {
+      // Reuse pending/failed submission or create new
+      let submission = existingSubmission;
+      if (!submission || (submission.status !== 'pending' && submission.status !== 'failed')) {
+        submission = await prisma.submission.create({
+          data: {
+            contractId,
+            labelerUserId: contract.labelerUserId,
+            format: 'CUSTOM_JSON',
+            s3Key: 'db://annotations_raw',
+            status: SubmissionStatus.pending,
+          },
+        });
+      }
+
+      // Enqueue normalize job — submission stays 'pending' until worker starts (worker sets 'processing')
+      try {
+        await addNormalizeJob(contractId, submission.id);
+        logger.info(`Normalize job enqueued for contract ${contractId}, submission ${submission.id}`);
+      } catch (enqueueError: unknown) {
+        const errorMessage = enqueueError instanceof Error ? enqueueError.message : 'Unknown enqueue error';
+        await prisma.submission.update({
+          where: { id: submission.id },
+          data: { status: SubmissionStatus.failed, errorMessage },
+        });
+        logger.error(`Failed to enqueue normalize job for contract ${contractId}:`, enqueueError);
+      }
+    }
+
     logger.info(`Contract submitted: ${contractId}`);
 
     return updatedContract;
   }
 
   /**
-   * Approve a contract (client approves labeler's work)
+   * Approve a contract (client approves labeler's work).
+   * Requires normalization to be completed first.
    */
   async approveContract(contractId: string, userId: string, userRole: UserRole) {
     const contract = await prisma.contract.findUnique({
@@ -266,6 +331,14 @@ export class ContractService {
     // Can only approve submitted contracts
     if (contract.status !== ContractStatus.submitted) {
       throw new BadRequestError(`Cannot approve contract with status: ${contract.status}`);
+    }
+
+    // Gate: normalization must be completed
+    const completedSubmission = await prisma.submission.findFirst({
+      where: { contractId, format: 'CUSTOM_JSON', status: 'completed' },
+    });
+    if (!completedSubmission) {
+      throw new BadRequestError('Normalization is not completed yet. Cannot approve contract.');
     }
 
     const updatedContract = await prisma.contract.update({
@@ -293,7 +366,9 @@ export class ContractService {
   }
 
   /**
-   * Reject a contract (client rejects labeler's work)
+   * Reject a contract (client rejects labeler's work → revision_requested).
+   * Requires normalization to be completed first.
+   * Resets all submitted/accepted task statuses to 'rejected' so labeler can re-lease.
    */
   async rejectContract(contractId: string, userId: string, userRole: UserRole, reason?: string) {
     const contract = await prisma.contract.findUnique({
@@ -314,6 +389,14 @@ export class ContractService {
       throw new BadRequestError(`Cannot reject contract with status: ${contract.status}`);
     }
 
+    // Gate: normalization must be completed
+    const completedSubmission = await prisma.submission.findFirst({
+      where: { contractId, format: 'CUSTOM_JSON', status: 'completed' },
+    });
+    if (!completedSubmission) {
+      throw new BadRequestError('Normalization is not completed yet. Cannot reject contract.');
+    }
+
     const updatedContract = await prisma.contract.update({
       where: { id: contractId },
       data: {
@@ -328,6 +411,25 @@ export class ContractService {
         labeler: { select: { id: true, email: true, displayName: true } },
       },
     });
+
+    // Reset task statuses so labeler can re-lease and re-work them.
+    // Submitted/accepted tasks → rejected (eligible for re-lease).
+    await prisma.task.updateMany({
+      where: {
+        contractId,
+        status: { in: [TaskStatus.submitted, TaskStatus.accepted] },
+      },
+      data: { status: TaskStatus.rejected },
+    });
+
+    // Invalidate the old completed submission so a new normalize cycle can run
+    // after re-submission.
+    if (completedSubmission) {
+      await prisma.submission.update({
+        where: { id: completedSubmission.id },
+        data: { status: SubmissionStatus.failed, errorMessage: 'Invalidated due to contract revision' },
+      });
+    }
 
     logger.info(`Contract revision requested: ${contractId}, reason: ${reason || 'No reason provided'}`);
 
@@ -387,5 +489,129 @@ export class ContractService {
     logger.info(`Contract cancelled: ${contractId}, reason: ${reason || 'No reason provided'}`);
 
     return updatedContract;
+  }
+
+  /**
+   * Get a QC sample of tasks for a submitted contract.
+   * Returns random task IDs with minimal metadata for the client to review.
+   *
+   * Requirements:
+   *   - Contract must be submitted
+   *   - Normalization must be completed (Submission status = completed)
+   *   - Only client or admin can access
+   */
+  async getQcSample(contractId: string, userId: string, userRole: UserRole, size: number = 100) {
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+    });
+
+    if (!contract) {
+      throw new NotFoundError('Contract');
+    }
+
+    // Only client or admin
+    if (userRole !== 'admin' && contract.clientUserId !== userId) {
+      throw new ForbiddenError('Only the client can access QC samples');
+    }
+
+    // Contract must be submitted
+    if (contract.status !== ContractStatus.submitted) {
+      throw new BadRequestError(`QC sample is only available for submitted contracts (current: ${contract.status})`);
+    }
+
+    // Normalization must be completed
+    const completedSubmission = await prisma.submission.findFirst({
+      where: { contractId, format: 'CUSTOM_JSON', status: 'completed' },
+    });
+    if (!completedSubmission) {
+      throw new BadRequestError('Normalization is not completed yet. QC sample not available.');
+    }
+
+    // Fetch all task IDs for this contract, then shuffle in application layer
+    // (avoids ORDER BY random() performance issues on large tables)
+    const allTasks = await prisma.task.findMany({
+      where: { contractId },
+      select: {
+        id: true,
+        status: true,
+        asset: {
+          select: { id: true, objectKey: true, mimeType: true, width: true, height: true },
+        },
+      },
+    });
+
+    // Fisher-Yates shuffle
+    const shuffled = [...allTasks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Take requested sample size
+    const sampleSize = Math.min(size, shuffled.length);
+    const sample = shuffled.slice(0, sampleSize);
+
+    return {
+      contractId,
+      totalTasks: allTasks.length,
+      sampleSize: sample.length,
+      tasks: sample,
+    };
+  }
+
+  /**
+   * Retry normalize job for a contract (admin only).
+   * Finds the latest failed/pending submission or creates a new one, then enqueues.
+   */
+  async retryNormalize(contractId: string, userId: string, userRole: UserRole) {
+    if (userRole !== 'admin') {
+      throw new ForbiddenError('Only admin can retry normalize');
+    }
+
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+    });
+
+    if (!contract) {
+      throw new NotFoundError('Contract');
+    }
+
+    // Find latest retryable submission (failed or pending)
+    let submission = await prisma.submission.findFirst({
+      where: {
+        contractId,
+        format: 'CUSTOM_JSON',
+        status: { in: ['failed', 'pending'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!submission) {
+      // No retryable submission — create a new one
+      submission = await prisma.submission.create({
+        data: {
+          contractId,
+          labelerUserId: contract.labelerUserId,
+          format: 'CUSTOM_JSON',
+          s3Key: 'db://annotations_raw',
+          status: SubmissionStatus.pending,
+        },
+      });
+    }
+
+    // Enqueue normalize job
+    try {
+      await addNormalizeJob(contractId, submission.id);
+      logger.info(`Normalize retry enqueued for contract ${contractId}, submission ${submission.id}`);
+    } catch (enqueueError: unknown) {
+      const errorMessage = enqueueError instanceof Error ? enqueueError.message : 'Unknown enqueue error';
+      await prisma.submission.update({
+        where: { id: submission.id },
+        data: { status: SubmissionStatus.failed, errorMessage },
+      });
+      throw new BadRequestError(`Failed to enqueue normalize job: ${errorMessage}`);
+    }
+
+    return { submissionId: submission.id, status: 'processing' };
   }
 }

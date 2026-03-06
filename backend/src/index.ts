@@ -21,6 +21,7 @@ import logger from './lib/logger';
 import redis from './lib/redis';
 import { ensureBucket } from './lib/storage';
 import { startAssetWorker } from './workers/asset.worker';
+import { startNormalizeWorker } from './workers/normalize.worker';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -73,8 +74,9 @@ const startServer = async () => {
       logger.warn('Redis connection failed, caching disabled:', error.message);
     });
 
-    // Start background worker
+    // Start background workers
     startAssetWorker();
+    startNormalizeWorker();
 
     // Ensure the storage bucket exists (creates it on MinIO if missing)
     await ensureBucket();

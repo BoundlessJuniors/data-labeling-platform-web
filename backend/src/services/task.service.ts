@@ -4,6 +4,7 @@ import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
 import logger from '../lib/logger';
 import crypto from 'crypto';
+import stableStringify from 'fast-json-stable-stringify';
 
 export class TaskService {
   /**
@@ -194,12 +195,14 @@ export class TaskService {
   }
 
   /**
-   * Lease a task (lock it for labeling) — uses transaction for race condition safety
+   * Lease a task (lock it for labeling) — race-safe via DB unique constraint.
+   *
+   * Concurrency guarantee:
+   *   taskLease has a unique constraint on taskId. If two concurrent requests
+   *   try to create a lease, one will get P2002. The loser receives ConflictError.
    */
   async leaseTask(taskId: string, labelerId: string, labelerRole: UserRole, leaseDurationMinutes: number = 30) {
-    // Use transaction to prevent race conditions
     const result = await prisma.$transaction(async (tx) => {
-      // Get task with lock
       const task = await tx.task.findUnique({
         where: { id: taskId },
         include: {
@@ -222,17 +225,16 @@ export class TaskService {
         throw new BadRequestError(`Cannot lease task with status: ${task.status}`);
       }
 
-      // Check if already leased (and not expired)
-      if (task.taskLease && task.taskLease.leasedUntil > new Date()) {
-        throw new ConflictError('Task is already leased');
-      }
-
-      // Generate lease token
       const leaseToken = crypto.randomUUID();
       const leasedUntil = new Date(Date.now() + leaseDurationMinutes * 60 * 1000);
 
-      // Create or update lease
       if (task.taskLease) {
+        // Lease record exists
+        if (task.taskLease.leasedUntil > new Date()) {
+          // Active lease — conflict
+          throw new ConflictError('Task is already leased');
+        }
+        // Expired lease — overwrite
         await tx.taskLease.update({
           where: { taskId },
           data: {
@@ -242,14 +244,25 @@ export class TaskService {
           },
         });
       } else {
-        await tx.taskLease.create({
-          data: {
-            taskId,
-            labelerUserId: labelerId,
-            leaseToken,
-            leasedUntil,
-          },
-        });
+        // No lease record — create (P2002 = lost race)
+        try {
+          await tx.taskLease.create({
+            data: {
+              taskId,
+              labelerUserId: labelerId,
+              leaseToken,
+              leasedUntil,
+            },
+          });
+        } catch (err: unknown) {
+          if (
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === 'P2002'
+          ) {
+            throw new ConflictError('Task is already leased');
+          }
+          throw err;
+        }
       }
 
       // Update task status
@@ -273,7 +286,26 @@ export class TaskService {
   }
 
   /**
-   * Submit a task (labeler submits annotation)
+   * Compute a stable SHA-256 hash of annotationData for idempotency.
+   * Uses fast-json-stable-stringify so key order doesn't matter.
+   */
+  computePayloadHash(annotationData: unknown): string {
+    const canonical = stableStringify(annotationData);
+    return crypto.createHash('sha256').update(canonical).digest('hex');
+  }
+
+  /**
+   * Submit a task (labeler submits annotation) — fully atomic and idempotent.
+   *
+   * All DB mutations (raw insert, task update, lease delete) run inside a
+   * single Prisma interactive transaction. On crash/error no partial state.
+   *
+   * Idempotency:
+   *   - Task already submitted/accepted + same payloadHash → 200 OK (pre-tx check)
+   *   - P2002 on annotationRaw insert → duplicate, finalize idempotently
+   *   - P2025 on lease delete → already deleted, safe to ignore
+   *
+   * No grace period: leasedUntil < now → hard reject.
    */
   async submitTask(
     taskId: string,
@@ -282,75 +314,117 @@ export class TaskService {
     leaseToken: string,
     annotationData: unknown
   ) {
-    const task = await prisma.task.findUnique({
+    // Compute stable payload hash for idempotency
+    const payloadHash = this.computePayloadHash(annotationData);
+
+    // --- Pre-transaction idempotent shortcut ---
+    const preCheck = await prisma.task.findUnique({
       where: { id: taskId },
-      include: {
-        contract: true,
-        taskLease: true,
-      },
+      include: { contract: true },
     });
 
-    if (!task) {
+    if (!preCheck) {
       throw new NotFoundError('Task');
     }
 
-    // Verify user is the contract's labeler
-    if (labelerRole !== 'admin' && task.contract.labelerUserId !== labelerId) {
+    // ACL (outside transaction — fast fail)
+    if (labelerRole !== 'admin' && preCheck.contract.labelerUserId !== labelerId) {
       throw new ForbiddenError('You are not the labeler for this contract');
     }
 
-    // Check task status
-    if (task.status !== TaskStatus.leased) {
-      throw new BadRequestError(`Cannot submit task with status: ${task.status}`);
-    }
-
-    // Verify lease token
-    if (!task.taskLease || task.taskLease.leaseToken !== leaseToken) {
-      throw new ForbiddenError('Invalid or expired lease token');
-    }
-
-    // Grace period: accept late submissions from the same labeler within 24h of lease expiry.
-    // This prevents discarding offline work while still enforcing a reasonable time window.
-    const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours
-    const now = new Date();
-    if (task.taskLease.leasedUntil < now) {
-      const elapsed = now.getTime() - task.taskLease.leasedUntil.getTime();
-      if (elapsed > GRACE_PERIOD_MS) {
-        throw new ForbiddenError('Lease has expired beyond the 24-hour grace period');
+    // Idempotent shortcut: if already submitted/accepted with same hash, return directly
+    if (preCheck.status === TaskStatus.submitted || preCheck.status === TaskStatus.accepted) {
+      const existingRaw = await prisma.annotationRaw.findFirst({
+        where: { taskId, payloadHash },
+      });
+      if (existingRaw) {
+        logger.info(`Idempotent submit for task ${taskId} (already ${preCheck.status}, same hash)`);
+        const currentTask = await prisma.task.findUnique({
+          where: { id: taskId },
+          include: { asset: { select: { id: true, objectKey: true } } },
+        });
+        return currentTask;
       }
-      // Within grace — check that the submitter is the original leasee
-      if (task.taskLease.labelerUserId !== labelerId) {
-        throw new ForbiddenError('Lease has expired and you are not the original leasee');
-      }
-      logger.warn(`Task ${taskId} submitted within grace period (lease expired ${elapsed}ms ago)`);
     }
 
-    // Save raw annotation
-    await prisma.annotationRaw.create({
-      data: {
-        taskId,
-        labelerUserId: labelerId,
-        payloadJson: annotationData as Prisma.InputJsonValue,
-      },
-    });
+    // --- Atomic transaction: raw insert + task update + lease delete ---
+    const updatedTask = await prisma.$transaction(async (tx) => {
+      // Re-read task inside transaction for consistency
+      const task = await tx.task.findUnique({
+        where: { id: taskId },
+        include: { taskLease: true },
+      });
 
-    // Update task status
-    const updatedTask = await prisma.task.update({
-      where: { id: taskId },
-      data: {
-        status: TaskStatus.submitted,
-        attemptCount: { increment: 1 },
-      },
-      include: {
-        asset: {
-          select: { id: true, objectKey: true },
+      if (!task) {
+        throw new NotFoundError('Task');
+      }
+
+      // Only leased tasks can be submitted (first time)
+      if (task.status !== TaskStatus.leased) {
+        throw new BadRequestError(`Cannot submit task with status: ${task.status}`);
+      }
+
+      // Verify lease token
+      if (!task.taskLease || task.taskLease.leaseToken !== leaseToken) {
+        throw new ForbiddenError('Invalid or expired lease token');
+      }
+
+      // No grace period: lease must be active
+      if (task.taskLease.leasedUntil < new Date()) {
+        throw new ForbiddenError('Lease has expired. Cannot submit.');
+      }
+
+      // 1. Insert raw annotation (P2002 = duplicate → idempotent)
+      let isDuplicate = false;
+      try {
+        await tx.annotationRaw.create({
+          data: {
+            taskId,
+            labelerUserId: labelerId,
+            leaseToken,
+            payloadHash,
+            payloadJson: annotationData as Prisma.InputJsonValue,
+          },
+        });
+      } catch (err: unknown) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          isDuplicate = true;
+          logger.info(`Duplicate annotation detected for task ${taskId} (P2002)`);
+        } else {
+          throw err;
+        }
+      }
+
+      // 2. Update task status → submitted
+      const result = await tx.task.update({
+        where: { id: taskId },
+        data: {
+          status: TaskStatus.submitted,
+          attemptCount: isDuplicate ? undefined : { increment: 1 },
         },
-      },
-    });
+        include: {
+          asset: { select: { id: true, objectKey: true } },
+        },
+      });
 
-    // Delete lease
-    await prisma.taskLease.delete({
-      where: { taskId },
+      // 3. Delete lease (P2025 = already deleted → safe)
+      try {
+        await tx.taskLease.delete({ where: { taskId } });
+      } catch (err: unknown) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2025'
+        ) {
+          logger.info(`Lease already deleted for task ${taskId} (idempotent)`);
+        } else {
+          throw err;
+        }
+      }
+
+      return result;
     });
 
     logger.info(`Task submitted: ${taskId}`);
@@ -470,9 +544,6 @@ export class TaskService {
   /**
    * Lease multiple tasks at once (for Desktop App bulk download)
    * Uses transaction for atomic bulk locking with retry for race conditions.
-   * Prisma does not support SELECT FOR UPDATE SKIP LOCKED, so concurrent
-   * callers may pick the same tasks.  If createMany fails on the taskLease
-   * unique constraint the whole transaction is retried (max 3 attempts).
    */
   async leaseTaskBatch(
     contractId: string,
@@ -577,5 +648,57 @@ export class TaskService {
 
     // Fallback (should not reach here)
     return [];
+  }
+
+  /**
+   * Get task QC view — detailed task data for client/admin QC inspection.
+   * Returns asset metadata + normalized annotation + latest raw annotation.
+   */
+  async getTaskQcView(taskId: string, userId: string, userRole: UserRole) {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        asset: true,
+        contract: {
+          include: {
+            listing: {
+              include: {
+                labelSet: {
+                  include: { labels: true },
+                },
+              },
+            },
+          },
+        },
+        annotationsRaw: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+        annotationNormalized: true,
+      },
+    });
+
+    if (!task) {
+      throw new NotFoundError('Task');
+    }
+
+    // Check access rights (client, labeler, or admin)
+    if (
+      userRole !== 'admin' &&
+      task.contract.clientUserId !== userId &&
+      task.contract.labelerUserId !== userId
+    ) {
+      throw new ForbiddenError('You do not have access to this task');
+    }
+
+    return {
+      id: task.id,
+      status: task.status,
+      asset: task.asset,
+      latestRaw: task.annotationsRaw[0] || null,
+      normalized: task.annotationNormalized || null,
+      normalizeReady: task.annotationNormalized !== null,
+      labelSet: task.contract.listing.labelSet,
+    };
   }
 }
