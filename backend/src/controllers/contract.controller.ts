@@ -66,6 +66,28 @@ export const getContractById = async (
   }
 };
 
+// Get labeling context for a contract (metadata only)
+export const getLabelingContext = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const result = await contractService.getLabelingContext(id, userId, userRole);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Approve a contract (Client approves labeler's work)
 export const approveContract = async (
   req: AuthRequest,

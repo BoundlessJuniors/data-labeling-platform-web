@@ -141,6 +141,74 @@ export class ContractService {
   }
 
   /**
+   * Get labeling context for a contract.
+   * Returns only contract-level labeling metadata, keeping payload minimal.
+   * Does NOT include tasks, submissions, or full user objects.
+   */
+  async getLabelingContext(contractId: string, userId: string, userRole: UserRole) {
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        listing: {
+          include: {
+            labelSet: {
+              include: {
+                labels: {
+                  orderBy: { createdAt: 'asc' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!contract) {
+      throw new NotFoundError('Contract');
+    }
+
+    // Check access rights using the same rule as getContractById
+    if (
+      userRole !== 'admin' &&
+      contract.clientUserId !== userId &&
+      contract.labelerUserId !== userId
+    ) {
+      throw new ForbiddenError('You do not have access to this contract');
+    }
+
+    return {
+      contract: {
+        id: contract.id,
+        status: contract.status,
+        listingId: contract.listingId,
+        clientUserId: contract.clientUserId,
+        labelerUserId: contract.labelerUserId,
+      },
+      listing: {
+        id: contract.listing.id,
+        title: contract.listing.title,
+        description: contract.listing.description,
+        annotationFormat: contract.listing.annotationFormat,
+        labelingSpecJson: contract.listing.labelingSpecJson,
+        qcMode: contract.listing.qcMode,
+        labelSetId: contract.listing.labelSetId,
+        labelSetVersion: contract.listing.labelSetVersion,
+      },
+      labelSet: contract.listing.labelSet ? {
+        id: contract.listing.labelSet.id,
+        name: contract.listing.labelSet.name,
+        version: contract.listing.labelSet.version,
+        labels: contract.listing.labelSet.labels.map((label) => ({
+          id: label.id,
+          name: label.name,
+          color: label.color,
+          attributesSchemaJson: label.attributesSchemaJson,
+        })),
+      } : null,
+    };
+  }
+
+  /**
    * Submit a contract (labeler submits completed work).
    * Creates a Submission record and enqueues a normalize job.
    */

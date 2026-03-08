@@ -35,6 +35,13 @@ router.get(
   contractController.getContractById
 );
 
+// GET /api/contracts/:id/labeling-context - Get contract-level labeling metadata
+router.get(
+  '/:id/labeling-context',
+  validate(idParamSchema, 'params'),
+  contractController.getLabelingContext
+);
+
 // GET /api/contracts/:id/qc-sample - Get QC sample task set (client/admin)
 router.get(
   '/:id/qc-sample',

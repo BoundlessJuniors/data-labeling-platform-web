@@ -217,6 +217,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 |--------|----------|----------|
 | GET | `/` | Kullanıcının sözleşmeleri (role-based: client→clientUserId, labeler→labelerUserId) |
 | GET | `/:id` | Sözleşme detayı |
+| GET | `/:id/labeling-context` | Sözleşmeye ait etiketleme metadatasını (context) döner |
 | GET | `/:id/qc-sample` | QC sample task seti al (client/admin, `?size=100`) |
 | PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) → normalize job enqueue |
 | PATCH | `/:id/approve` | Sözleşmeyi onayla (client) — normalize completed gerektirir |
