@@ -4,27 +4,12 @@ import { ContractService } from '../services/contract.service';
 
 const contractService = new ContractService();
 
-// Create a new contract (Labeler applies to a listing)
-export const createContract = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { listingId } = req.body;
-    const labelerId = req.user!.id;
-    const labelerRole = req.user!.role;
-
-    const contract = await contractService.createContract(labelerId, labelerRole, listingId);
-
-    res.status(201).json({
-      success: true,
-      data: contract,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// ============================================================================
+// ARCHITECTURAL NOTE:
+//   Contract creation happens exclusively through proposal acceptance
+//   (ProposalService.acceptProposal). There is no direct createContract
+//   controller. See proposal.controller.ts → acceptProposal.
+// ============================================================================
 
 // Get all contracts (with filters)
 export const getContracts = async (

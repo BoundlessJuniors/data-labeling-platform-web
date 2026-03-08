@@ -6,8 +6,31 @@ import { validate } from '../middlewares/validate.middleware';
 import { 
   createAnnotationRawSchema,
   normalizeAnnotationSchema,
-  idParamSchema
 } from '../validators/validation.schemas';
+
+// ============================================================================
+// Annotation Routes (admin-only debug/reprocess endpoints)
+//
+// IMPORTANT — Two separate annotation submission paths exist:
+//
+// 1. CANONICAL LABELER PATH:
+//    POST /api/tasks/:id/submit  (see task.routes.ts)
+//    - Used by the Desktop App to submit completed annotations
+//    - Requires a valid leaseToken
+//    - Raw annotation rows include leaseToken → included in normalize pipeline
+//
+// 2. ADMIN DEBUG/REPROCESS PATH (this file):
+//    POST /api/annotations/raw
+//    - Admin-only endpoint for manual raw annotation insertion
+//    - Rows intentionally OMIT leaseToken
+//    - Normalize worker excludes these rows (filters lease_token IS NOT NULL)
+//
+//    POST /api/annotations/normalize
+//    - Admin-only endpoint for manual normalization (upsert)
+//    - Useful for debugging or correcting normalized data
+//
+// Future developers: do NOT confuse these two flows.
+// ============================================================================
 
 const router = Router();
 

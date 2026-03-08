@@ -4,7 +4,6 @@ import { authenticate } from '../middlewares/auth.middleware';
 import { adminOrLabeler, adminOrClient, adminOnly } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { 
-  createContractSchema, 
   idParamSchema,
   rejectContractSchema,
   cancelContractSchema,
@@ -16,17 +15,17 @@ const router = Router();
 // All contract routes require authentication
 router.use(authenticate);
 
+// ============================================================================
+// ARCHITECTURAL NOTE:
+//   Contract creation happens exclusively through proposal acceptance:
+//   PATCH /api/proposals/:id/accept → creates contract + tasks atomically.
+//   There is intentionally NO POST /contracts endpoint.
+// ============================================================================
+
 // GET /api/contracts - Get all contracts
 router.get(
   '/',
   contractController.getContracts
-);
-
-// POST /api/contracts - Create a new contract (labeler applies)
-router.post(
-  '/',
-  validate(createContractSchema),
-  contractController.createContract
 );
 
 // GET /api/contracts/:id - Get a single contract

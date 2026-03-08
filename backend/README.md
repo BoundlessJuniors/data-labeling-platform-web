@@ -192,30 +192,30 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PUT | `/:id` | İlan güncelle |
 | PATCH | `/:id` | İlan güncelle |
 | DELETE | `/:id` | İlan sil |
-| POST | `/:id/generate-tasks` | İlan için görevleri (tasks) oluştur |
 | GET | `/:listingId/proposals` | İlanın başvuruları |
+
+> **Not:** Görev oluşturma (task generation) artık başvuru kabul akışı (`acceptProposal`) içinde atomik olarak gerçekleşir. Ayrı bir `generate-tasks` endpoint'i yoktur.
 
 > **Cache:** Listings için Redis cache (`cacheMiddleware`) kullanılır.
 
-### Proposal Routes (`/api/v1/proposals`) 🆕
+### Proposal Routes (`/api/v1/proposals`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| POST | `/` | İlana başvur (labeler) |
+| POST | `/` | İlana başvur (sadece labeler/admin — client 403 alır) |
 | GET | `/` | Başvuruları listele |
 | GET | `/:id` | Başvuru detayı |
-| PATCH | `/:id/accept` | Başvuruyu kabul et → Contract oluşur |
+| PATCH | `/:id/accept` | Başvuruyu kabul et → Contract + Tasks oluşur |
 | PATCH | `/:id/reject` | Başvuruyu reddet |
 | PATCH | `/:id/withdraw` | Başvuruyu geri çek (labeler) |
 
-> **Not:** `acceptProposal` transaction içinde: Proposal kabul → Contract oluştur → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `in_progress`'e güncelle
+> **Mimari Not:** `acceptProposal` — sözleşme oluşturmanın tek kanonik yoludur. Transaction içinde: Proposal kabul → Contract oluştur → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `in_progress`'e güncelle
 
 ### Contract Routes (`/api/v1/contracts`)
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/` | Kullanıcının sözleşmeleri |
-| POST | `/` | Yeni Contract oluştur |
+| GET | `/` | Kullanıcının sözleşmeleri (role-based: client→clientUserId, labeler→labelerUserId) |
 | GET | `/:id` | Sözleşme detayı |
 | GET | `/:id/qc-sample` | QC sample task seti al (client/admin, `?size=100`) |
 | PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) → normalize job enqueue |
@@ -223,6 +223,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PATCH | `/:id/reject` | Sözleşmeyi revision_requested'a çevir (client) — task statülerini sıfırlar |
 | PATCH | `/:id/cancel` | Sözleşmeyi iptal et |
 | POST | `/:id/normalize-retry` | Normalize job'ı tekrar enqueue et (admin only) |
+
+> **Mimari Not:** Doğrudan `POST /contracts` endpoint'i yoktur. Contract oluşturma yalnızca `PATCH /proposals/:id/accept` ile gerçekleşir.
 
 ### Task Routes (`/api/v1/tasks`)
 
@@ -232,20 +234,25 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/lease-batch` | Toplu görev kilitle (Desktop App, active/revision_requested contract) |
 | GET | `/:id` | Görev detayı |
 | GET | `/:id/qc-view` | QC inceleme görünümü (asset + raw + normalized + labelSet) |
+| GET | `/:id/annotations` | Görevin annotation'ları (raw + normalized) |
 | POST | `/:id/lease` | Görevi kilitle (race-safe, DB constraint ile) |
-| POST | `/:id/submit` | Görevi teslim et (atomic transaction, idempotent via payloadHash) |
+| POST | `/:id/submit` | Görevi teslim et — **tam snapshot** (atomic, idempotent via payloadHash) |
 | PATCH | `/:id/accept` | Görevi onayla (QC) |
 | PATCH | `/:id/reject` | Görevi reddet (QC) |
 | POST | `/release-expired` | Süresi dolan kilitleri kaldır (admin) |
+
+> **Snapshot Semantiği:** `POST /:id/submit` her çağrıda görevin **tamamen nihai annotation**'ını bekler (partial patch değil). Normalize worker her görev için en son geçerli raw kaydı kullanır.
 
 ### Annotation Routes (`/api/v1/annotations`) 🔒 Admin Only
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| POST | `/raw` | Ham annotation kaydet (debug/reprocess — admin only) |
-| POST | `/normalize` | Normalize annotation kaydet (debug — admin only) |
+| POST | `/raw` | Ham annotation kaydet (debug/reprocess — admin only, leaseToken yok) |
+| POST | `/normalize` | Normalize annotation kaydet (debug — admin only, object veya array kabul eder) |
 
-> **Not:** Normal labeler akışı `/tasks/:id/submit` üzerinden geçer. Annotation endpoint'leri sadece admin debug/reprocess içindir. Admin raw kayıtları normalize pipeline'ını etkilemez (`leaseToken` null olarak yazılır).
+> **İki Ayrı Annotation Akışı:**
+> - **Kanonik labeler akışı:** `POST /tasks/:id/submit` — leaseToken ile raw kayıt oluşturur → normalize pipeline'a dahil
+> - **Admin debug akışı:** `POST /annotations/raw` — leaseToken olmadan kayıt oluşturur → normalize worker tarafından yok sayılır (`lease_token IS NOT NULL` filtresi)
 
 ### Review Routes (`/api/v1/reviews`)
 
@@ -372,6 +379,6 @@ JWT tabanlı authentication sistemi (`httpOnly` cookie):
 
 | Rol | Erişim Hakları |
 |-----|----------------|
-| **admin** | Tüm endpointlere erişim, kullanıcı yönetimi |
-| **client** | Dataset, listing, contract yönetimi |
-| **labeler** | İlanları görüntüleme, başvuru takibi, görev yapma |
+| **admin** | Tüm endpointlere erişim, kullanıcı yönetimi, normalize retry, debug annotation |
+| **client** | Dataset, listing yönetimi, proposal kabul/red, contract QC (approve/reject). Proposal oluşturamaz (403). Sadece kendi `clientUserId` ile eşleşen sözleşmeleri görür. |
+| **labeler** | İlanları görüntüleme, proposal oluşturma, görev lease/submit. Sadece kendi `labelerUserId` ile eşleşen sözleşmeleri görür. |

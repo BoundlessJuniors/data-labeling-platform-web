@@ -4,27 +4,11 @@ import { TaskService } from '../services/task.service';
 
 const taskService = new TaskService();
 
-// Generate tasks for a listing (create tasks for each asset)
-export const generateTasks = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id: listingId } = req.params;
-    const userId = req.user!.id;
-    const userRole = req.user!.role;
-
-    const result = await taskService.generateTasks(listingId, userId, userRole);
-
-    res.status(201).json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+// ============================================================================
+// ARCHITECTURAL NOTE:
+//   Task generation happens exclusively inside ProposalService.acceptProposal.
+//   There is no generateTasks controller. See proposal.controller.ts → acceptProposal.
+// ============================================================================
 
 // Get all tasks (with filters)
 export const getTasks = async (

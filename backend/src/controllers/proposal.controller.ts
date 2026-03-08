@@ -4,7 +4,7 @@ import { ProposalService } from '../services/proposal.service';
 
 const proposalService = new ProposalService();
 
-// Create a new proposal (labeler applies to a listing)
+// Create a new proposal (labeler or admin only)
 export const createProposal = async (
   req: AuthRequest,
   res: Response,
@@ -13,10 +13,12 @@ export const createProposal = async (
   try {
     const { listingId, priceQuote, coverLetter } = req.body;
     const userId = req.user!.id;
+    const userRole = req.user!.role;
 
     const proposal = await proposalService.createProposal(
       listingId,
       userId,
+      userRole,
       priceQuote,
       coverLetter
     );

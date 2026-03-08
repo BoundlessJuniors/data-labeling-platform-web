@@ -215,11 +215,9 @@ export const updateListingSchema = Joi.object({
 // Contract Schemas
 // ============================================================================
 
-export const createContractSchema = Joi.object({
-  listingId: uuidSchema.messages({
-    'any.required': 'Listing ID is required',
-  }),
-});
+// ARCHITECTURAL NOTE:
+//   There is no createContractSchema because contract creation happens
+//   exclusively through proposal acceptance (PATCH /proposals/:id/accept).
 
 export const rejectContractSchema = Joi.object({
   reason: Joi.string().max(1000).optional().allow(''),
@@ -233,11 +231,9 @@ export const cancelContractSchema = Joi.object({
 // Task Schemas
 // ============================================================================
 
-export const generateTasksSchema = Joi.object({
-  listingId: uuidSchema.messages({
-    'any.required': 'Listing ID is required to generate tasks',
-  }),
-});
+// ARCHITECTURAL NOTE:
+//   There is no generateTasksSchema because task generation happens
+//   exclusively inside ProposalService.acceptProposal.
 
 export const leaseTaskSchema = Joi.object({
   leaseDurationMinutes: Joi.number().integer().min(5).max(120).optional().default(30),
@@ -253,7 +249,19 @@ export const leaseTaskBatchSchema = Joi.object({
   }),
 });
 
-// Shared annotation payload shape — enforced in both task submit and raw annotation
+// ── Shared annotation payload shape ─────────────────────────────────────────
+//
+// This schema defines the FULL FINAL annotation snapshot for a single task.
+// It is NOT a partial patch or incremental append — each submission contains
+// the complete annotation state for that task.
+//
+// - "type" identifies the annotation geometry/format.
+// - "data" is the complete annotation payload (object or array of objects).
+// - "export" type represents a full annotation package from the desktop app.
+//
+// The normalize worker treats the LATEST valid raw row per task as authoritative.
+// Enforced in both task submit (POST /tasks/:id/submit) and admin raw annotation
+// (POST /annotations/raw).
 const annotationPayloadSchema = Joi.object({
   type: Joi.string()
     .valid('bbox', 'polygon', 'polyline', 'keypoint', 'circle', 'export')
@@ -300,9 +308,15 @@ export const normalizeAnnotationSchema = Joi.object({
   taskId: uuidSchema.messages({
     'any.required': 'Task ID is required',
   }),
-  normalizedJson: Joi.object().required().messages({
-    'any.required': 'Normalized JSON is required',
-  }),
+  // normalizedJson accepts both objects and arrays to match the normalize
+  // pipeline's behavior (normalizeRawPayload is an identity transform that
+  // can produce whatever the raw payload contained).
+  normalizedJson: Joi.alternatives()
+    .try(Joi.object().unknown(true), Joi.array())
+    .required()
+    .messages({
+      'any.required': 'Normalized JSON is required',
+    }),
 });
 
 // ============================================================================

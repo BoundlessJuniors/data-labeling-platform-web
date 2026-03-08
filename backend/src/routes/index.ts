@@ -10,8 +10,8 @@ import annotationRoutes from './annotation.routes';
 import reviewRoutes from './review.routes';
 import adminRoutes from './admin.routes';
 import proposalRoutes from './proposal.routes';
-import * as taskController from '../controllers/task.controller';
 import * as proposalController from '../controllers/proposal.controller';
+import * as annotationController from '../controllers/annotation.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { idParamSchema } from '../validators/validation.schemas';
@@ -31,17 +31,16 @@ router.use('/reviews', reviewRoutes);
 router.use('/admin', adminRoutes);
 router.use('/proposals', proposalRoutes);
 
-// Special routes
-// POST /api/listings/:id/generate-tasks
-router.post(
-  '/listings/:id/generate-tasks',
-  authenticate,
-  validate(idParamSchema, 'params'),
-  taskController.generateTasks
-);
+// ============================================================================
+// Special routes (mounted at top level for cleaner URLs)
+// ============================================================================
+
+// ARCHITECTURAL NOTE:
+//   Task generation happens exclusively inside ProposalService.acceptProposal.
+//   There is intentionally no POST /listings/:id/generate-tasks endpoint.
 
 // GET /api/tasks/:id/annotations (mounted directly for cleaner URL)
-import * as annotationController from '../controllers/annotation.controller';
+
 router.get(
   '/tasks/:id/annotations',
   authenticate,

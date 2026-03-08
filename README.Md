@@ -117,10 +117,10 @@ npm run dev
 | Assets | `/api/v1/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
 | LabelSets | `/api/v1/labelsets/*` | Etiket setleri (CRUD + edit guard) |
 | Listings | `/api/v1/listings/*` | İlanlar (`?search=` ile başlık araması) |
-| Proposals | `/api/v1/proposals/*` | İlan başvuruları |
-| Contracts | `/api/v1/contracts/*` | Sözleşmeler |
-| Tasks | `/api/v1/tasks/*` | Görevler |
-| Annotations | `/api/v1/annotations/*` | Etiketlemeler |
+| Proposals | `/api/v1/proposals/*` | İlan başvuruları (sadece labeler/admin) |
+| Contracts | `/api/v1/contracts/*` | Sözleşmeler (yalnızca proposal kabul ile oluşur) |
+| Tasks | `/api/v1/tasks/*` | Görevler (lease, submit, QC) |
+| Annotations | `/api/v1/annotations/*` | Admin debug/reprocess (labeler akışı: `/tasks/:id/submit`) |
 | Reviews | `/api/v1/reviews/*` | QC reviews |
 | Admin | `/api/v1/admin/*` | Admin işlemleri |
 
@@ -136,9 +136,9 @@ npm run dev
 
 | Rol | Erişim | Özellikler |
 |-----|--------|------------|
-| **Admin** | `/admin/*` | Kullanıcı yönetimi, platform istatistikleri |
-| **Client** | `/client/*` | Dataset, listing, contract yönetimi |
-| **Labeler** | `/labeler/*` | İlanları görüntüleme, başvuru takibi, görev yapma |
+| **Admin** | `/admin/*` | Tüm erişim, normalize retry, debug annotation |
+| **Client** | `/client/*` | Dataset, listing, proposal kabul/red, contract QC. Proposal oluşturamaz. |
+| **Labeler** | `/labeler/*` | Proposal oluşturma, görev lease/submit, teslim |
 
 ## 📖 Detaylı Dokümantasyon
 

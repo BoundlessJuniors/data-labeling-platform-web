@@ -1,76 +1,19 @@
 import { ContractStatus, ListingStatus, Prisma, SubmissionStatus, TaskStatus } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
-import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import logger from '../lib/logger';
 import { addNormalizeJob } from '../lib/queue';
 
+/**
+ * Service layer for contract lifecycle management.
+ *
+ * ARCHITECTURAL NOTE:
+ *   Contract creation happens exclusively through ProposalService.acceptProposal.
+ *   There is intentionally no createContract method here.
+ *   The canonical flow is: proposal → accept proposal → contract + tasks.
+ */
 export class ContractService {
-  /**
-   * Create a new contract (labeler applies to a listing)
-   *
-   * MVP Design Decision:
-   *   Contract starts as 'active' immediately — no pending → active approval flow.
-   */
-  async createContract(labelerId: string, labelerRole: UserRole, listingId: string) {
-    // Verify user is a labeler
-    if (labelerRole !== 'labeler' && labelerRole !== 'admin') {
-      throw new ForbiddenError('Only labelers can apply to listings');
-    }
-
-    // Verify listing exists and is open
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      include: { contracts: true },
-    });
-
-    if (!listing) {
-      throw new NotFoundError('Listing');
-    }
-
-    if (listing.status !== ListingStatus.open) {
-      throw new BadRequestError('Listing is not open for applications');
-    }
-
-    // Check if listing already has an active contract
-    const activeContracts = listing.contracts.filter((c) => c.status === 'active');
-    if (activeContracts.length > 0) {
-      throw new ConflictError('Listing already has an active contract');
-    }
-
-    // Create contract
-    const contract = await prisma.contract.create({
-      data: {
-        listingId,
-        clientUserId: listing.ownerUserId,
-        labelerUserId: labelerId,
-        agreedPriceTotal: listing.priceTotal,
-        currency: listing.currency,
-        status: ContractStatus.active,
-      },
-      include: {
-        listing: {
-          select: { id: true, title: true },
-        },
-        client: {
-          select: { id: true, email: true, displayName: true },
-        },
-        labeler: {
-          select: { id: true, email: true, displayName: true },
-        },
-      },
-    });
-
-    // Update listing status to in_progress
-    await prisma.listing.update({
-      where: { id: listingId },
-      data: { status: ListingStatus.in_progress },
-    });
-
-    logger.info(`Contract created: ${contract.id} by labeler ${labelerId}`);
-
-    return contract;
-  }
 
   /**
    * Get all contracts with filtering and pagination
@@ -92,14 +35,21 @@ export class ContractService {
       where.status = status as ContractStatus;
     }
 
-    // Filter by user role
-    if (userRole === 'admin' && !ownOnly) {
-      // Admin sees all
-    } else if (userRole === 'client' || ownOnly) {
-      where.OR = [
-        { clientUserId: userId },
-        { labelerUserId: userId },
-      ];
+    // ── Role-based filtering ──────────────────────────────────────────
+    // admin + !ownOnly  → no restriction (sees all contracts)
+    // admin + ownOnly   → contracts where admin is directly involved
+    // client            → only contracts where clientUserId = self
+    // labeler           → only contracts where labelerUserId = self
+    if (userRole === 'admin') {
+      if (ownOnly) {
+        where.OR = [
+          { clientUserId: userId },
+          { labelerUserId: userId },
+        ];
+      }
+      // else: admin sees all — no additional filter
+    } else if (userRole === 'client') {
+      where.clientUserId = userId;
     } else if (userRole === 'labeler') {
       where.labelerUserId = userId;
     }

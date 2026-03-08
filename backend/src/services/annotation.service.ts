@@ -5,6 +5,21 @@ import logger from '../lib/logger';
 import crypto from 'crypto';
 import stableStringify from 'fast-json-stable-stringify';
 
+/**
+ * Service for admin-only annotation management (debug/reprocess).
+ *
+ * IMPORTANT — Two annotation submission flows exist:
+ *
+ * 1. Canonical labeler path: POST /tasks/:id/submit  →  TaskService.submitTask
+ *    - Creates raw annotation WITH leaseToken → included in normalize pipeline.
+ *
+ * 2. Admin debug path: POST /annotations/raw  →  this service
+ *    - Creates raw annotation WITHOUT leaseToken → excluded from normalize pipeline
+ *      (worker filters lease_token IS NOT NULL).
+ *
+ * The normalize endpoint (POST /annotations/normalize) is also admin-only and
+ * allows manual upsert of normalized data for debugging.
+ */
 export class AnnotationService {
   /**
    * Compute a stable SHA-256 hash of a JSON payload.

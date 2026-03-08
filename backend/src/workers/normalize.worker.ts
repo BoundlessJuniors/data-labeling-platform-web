@@ -61,9 +61,19 @@ export function startNormalizeWorker() {
         }
 
         // 4. Fetch latest raw annotation per task using DISTINCT ON.
-        //    - Only considers rows with lease_token IS NOT NULL (excludes admin debug)
-        //    - Tie-break on id DESC for deterministic selection when timestamps match
-        //    - Returns exactly 1 row per task → O(tasks), not O(raw_history)
+        //
+        //    FULL SNAPSHOT SEMANTICS:
+        //      Each raw annotation row is a complete task annotation snapshot,
+        //      not a partial patch. We take the LATEST valid row per task.
+        //
+        //    ADMIN DEBUG EXCLUSION:
+        //      lease_token IS NOT NULL excludes admin debug rows
+        //      (POST /annotations/raw creates rows without leaseToken).
+        //      Only real labeler submissions (POST /tasks/:id/submit) are
+        //      considered for normalization.
+        //
+        //    Tie-break on id DESC for deterministic selection when timestamps match.
+        //    Returns exactly 1 row per task → O(tasks), not O(raw_history).
         const latestRaws: LatestRawRow[] = await prisma.$queryRaw`
           SELECT DISTINCT ON (ar.task_id)
             ar.task_id AS "taskId",

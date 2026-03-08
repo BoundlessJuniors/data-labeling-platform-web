@@ -6,77 +6,15 @@ import logger from '../lib/logger';
 import crypto from 'crypto';
 import stableStringify from 'fast-json-stable-stringify';
 
+/**
+ * Service for task lifecycle: leasing, submission, QC, and batch operations.
+ *
+ * ARCHITECTURAL NOTE:
+ *   Task generation happens exclusively inside ProposalService.acceptProposal.
+ *   There is intentionally no generateTasks method here.
+ *   The canonical flow is: accept proposal → create contract → create tasks.
+ */
 export class TaskService {
-  /**
-   * Generate tasks for a listing (create tasks for each asset in the dataset)
-   */
-  async generateTasks(listingId: string, userId: string, userRole: UserRole) {
-    // Verify listing exists
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      include: {
-        contracts: true,
-        dataset: {
-          include: {
-            assets: true,
-          },
-        },
-      },
-    });
-
-    if (!listing) {
-      throw new NotFoundError('Listing');
-    }
-
-    // Only client or admin can generate tasks
-    if (userRole !== 'admin' && listing.ownerUserId !== userId) {
-      throw new ForbiddenError('Only the listing owner can generate tasks');
-    }
-
-    // Must have an active contract
-    const activeContract = listing.contracts.find((c) => c.status === 'active');
-    if (!activeContract) {
-      throw new BadRequestError('Listing must have an active contract before generating tasks');
-    }
-
-    // Check if tasks already exist
-    const existingTasks = await prisma.task.count({
-      where: { contractId: activeContract.id },
-    });
-
-    if (existingTasks > 0) {
-      throw new ConflictError('Tasks already generated for this contract');
-    }
-
-    // Create tasks for each asset
-    const assets = listing.dataset.assets;
-
-    if (assets.length === 0) {
-      throw new BadRequestError('Dataset has no assets to create tasks for');
-    }
-
-    const tasks = await prisma.task.createMany({
-      data: assets.map((asset) => ({
-        contractId: activeContract.id,
-        assetId: asset.id,
-        status: TaskStatus.ready,
-      })),
-    });
-
-    logger.info(`Generated ${tasks.count} tasks for listing ${listingId}`);
-
-    // Fetch created tasks
-    const createdTasks = await prisma.task.findMany({
-      where: { contractId: activeContract.id },
-      include: {
-        asset: {
-          select: { id: true, objectKey: true, mimeType: true },
-        },
-      },
-    });
-
-    return { count: tasks.count, tasks: createdTasks };
-  }
 
   /**
    * Get all tasks with filtering and pagination
@@ -296,6 +234,13 @@ export class TaskService {
 
   /**
    * Submit a task (labeler submits annotation) — fully atomic and idempotent.
+   *
+   * IMPORTANT — FULL SNAPSHOT SEMANTICS:
+   *   annotationData is the FULL FINAL annotation snapshot for this task.
+   *   It is NOT a partial patch or incremental append. Each submission
+   *   replaces the previous annotation state for this task.
+   *   The normalize worker treats the LATEST valid raw row per task as
+   *   authoritative (latest = most recent created_at, tie-break by id DESC).
    *
    * All DB mutations (raw insert, task update, lease delete) run inside a
    * single Prisma interactive transaction. On crash/error no partial state.

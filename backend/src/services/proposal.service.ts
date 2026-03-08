@@ -7,14 +7,24 @@ import logger from '../lib/logger';
 
 export class ProposalService {
   /**
-   * Create a new proposal (labeler applies to a listing)
+   * Create a new proposal (labeler or admin only).
+   *
+   * Business rule: only labelers (and admins) can create proposals.
+   * Clients must not be able to create proposals — they are the listing owners
+   * who receive and accept/reject proposals.
    */
   async createProposal(
     listingId: string,
     labelerUserId: string,
+    userRole: UserRole,
     priceQuote: number,
     coverLetter?: string
   ) {
+    // ── Role check (defense-in-depth; also enforced at route level) ──
+    if (userRole !== 'labeler' && userRole !== 'admin') {
+      throw new ForbiddenError('Only labelers can create proposals');
+    }
+
     // Verify listing exists and is open
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },

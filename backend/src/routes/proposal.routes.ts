@@ -1,15 +1,17 @@
 import { Router } from 'express';
 import * as proposalController from '../controllers/proposal.controller';
 import { authenticate } from '../middlewares/auth.middleware';
+import { adminOrLabeler } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { createProposalSchema, idParamSchema } from '../validators/validation.schemas';
 
 const router = Router();
 
-// POST /api/proposals - Create a new proposal (labeler applies to listing)
+// POST /api/proposals - Create a new proposal (labeler or admin only)
 router.post(
   '/',
   authenticate,
+  adminOrLabeler,
   validate(createProposalSchema),
   proposalController.createProposal
 );
