@@ -135,10 +135,21 @@ export class TaskService {
   /**
    * Lease a task (lock it for labeling) — race-safe via DB unique constraint.
    *
+   * Supported lease paths:
+   *   - Normal lease: task status is `ready` or `rejected` and there is no active lease.
+   *   - Reclaim lease: task status is `leased` but its existing lease is expired.
+   *   - Stale-row reclaim: task status is `ready` or `rejected` but an expired stale
+   *     `taskLease` row still exists; in this case the lease row is overwritten.
+   *
+   * Rejected cases:
+   *   - Active lease exists → ConflictError
+   *   - Task is `leased` but has no lease row → BadRequestError (inconsistent state)
+   *   - Any other task status → BadRequestError
+   *
    * Concurrency guarantee:
    *   taskLease has a unique constraint on taskId. If two concurrent requests
    *   try to create a lease, one will get P2002. The loser receives ConflictError.
-   */
+  */
   async leaseTask(taskId: string, labelerId: string, labelerRole: UserRole, leaseDurationMinutes: number = 30) {
     const result = await prisma.$transaction(async (tx) => {
       const task = await tx.task.findUnique({
@@ -158,21 +169,39 @@ export class TaskService {
         throw new ForbiddenError('You are not the labeler for this contract');
       }
 
-      // Check task status — allow leasing ready or rejected tasks
-      if (task.status !== TaskStatus.ready && task.status !== TaskStatus.rejected) {
+      const now = new Date();
+      const leaseToken = crypto.randomUUID();
+      const leasedUntil = new Date(now.getTime() + leaseDurationMinutes * 60 * 1000);
+
+      let mode: 'create' | 'reclaim' = 'create';
+
+      // 1. Authoritative decision block for leaseability
+      if (task.status === TaskStatus.leased) {
+        if (!task.taskLease) {
+          throw new BadRequestError('Task is in leased state without an active lease record');
+        }
+        if (task.taskLease.leasedUntil > now) {
+          throw new ConflictError('Task is already leased');
+        }
+        // Task has an expired lease — we can reclaim it.
+        mode = 'reclaim';
+      } else if (task.status === TaskStatus.ready || task.status === TaskStatus.rejected) {
+        if (task.taskLease) {
+          if (task.taskLease.leasedUntil > now) {
+            throw new ConflictError('Task has an active lease despite being marked available');
+          }
+          // Stale lease row exists and is expired — reclaim it.
+          mode = 'reclaim';
+        } else {
+          // Normal lease flow for available task.
+          mode = 'create';
+        }
+      } else {
         throw new BadRequestError(`Cannot lease task with status: ${task.status}`);
       }
 
-      const leaseToken = crypto.randomUUID();
-      const leasedUntil = new Date(Date.now() + leaseDurationMinutes * 60 * 1000);
-
-      if (task.taskLease) {
-        // Lease record exists
-        if (task.taskLease.leasedUntil > new Date()) {
-          // Active lease — conflict
-          throw new ConflictError('Task is already leased');
-        }
-        // Expired lease — overwrite
+      if (mode === 'reclaim') {
+        // Expired lease — overwrite it
         await tx.taskLease.update({
           where: { taskId },
           data: {
@@ -182,7 +211,7 @@ export class TaskService {
           },
         });
       } else {
-        // No lease record — create (P2002 = lost race)
+        // Normal path — no lease record should exist, create it (P2002 = lost race)
         try {
           await tx.taskLease.create({
             data: {
@@ -203,7 +232,7 @@ export class TaskService {
         }
       }
 
-      // Update task status
+      // 2. Update task status
       const updatedTask = await tx.task.update({
         where: { id: taskId },
         data: { status: TaskStatus.leased },
@@ -250,7 +279,7 @@ export class TaskService {
    *   - P2002 on annotationRaw insert → duplicate, finalize idempotently
    *   - P2025 on lease delete → already deleted, safe to ignore
    *
-   * No grace period: leasedUntil < now → hard reject.
+   *  * No grace period: leasedUntil <= now → hard reject.
    */
   async submitTask(
     taskId: string,
@@ -315,7 +344,7 @@ export class TaskService {
       }
 
       // No grace period: lease must be active
-      if (task.taskLease.leasedUntil < new Date()) {
+      if (task.taskLease.leasedUntil <= new Date()) {
         throw new ForbiddenError('Lease has expired. Cannot submit.');
       }
 
@@ -463,7 +492,7 @@ export class TaskService {
     // Find expired leases
     const expiredLeases = await prisma.taskLease.findMany({
       where: {
-        leasedUntil: { lt: now },
+        leasedUntil: { lte: now },
       },
       include: { task: true },
     });
@@ -523,10 +552,19 @@ export class TaskService {
         const result = await prisma.$transaction(async (tx) => {
           // 1. Find 'count' available tasks (ordered by updatedAt to reduce
           //    collision when concurrent callers hit the same deterministic set)
+          const now = new Date();
           const availableTasks = await tx.task.findMany({
             where: {
               contractId,
-              status: { in: [TaskStatus.ready, TaskStatus.rejected] },
+              OR: [
+                { status: { in: [TaskStatus.ready, TaskStatus.rejected] } },
+                {
+                  status: TaskStatus.leased,
+                  taskLease: {
+                    leasedUntil: { lte: now },
+                  },
+                },
+              ],
             },
             orderBy: { updatedAt: 'asc' },
             take: count,
@@ -546,7 +584,12 @@ export class TaskService {
             data: { status: TaskStatus.leased },
           });
 
-          // 3. Create lease records with unique tokens per task
+          // 3. Clean up any stale leases for these tasks before reassigning
+          await tx.taskLease.deleteMany({
+            where: { taskId: { in: taskIds } },
+          });
+
+          // 4. Create lease records with unique tokens per task
           const leases = taskIds.map((taskId) => ({
             taskId,
             labelerUserId: labelerId,

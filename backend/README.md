@@ -242,6 +242,9 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/release-expired` | Süresi dolan kilitleri kaldır (admin) |
 
 > **Snapshot Semantiği:** `POST /:id/submit` her çağrıda görevin **tamamen nihai annotation**'ını bekler (partial patch değil). Normalize worker her görev için en son geçerli raw kaydı kullanır.
+> 
+> **Lease Semantiği:** Görev kilit işlemleri (`POST /:id/lease` ve `POST /lease-batch`), süresi dolmuş (`leasedUntil <= now`) veya asılı kalmış (stale row) kilitleri otomatik olarak üzerine yazarak (reclaim) sisteme kazandırır. `POST /release-expired` yalnızca yardımcı bir admin opsiyonudur, normal işleyişte gerekli değildir.
+
 
 ### Annotation Routes (`/api/v1/annotations`) 🔒 Admin Only
 
