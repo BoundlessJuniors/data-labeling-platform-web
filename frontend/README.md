@@ -96,6 +96,9 @@ frontend/
 │   │   │   └── ClientListingCard.vue
 │   │   ├── proposals/         # Başvuru kartı bileşenleri
 │   │   │   └── ProposalCard.vue
+│   │   ├── contracts/         # Sözleşme ve QC bileşenleri
+│   │   │   ├── ContractQcPreviewModal.vue
+│   │   │   └── QcImageCanvas.vue
 │   │   ├── ToastContainer.vue
 │   │   └── HelloWorld.vue
 │   │
@@ -124,7 +127,7 @@ frontend/
 │   │       ├── MyContractsPage.vue
 │   │       └── TasksPage.vue
 │   │
-│   ├── types/                 # TypeScript type tanımları (10 dosya)
+│   ├── types/                 # TypeScript type tanımları (11 dosya)
 │   │   ├── index.ts           # Export barrel
 │   │   ├── api.ts             # API response types
 │   │   ├── auth.ts            # Auth types
@@ -134,7 +137,8 @@ frontend/
 │   │   ├── listing.ts         # Listing types (`AnnotationFormat` enum, `CreateListingRequest`, `UpdateListingRequest`)
 │   │   ├── proposal.ts        # Proposal types
 │   │   ├── contract.ts        # Contract types (agreedPriceTotal, startedAt, tasks[])
-│   │   └── task.ts            # Task types
+│   │   ├── task.ts            # Task types
+│   │   └── qc.ts              # QC Preview types ve yardımcı fonksiyonlar (extractAnnotationShapes vb.)
 │   │
 │   ├── composables/           # Vue composables
 │   │
@@ -349,6 +353,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] `ContractDetailPage.vue` silindi, `client-contract-detail` route kaldırıldı
 - [x] Backend arama desteği: Dataset (`name`) ve Listing (`title`) için `?search=` query parametresi (case-insensitive)
 - [x] Frontend enum düzeltmeleri: `ListingsPage` status filtreleri `ListingStatus` enum'una, `ContractsPage` status filtreleri `ContractStatus` enum'una uyumlu hale getirildi
+- [x] QC Preview modülü parser güncellemeleri: Envelope objelerini (`{type: "export", data: [...]}`) algılama, DOM görsel sizing düzeltmeleri (`nextTick` + `rAF`), SVG skeleton loading state ayrıştırması
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

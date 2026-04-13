@@ -245,6 +245,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 > **Snapshot Semantiği:** `POST /:id/submit` her çağrıda görevin **tamamen nihai annotation**'ını bekler (partial patch değil). Normalize worker her görev için en son geçerli raw kaydı kullanır.
 > 
 > **Lease Semantiği:** Görev kilit işlemleri (`POST /:id/lease` ve `POST /lease-batch`), süresi dolmuş (`leasedUntil <= now`) veya asılı kalmış (stale row) kilitleri otomatik olarak üzerine yazarak (reclaim) sisteme kazandırır. `POST /release-expired` yalnızca yardımcı bir admin opsiyonudur, normal işleyişte gerekli değildir.
+>
+> **QC View Payload İşleme Notu:** `/:id/qc-view` endpointinden dönen verilerdeki annotation payload'ları frontend tarafında akıllıca parse edilir. Örn: `{ type: "export", data: [...] }` formatındaki envelope (zarf) tipli objeler frontend parser (`extractAnnotationShapes`) tarafından artık otomatik ayırt edilip içindeki array üzerinden işlenmektedir. Herhangi bir ekstra backend string manipulation'a gerek kalmadan JSON formatındaki raw/normalized annotation payload'unu olduğu gibi iletmeniz yeterlidir.
 
 
 ### Annotation Routes (`/api/v1/annotations`) 🔒 Admin Only
