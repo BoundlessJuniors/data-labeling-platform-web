@@ -354,6 +354,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Backend arama desteği: Dataset (`name`) ve Listing (`title`) için `?search=` query parametresi (case-insensitive)
 - [x] Frontend enum düzeltmeleri: `ListingsPage` status filtreleri `ListingStatus` enum'una, `ContractsPage` status filtreleri `ContractStatus` enum'una uyumlu hale getirildi
 - [x] QC Preview modülü parser güncellemeleri: Envelope objelerini (`{type: "export", data: [...]}`) algılama, DOM görsel sizing düzeltmeleri (`nextTick` + `rAF`), SVG skeleton loading state ayrıştırması
+- [x] Approved Contract Export mekanizması: Onaylanmış sözleşmelerin çıktılarını BBOX-only olarak COCO (JSON), YOLO (ZIP) veya Pascal VOC (ZIP) formatlarında direkt indirebilme
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

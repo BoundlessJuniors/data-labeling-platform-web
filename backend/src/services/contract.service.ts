@@ -5,7 +5,11 @@ import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors'
 import logger from '../lib/logger';
 import { addNormalizeJob } from '../lib/queue';
 import { getSignedUrl } from '../lib/storage';
-
+import { ExportFormat, ExportableTaskRecord } from '../utils/export/export.types';
+import { extractBboxes } from '../utils/export/export.helpers';
+import { exportCoco } from '../utils/export/coco.export';
+import { exportYolo } from '../utils/export/yolo.export';
+import { exportVoc } from '../utils/export/voc.export';
 /**
  * Service layer for contract lifecycle management.
  *
@@ -646,6 +650,94 @@ export class ContractService {
       throw new BadRequestError(`Failed to enqueue normalize job: ${errorMessage}`);
     }
 
+
     return { submissionId: submission.id, status: 'processing' };
+  }
+
+  /**
+   * Export an approved contract's labeling outputs in a specific format.
+   * Only accessible by client or admin.
+   */
+  async exportContract(contractId: string, userId: string, userRole: UserRole, format: ExportFormat) {
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        listing: {
+          include: {
+            labelSet: {
+              include: { labels: true },
+            },
+          },
+        },
+        tasks: {
+          include: {
+            asset: true,
+            annotationNormalized: true,
+          },
+        },
+      },
+    });
+
+    if (!contract) {
+      throw new NotFoundError('Contract');
+    }
+
+    // Only client or admin can export
+    if (userRole !== 'admin' && contract.clientUserId !== userId) {
+      throw new ForbiddenError('Only the client can export this contract');
+    }
+
+    if (contract.status !== ContractStatus.approved) {
+      throw new BadRequestError(`Cannot export contract with status: ${contract.status}. Status must be 'approved'.`);
+    }
+
+    const labels = contract.listing.labelSet?.labels || [];
+    if (labels.length === 0) {
+      throw new BadRequestError('Labeling set has no labels.');
+    }
+
+    const exportableTasks: ExportableTaskRecord[] = [];
+
+    for (const task of contract.tasks) {
+      if (!task.annotationNormalized || !task.annotationNormalized.normalizedJson) {
+        throw new BadRequestError(`Task ${task.id} does not have a normalized annotation. All tasks must be completed for export.`);
+      }
+
+      if (!task.asset) {
+        throw new BadRequestError(`Task ${task.id} is missing an associated asset.`);
+      }
+
+      const payload = task.annotationNormalized.normalizedJson as any;
+      if (payload.type !== 'export' || !Array.isArray(payload.data)) {
+        throw new BadRequestError(`Task ${task.id} has an invalid normalized payload format.`);
+      }
+
+      const bboxes = extractBboxes(payload.data, labels);
+
+      exportableTasks.push({
+        taskId: task.id,
+        objectKey: task.asset.objectKey,
+        basename: task.asset.objectKey.split('/').pop() || `task-${task.id}.jpg`,
+        width: task.asset.width || 0,
+        height: task.asset.height || 0,
+        bboxes,
+      });
+    }
+
+    switch (format) {
+      case 'COCO':
+        return exportCoco(contractId, exportableTasks, labels);
+      case 'YOLO':
+        // YOLO and VOC normally require width and height to be > 0.
+        const missingDimensions = exportableTasks.find(t => t.width === 0 || t.height === 0);
+        if (missingDimensions) {
+          throw new BadRequestError(`Task ${missingDimensions.taskId} has an asset (key: ${missingDimensions.objectKey}) with missing width or height. This is required for YOLO logic.`);
+        }
+        return exportYolo(contractId, exportableTasks, labels);
+      case 'VOC':
+        return exportVoc(contractId, exportableTasks, labels);
+      default:
+        throw new BadRequestError(`Unsupported export format: ${format}`);
+    }
   }
 }

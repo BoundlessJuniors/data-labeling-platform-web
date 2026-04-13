@@ -36,6 +36,9 @@ export const useContractsStore = defineStore('contracts', () => {
   const qcLoading = ref(false);
   const qcError = ref<string | null>(null);
 
+  // ── Export State ──────────────────────────────────────────────────
+  const exportLoadingMap = ref<Record<string, boolean>>({});
+
   /**
    * Fetch paginated contracts list
    */
@@ -151,6 +154,50 @@ export const useContractsStore = defineStore('contracts', () => {
       return false;
     } finally {
       loading.value = false;
+    }
+  }
+
+  // ── Export Actions ────────────────────────────────────────────────
+  
+  /**
+   * Export approved contract data
+   */
+  async function downloadContractExport(contractId: string, format: 'COCO' | 'YOLO' | 'VOC') {
+    exportLoadingMap.value[contractId] = true;
+    try {
+      const response = await contractsApi.export(contractId, format);
+      const blob = response.data;
+      
+      // Try to parse filename from Content-Disposition
+      let filename = `contract-${contractId}.${format.toLowerCase()}`;
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      } else {
+        // Fallback extensions
+        if (format === 'COCO') filename += '.json';
+        else filename += '.zip';
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toastStore.success('Dışa aktarım indirildi');
+      return true;
+    } catch (_err) {
+      toastStore.error(getErrorMessage(_err, 'Dışa aktarım başarısız oldu'));
+      return false;
+    } finally {
+      exportLoadingMap.value[contractId] = false;
     }
   }
 
@@ -278,6 +325,7 @@ export const useContractsStore = defineStore('contracts', () => {
     qcTaskViews,
     qcLoading,
     qcError,
+    exportLoadingMap,
     // Actions
     fetchContracts,
     fetchContract,
@@ -285,6 +333,7 @@ export const useContractsStore = defineStore('contracts', () => {
     rejectContract,
     cancelContract,
     completeContract,
+    downloadContractExport,
     setStatusFilter,
     goToPage,
     reset,

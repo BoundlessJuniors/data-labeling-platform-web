@@ -70,5 +70,16 @@ export const contractsApi = {
       params: { size },
     });
   },
+
+  /**
+   * Export labeled data for an approved contract
+   */
+  export(contractId: string, format: 'COCO' | 'YOLO' | 'VOC') {
+    return apiClient.get<Blob>(`/contracts/${contractId}/export`, {
+      params: { format },
+      responseType: 'blob',
+    });
+  },
 };
+
 

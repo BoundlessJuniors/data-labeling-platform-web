@@ -46,6 +46,9 @@ const showRejectReasonModal = ref(false);
 const rejectContractId = ref<string | null>(null);
 const rejectReason = ref('');
 
+// ── Export Format Map ───────────────────────────────────────────
+const formatMap = ref<Record<string, 'COCO' | 'YOLO' | 'VOC'>>({});
+
 function openConfirm(action: 'approve' | 'reject' | 'cancel', contractId: string) {
   if (action === 'reject') {
     // Open rejection reason modal instead
@@ -255,6 +258,33 @@ const currentConfirmMessage = computed(() => {
                 @click="openConfirm('reject', contract.id)"
               >
                 Revizyon İste
+              </button>
+            </div>
+            <!-- Actions for approved contracts -->
+            <div v-if="contract.status === 'approved'" class="flex flex-wrap gap-2 items-center">
+              <select
+                class="select select-sm select-bordered rounded-lg bg-white dark:bg-gray-800 text-sm"
+                :value="formatMap[contract.id] || 'COCO'"
+                @change="(e) => formatMap[contract.id] = (e.target as HTMLSelectElement).value as any"
+              >
+                <option value="COCO">COCO JSON</option>
+                <option value="YOLO">YOLO ZIP</option>
+                <option value="VOC">VOC ZIP</option>
+              </select>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition-colors"
+                :disabled="contractsStore.exportLoadingMap[contract.id]"
+                @click="contractsStore.downloadContractExport(contract.id, formatMap[contract.id] || 'COCO')"
+              >
+                <span v-if="contractsStore.exportLoadingMap[contract.id]" class="flex items-center gap-1">
+                  <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Hazırlanıyor…
+                </span>
+                <span v-else>Çıktıyı İndir</span>
               </button>
             </div>
             <!-- Actions for active contracts -->

@@ -108,8 +108,14 @@ backend/
 │   │   ├── storage.ts     # MinIO/R2 Storage Utils
 │   │   └── logger.ts      # Winston logger
 │   ├── utils/             # Utility functions & custom error classes
+│   │   ├── export/        # Contract data export utilities (COCO, YOLO, VOC)
+│   │   │   ├── export.types.ts
+│   │   │   ├── export.helpers.ts
+│   │   │   ├── coco.export.ts
+│   │   │   ├── yolo.export.ts
+│   │   │   └── voc.export.ts
 │   │   ├── errors.ts      # Custom error classes
-│   │   └── normalize.util.ts  # Normalize raw → normalized transform (MVP: identity)
+│   │   └── normalize.util.ts  # Normalize raw → normalized transform
 │   └── index.ts           # App entry point
 │
 ├── package.json
@@ -218,6 +224,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/` | Kullanıcının sözleşmeleri (role-based: client→clientUserId, labeler→labelerUserId) |
 | GET | `/:id` | Sözleşme detayı |
 | GET | `/:id/labeling-context` | Sözleşmeye ait etiketleme metadatasını (context) döner |
+| GET | `/:id/export` | Onaylanmış sözleşmenin çıktılarını BBOX olarak indir (`?format=COCO/YOLO/VOC`) |
 | GET | `/:id/qc-sample` | QC sample task seti al (client/admin, `?size=100`) |
 | PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) → normalize job enqueue |
 | PATCH | `/:id/approve` | Sözleşmeyi onayla (client) — normalize completed gerektirir |

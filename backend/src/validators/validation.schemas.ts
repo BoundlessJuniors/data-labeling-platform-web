@@ -227,6 +227,13 @@ export const cancelContractSchema = Joi.object({
   reason: Joi.string().max(1000).optional().allow(''),
 });
 
+export const exportContractQuerySchema = Joi.object({
+  format: Joi.string().valid('COCO', 'YOLO', 'VOC').required().messages({
+    'any.required': 'Export format is required',
+    'any.only': 'Export format must be one of: COCO, YOLO, VOC',
+  }),
+});
+
 // ============================================================================
 // Task Schemas
 // ============================================================================

@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { ContractService } from '../services/contract.service';
+import { ExportFormat } from '../utils/export/export.types';
 
 const contractService = new ContractService();
 
@@ -196,6 +197,28 @@ export const getQcSample = async (
       success: true,
       data: result,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Export contract (client/admin)
+export const exportContract = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const format = req.query.format as ExportFormat;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const exportArtifact = await contractService.exportContract(id, userId, userRole, format);
+
+    res.setHeader('Content-Type', exportArtifact.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${exportArtifact.filename}"`);
+    res.send(exportArtifact.buffer);
   } catch (error) {
     next(error);
   }

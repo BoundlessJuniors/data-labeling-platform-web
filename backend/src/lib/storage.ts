@@ -196,6 +196,33 @@ export async function getSignedUrl(
 }
 
 /**
+ * Download an object directly as a Buffer.
+ * Useful when constructing zip archives in-memory.
+ */
+export async function downloadFromR2(key: string): Promise<Buffer> {
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+  });
+
+  const response = await s3Client.send(command);
+  
+  if (!response.Body) {
+    throw new Error(`Object body is empty for key: ${key}`);
+  }
+
+  // Transform the response stream to a Buffer
+  const stream = response.Body as NodeJS.ReadableStream;
+  const chunks: Buffer[] = [];
+  
+  return new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on('error', (err) => reject(err));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+  });
+}
+
+/**
  * Generate a time-limited signed URL for UPLOADING an object (PUT).
  * @param key         - The object key in the bucket.
  * @param contentType - The MIME type of the file.

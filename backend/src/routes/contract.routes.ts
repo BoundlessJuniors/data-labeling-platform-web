@@ -7,7 +7,8 @@ import {
   idParamSchema,
   rejectContractSchema,
   cancelContractSchema,
-  qcSampleQuerySchema
+  qcSampleQuerySchema,
+  exportContractQuerySchema
 } from '../validators/validation.schemas';
 
 const router = Router();
@@ -49,6 +50,15 @@ router.get(
   validate(idParamSchema, 'params'),
   validate(qcSampleQuerySchema, 'query'),
   contractController.getQcSample
+);
+
+// GET /api/contracts/:id/export - Export labeled data (client/admin)
+router.get(
+  '/:id/export',
+  adminOrClient,
+  validate(idParamSchema, 'params'),
+  validate(exportContractQuerySchema, 'query'),
+  contractController.exportContract
 );
 
 // PATCH /api/contracts/:id/submit - Submit contract (labeler or admin)
