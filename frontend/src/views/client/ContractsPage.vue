@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ContractsPage - Client contracts list with status actions
+ * ContractsPage - Client contracts list with QC preview and status actions
  */
 import { onMounted, ref, computed } from 'vue';
 import { useContractsStore } from '@/stores/contracts';
@@ -12,6 +12,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
 import BasePagination from '@/components/ui/BasePagination.vue';
 import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
+import ContractQcPreviewModal from '@/components/contracts/ContractQcPreviewModal.vue';
 
 useSeo({
   title: 'Sözleşmeler',
@@ -35,12 +36,24 @@ onMounted(() => {
   contractsStore.fetchContracts();
 });
 
-// Confirmation modal
+// ── Confirmation modal ──────────────────────────────────────────
 const showConfirmModal = ref(false);
-const confirmAction = ref<'accept' | 'reject' | 'cancel' | 'complete' | null>(null);
+const confirmAction = ref<'approve' | 'reject' | 'cancel' | null>(null);
 const confirmContractId = ref<string | null>(null);
 
-function openConfirm(action: 'accept' | 'reject' | 'cancel' | 'complete', contractId: string) {
+// ── Rejection reason modal ──────────────────────────────────────
+const showRejectReasonModal = ref(false);
+const rejectContractId = ref<string | null>(null);
+const rejectReason = ref('');
+
+function openConfirm(action: 'approve' | 'reject' | 'cancel', contractId: string) {
+  if (action === 'reject') {
+    // Open rejection reason modal instead
+    rejectContractId.value = contractId;
+    rejectReason.value = '';
+    showRejectReasonModal.value = true;
+    return;
+  }
   confirmAction.value = action;
   confirmContractId.value = contractId;
   showConfirmModal.value = true;
@@ -48,20 +61,37 @@ function openConfirm(action: 'accept' | 'reject' | 'cancel' | 'complete', contra
 
 async function handleConfirm() {
   if (!confirmContractId.value || !confirmAction.value) return;
-  
+
   const actions = {
-    accept: contractsStore.acceptContract,
-    reject: contractsStore.rejectContract,
-    cancel: contractsStore.cancelContract,
-    complete: contractsStore.completeContract,
-  };
-  
-  await actions[confirmAction.value](confirmContractId.value);
+    approve: () => contractsStore.approveContract(confirmContractId.value!),
+    cancel: () => contractsStore.cancelContract(confirmContractId.value!),
+  } as const;
+
+  const actionFn = actions[confirmAction.value as keyof typeof actions];
+  if (actionFn) {
+    await actionFn();
+  }
+
   showConfirmModal.value = false;
   confirmAction.value = null;
   confirmContractId.value = null;
 }
 
+async function handleRejectWithReason() {
+  if (!rejectContractId.value) return;
+  const reason = rejectReason.value.trim() || undefined;
+  await contractsStore.rejectContract(rejectContractId.value, reason);
+  showRejectReasonModal.value = false;
+  rejectContractId.value = null;
+  rejectReason.value = '';
+}
+
+// ── QC Preview ──────────────────────────────────────────────────
+async function openQcPreview(contractId: string) {
+  await contractsStore.fetchQcPreview(contractId);
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
 function getStatusBadge(status: string) {
   const badges: Record<string, string> = {
     active: 'badge-info',
@@ -69,6 +99,7 @@ function getStatusBadge(status: string) {
     approved: 'badge-success',
     cancelled: 'badge-error',
     rejected: 'badge-error',
+    revision_requested: 'badge-warning',
   };
   return badges[status] || 'badge-neutral';
 }
@@ -80,6 +111,7 @@ function getStatusLabel(status: string) {
     approved: 'Onaylandı',
     cancelled: 'İptal Edildi',
     rejected: 'Reddedildi',
+    revision_requested: 'Revizyon İstendi',
   };
   return labels[status] || status;
 }
@@ -104,15 +136,13 @@ function getCompletedCount(contract: { tasks?: { status: string }[] }) {
 }
 
 const confirmMessages: Record<string, { title: string; message: string; buttonText: string; buttonVariant: 'primary' | 'danger' | 'secondary' }> = {
-  accept: { title: 'Sözleşmeyi Kabul Et', message: 'Bu sözleşmeyi kabul etmek istediğinizden emin misiniz?', buttonText: 'Kabul Et', buttonVariant: 'primary' },
-  reject: { title: 'Sözleşmeyi Reddet', message: 'Bu sözleşmeyi reddetmek istediğinizden emin misiniz?', buttonText: 'Reddet', buttonVariant: 'danger' },
+  approve: { title: 'Sözleşmeyi Onayla', message: 'Bu sözleşmeyi onaylamak istediğinizden emin misiniz? Bu işlem geri alınamaz.', buttonText: 'Onayla', buttonVariant: 'primary' },
   cancel: { title: 'Sözleşmeyi İptal Et', message: 'Bu sözleşmeyi iptal etmek istediğinizden emin misiniz?', buttonText: 'İptal Et', buttonVariant: 'danger' },
-  complete: { title: 'Sözleşmeyi Tamamla', message: 'Tüm görevler onaylandı mı? Sözleşmeyi tamamlamak istediğinizden emin misiniz?', buttonText: 'Tamamla', buttonVariant: 'primary' },
 };
 
 const currentConfirmMessage = computed(() => {
   if (!confirmAction.value) return null;
-  return confirmMessages[confirmAction.value];
+  return confirmMessages[confirmAction.value] ?? null;
 });
 </script>
 
@@ -195,15 +225,46 @@ const currentConfirmMessage = computed(() => {
             <p class="text-lg font-bold text-gray-900 dark:text-white">
               {{ formatPrice(contract.agreedPriceTotal, contract.currency) }}
             </p>
-            <!-- Actions -->
-            <div class="flex gap-2">
+            <!-- Actions for submitted contracts -->
+            <div v-if="contract.status === 'submitted'" class="flex flex-wrap gap-2">
               <button
-                v-if="contract.status === 'submitted'"
                 type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
-                @click="openConfirm('complete', contract.id)"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50 transition-colors"
+                :disabled="contractsStore.qcLoading"
+                @click="openQcPreview(contract.id)"
               >
-                Tamamla
+                <span v-if="contractsStore.qcLoading && contractsStore.qcPreviewContractId === contract.id" class="flex items-center gap-1">
+                  <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Yükleniyor…
+                </span>
+                <span v-else>QC Önizleme</span>
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 transition-colors"
+                @click="openConfirm('approve', contract.id)"
+              >
+                Onayla
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors"
+                @click="openConfirm('reject', contract.id)"
+              >
+                Revizyon İste
+              </button>
+            </div>
+            <!-- Actions for active contracts -->
+            <div v-if="contract.status === 'active'" class="flex gap-2">
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors"
+                @click="openConfirm('cancel', contract.id)"
+              >
+                İptal Et
               </button>
             </div>
           </div>
@@ -220,7 +281,10 @@ const currentConfirmMessage = computed(() => {
       @page-change="contractsStore.goToPage"
     />
 
-    <!-- Confirm Modal -->
+    <!-- QC Preview Modal -->
+    <ContractQcPreviewModal />
+
+    <!-- Confirm Modal (approve / cancel) -->
     <Teleport to="body">
       <div
         v-if="showConfirmModal && confirmAction"
@@ -242,6 +306,40 @@ const currentConfirmMessage = computed(() => {
               @click="handleConfirm"
             >
               {{ currentConfirmMessage?.buttonText }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Rejection Reason Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showRejectReasonModal"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        @click.self="showRejectReasonModal = false"
+      >
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Revizyon İste
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Lütfen revizyon isteğinizin nedenini açıklayın. Bu bilgi labeler'a iletilecektir.
+          </p>
+          <textarea
+            v-model="rejectReason"
+            class="input resize-none"
+            rows="3"
+            placeholder="Revizyon nedeni (opsiyonel)"
+          />
+          <div class="flex justify-end gap-3 mt-4">
+            <BaseButton variant="secondary" @click="showRejectReasonModal = false">İptal</BaseButton>
+            <BaseButton
+              variant="danger"
+              :loading="contractsStore.loading"
+              @click="handleRejectWithReason"
+            >
+              Revizyon İste
             </BaseButton>
           </div>
         </div>

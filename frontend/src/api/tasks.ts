@@ -4,6 +4,7 @@
 import apiClient from './client';
 import type { Task, TaskWithDetails, CreateReviewRequest, TaskReview } from '@/types/task';
 import type { ApiResponse, PaginatedResponse } from '@/types/api';
+import type { QcTaskView } from '@/types/qc';
 
 export interface TaskListParams {
   page?: number;
@@ -33,4 +34,12 @@ export const tasksApi = {
   createReview(data: CreateReviewRequest) {
     return apiClient.post<ApiResponse<TaskReview>>(`/tasks/${data.taskId}/reviews`, data);
   },
+
+  /**
+   * Get task QC view — detailed annotation data for preview
+   */
+  getQcView(taskId: string) {
+    return apiClient.get<ApiResponse<QcTaskView>>(`/tasks/${taskId}/qc-view`);
+  },
 };
+

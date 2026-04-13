@@ -159,6 +159,6 @@ export function startNormalizeWorker() {
     logger.error(`[NormalizeWorker] Job ${job?.id} failed with ${err.message}`);
   });
 
-  logger.info(`🚀 Worker "${WORKER_NAME}" started`);
+  logger.info(` Worker "${WORKER_NAME}" started`);
   return worker;
 }

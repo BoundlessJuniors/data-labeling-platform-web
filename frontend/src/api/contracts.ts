@@ -4,6 +4,7 @@
 import apiClient from './client';
 import type { Contract, ContractWithDetails, ContractStatus } from '@/types/contract';
 import type { ApiResponse, PaginatedResponse } from '@/types/api';
+import type { QcSampleResponse } from '@/types/qc';
 
 export interface ContractListParams {
   page?: number;
@@ -27,17 +28,24 @@ export const contractsApi = {
   },
 
   /**
-   * Accept a contract
+   * Accept a contract (legacy alias — prefer approve)
    */
   accept(id: string) {
     return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/accept`);
   },
 
   /**
-   * Reject a contract
+   * Approve a contract (client approves labeler's work)
    */
-  reject(id: string) {
-    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/reject`);
+  approve(id: string) {
+    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/approve`);
+  },
+
+  /**
+   * Reject a contract with a reason
+   */
+  reject(id: string, reason?: string) {
+    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/reject`, { reason });
   },
 
   /**
@@ -53,4 +61,14 @@ export const contractsApi = {
   complete(id: string) {
     return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/complete`);
   },
+
+  /**
+   * Get QC sample tasks for a submitted contract (client/admin)
+   */
+  getQcSample(contractId: string, size: number = 5) {
+    return apiClient.get<ApiResponse<QcSampleResponse>>(`/contracts/${contractId}/qc-sample`, {
+      params: { size },
+    });
+  },
 };
+

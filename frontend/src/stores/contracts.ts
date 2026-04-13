@@ -4,7 +4,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { contractsApi, type ContractListParams } from '@/api/contracts';
+import { tasksApi } from '@/api/tasks';
 import type { Contract, ContractWithDetails, ContractStatus } from '@/types/contract';
+import type { QcSampleResponse, QcTaskView } from '@/types/qc';
 import { getErrorMessage } from '@/types/api';
 import { useToastStore } from './toast';
 
@@ -25,6 +27,14 @@ export const useContractsStore = defineStore('contracts', () => {
 
   // Filters
   const statusFilter = ref<ContractStatus | ''>('');
+
+  // ── QC Preview State ──────────────────────────────────────────────
+  const qcPreviewOpen = ref(false);
+  const qcPreviewContractId = ref<string | null>(null);
+  const qcSample = ref<QcSampleResponse | null>(null);
+  const qcTaskViews = ref<Map<string, QcTaskView>>(new Map());
+  const qcLoading = ref(false);
+  const qcError = ref<string | null>(null);
 
   /**
    * Fetch paginated contracts list
@@ -73,17 +83,17 @@ export const useContractsStore = defineStore('contracts', () => {
   }
 
   /**
-   * Accept a contract
+   * Approve a contract (client approves labeler's work)
    */
-  async function acceptContract(id: string) {
+  async function approveContract(id: string) {
     loading.value = true;
     try {
-      const response = await contractsApi.accept(id);
+      const response = await contractsApi.approve(id);
       updateContractInList(id, response.data.data);
-      toastStore.success('Sözleşme kabul edildi');
+      toastStore.success('Sözleşme onaylandı');
       return true;
     } catch (_err) {
-      toastStore.error(getErrorMessage(_err, 'Sözleşme kabul edilemedi'));
+      toastStore.error(getErrorMessage(_err, 'Sözleşme onaylanamadı'));
       return false;
     } finally {
       loading.value = false;
@@ -91,17 +101,17 @@ export const useContractsStore = defineStore('contracts', () => {
   }
 
   /**
-   * Reject a contract
+   * Reject a contract (client requests revision)
    */
-  async function rejectContract(id: string) {
+  async function rejectContract(id: string, reason?: string) {
     loading.value = true;
     try {
-      const response = await contractsApi.reject(id);
+      const response = await contractsApi.reject(id, reason);
       updateContractInList(id, response.data.data);
-      toastStore.success('Sözleşme reddedildi');
+      toastStore.success('Revizyon istendi');
       return true;
     } catch (_err) {
-      toastStore.error(getErrorMessage(_err, 'Sözleşme reddedilemedi'));
+      toastStore.error(getErrorMessage(_err, 'Revizyon istenemedi'));
       return false;
     } finally {
       loading.value = false;
@@ -127,7 +137,7 @@ export const useContractsStore = defineStore('contracts', () => {
   }
 
   /**
-   * Complete a contract
+   * Complete a contract (legacy — backend may not support)
    */
   async function completeContract(id: string) {
     loading.value = true;
@@ -142,6 +152,70 @@ export const useContractsStore = defineStore('contracts', () => {
     } finally {
       loading.value = false;
     }
+  }
+
+  // ── QC Preview Actions ────────────────────────────────────────────
+
+  /**
+   * Fetch QC preview: sample tasks + individual QC views
+   */
+  async function fetchQcPreview(contractId: string) {
+    qcLoading.value = true;
+    qcError.value = null;
+    qcSample.value = null;
+    qcTaskViews.value = new Map();
+    qcPreviewContractId.value = contractId;
+
+    try {
+      // 1. Fetch QC sample (5 random tasks)
+      const sampleRes = await contractsApi.getQcSample(contractId, 5);
+      qcSample.value = sampleRes.data.data;
+
+      if (qcSample.value.tasks.length === 0) {
+        qcPreviewOpen.value = true;
+        return true;
+      }
+
+      // 2. Fetch detailed QC view for each sample task
+      const viewPromises = qcSample.value.tasks.map(async (task) => {
+        try {
+          const viewRes = await tasksApi.getQcView(task.id);
+          return { taskId: task.id, view: viewRes.data.data };
+        } catch (err) {
+          console.warn(`Failed to fetch QC view for task ${task.id}:`, err);
+          return null;
+        }
+      });
+
+      const views = await Promise.all(viewPromises);
+      const viewMap = new Map<string, QcTaskView>();
+      for (const result of views) {
+        if (result) {
+          viewMap.set(result.taskId, result.view);
+        }
+      }
+      qcTaskViews.value = viewMap;
+
+      qcPreviewOpen.value = true;
+      return true;
+    } catch (_err) {
+      qcError.value = getErrorMessage(_err, 'QC önizleme yüklenemedi');
+      toastStore.error(qcError.value);
+      return false;
+    } finally {
+      qcLoading.value = false;
+    }
+  }
+
+  /**
+   * Close QC preview modal and reset state
+   */
+  function closeQcPreview() {
+    qcPreviewOpen.value = false;
+    qcPreviewContractId.value = null;
+    qcSample.value = null;
+    qcTaskViews.value = new Map();
+    qcError.value = null;
   }
 
   function updateContractInList(id: string, updatedContract: Contract) {
@@ -182,6 +256,7 @@ export const useContractsStore = defineStore('contracts', () => {
     page.value = 1;
     total.value = 0;
     statusFilter.value = '';
+    closeQcPreview();
   }
 
   return {
@@ -196,15 +271,26 @@ export const useContractsStore = defineStore('contracts', () => {
     total,
     totalPages,
     statusFilter,
+    // QC Preview State
+    qcPreviewOpen,
+    qcPreviewContractId,
+    qcSample,
+    qcTaskViews,
+    qcLoading,
+    qcError,
     // Actions
     fetchContracts,
     fetchContract,
-    acceptContract,
+    approveContract,
     rejectContract,
     cancelContract,
     completeContract,
     setStatusFilter,
     goToPage,
     reset,
+    // QC Preview Actions
+    fetchQcPreview,
+    closeQcPreview,
   };
 });
+

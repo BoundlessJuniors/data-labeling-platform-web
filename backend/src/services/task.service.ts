@@ -4,6 +4,7 @@ import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
 import logger from '../lib/logger';
 import crypto from 'crypto';
+import { getSignedUrl } from '../lib/storage';
 import stableStringify from 'fast-json-stable-stringify';
 
 /**
@@ -679,10 +680,21 @@ export class TaskService {
       throw new ForbiddenError('You do not have access to this task');
     }
 
+    // Generate signed URL for direct image access
+    let imageUrl: string | null = null;
+    if (task.asset?.objectKey) {
+      try {
+        imageUrl = await getSignedUrl(task.asset.objectKey, 3600);
+      } catch (err) {
+        logger.warn(`Failed to generate signed URL for asset ${task.asset.id}:`, err);
+      }
+    }
+
     return {
       id: task.id,
       status: task.status,
       asset: task.asset,
+      imageUrl,
       latestRaw: task.annotationsRaw[0] || null,
       normalized: task.annotationNormalized || null,
       normalizeReady: task.annotationNormalized !== null,

@@ -4,6 +4,7 @@ import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import logger from '../lib/logger';
 import { addNormalizeJob } from '../lib/queue';
+import { getSignedUrl } from '../lib/storage';
 
 /**
  * Service layer for contract lifecycle management.
@@ -569,11 +570,26 @@ export class ContractService {
     const sampleSize = Math.min(size, shuffled.length);
     const sample = shuffled.slice(0, sampleSize);
 
+    // Generate signed URLs for each sample task's asset
+    const tasksWithUrls = await Promise.all(
+      sample.map(async (task) => {
+        let imageUrl: string | null = null;
+        if (task.asset?.objectKey) {
+          try {
+            imageUrl = await getSignedUrl(task.asset.objectKey, 3600);
+          } catch (err) {
+            logger.warn(`Failed to generate signed URL for asset ${task.asset?.id}:`, err);
+          }
+        }
+        return { ...task, imageUrl };
+      })
+    );
+
     return {
       contractId,
       totalTasks: allTasks.length,
-      sampleSize: sample.length,
-      tasks: sample,
+      sampleSize: tasksWithUrls.length,
+      tasks: tasksWithUrls,
     };
   }
 
