@@ -148,10 +148,13 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
+| GET | `/dashboard` | İstatistik paneli verileri (20+ metrik) |
 | GET | `/users` | Tüm kullanıcıları listele |
 | GET | `/users/:id` | Kullanıcı detayı |
-| PATCH | `/users/:id` | Kullanıcı güncelle |
+| PATCH | `/users/:id` | Kullanıcı rolünü vs. güncelle |
 | DELETE | `/users/:id` | Kullanıcı sil |
+| GET | `/monitoring/uploads` | Asset / upload pipeline metriklerini ve statülerini al |
+| GET | `/monitoring/queues` | BullMQ kuyruk özetini ve son işleri al |
 
 ### Dataset Routes (`/api/v1/datasets`)
 

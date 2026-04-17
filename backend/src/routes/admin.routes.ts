@@ -14,6 +14,12 @@ const router = Router();
 router.use(authenticate);
 router.use(adminOnly);
 
+// GET /api/admin/dashboard - Dashboard statistics
+router.get(
+  '/dashboard',
+  adminController.getDashboard
+);
+
 // GET /api/admin/users - Get all users
 router.get(
   '/users',
@@ -42,4 +48,17 @@ router.delete(
   adminController.deleteUser
 );
 
+// GET /api/admin/monitoring/uploads - Upload/asset pipeline monitoring
+router.get(
+  '/monitoring/uploads',
+  adminController.getUploadMonitoring
+);
+
+// GET /api/admin/monitoring/queues - BullMQ queue monitoring
+router.get(
+  '/monitoring/queues',
+  adminController.getQueueMonitoring
+);
+
 export default router;
+

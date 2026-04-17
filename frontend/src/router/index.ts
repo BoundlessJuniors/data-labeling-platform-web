@@ -51,9 +51,10 @@ const router = createRouter({
       component: () => import('@/views/DashboardRedirect.vue'),
       meta: { requiresAuth: true, title: 'Dashboard' },
     },
-    // Admin routes
+    // Admin routes — AdminLayout wraps all admin children via RouterView
     {
       path: '/admin',
+      component: () => import('@/layouts/AdminLayout.vue'),
       meta: { requiresAuth: true, role: 'admin' },
       children: [
         {
@@ -67,6 +68,18 @@ const router = createRouter({
           name: 'admin-users',
           component: () => import('@/views/admin/UsersPage.vue'),
           meta: { title: 'Kullanıcı Yönetimi' },
+        },
+        {
+          path: 'monitoring/uploads',
+          name: 'admin-monitoring-uploads',
+          component: () => import('@/views/admin/UploadMonitoringPage.vue'),
+          meta: { title: 'Upload Monitoring' },
+        },
+        {
+          path: 'monitoring/queues',
+          name: 'admin-monitoring-queues',
+          component: () => import('@/views/admin/QueueMonitoringPage.vue'),
+          meta: { title: 'Queue Monitoring' },
         },
       ],
     },

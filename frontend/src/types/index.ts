@@ -14,3 +14,5 @@ export * from './contract';
 export * from './proposal';
 export * from './task';
 export * from './labelset';
+export * from './admin';
+

@@ -47,9 +47,10 @@ frontend/
 │   └── vite.svg
 │
 ├── src/
-│   ├── api/                   # API katmanı (9 modül)
+│   ├── api/                   # API katmanı (10 modül)
 │   │   ├── client.ts          # Axios instance & interceptors
 │   │   ├── auth.ts            # Auth API fonksiyonları
+│   │   ├── admin.ts           # Admin API
 │   │   ├── datasets.ts        # Dataset API
 │   │   ├── assets.ts          # Asset API (upload dahil)
 │   │   ├── listings.ts        # Listing API
@@ -111,7 +112,9 @@ frontend/
 │   │   │
 │   │   ├── admin/             # Admin sayfaları
 │   │   │   ├── AdminDashboardPage.vue
-│   │   │   └── UsersPage.vue
+│   │   │   ├── UsersPage.vue
+│   │   │   ├── UploadMonitoringPage.vue
+│   │   │   └── QueueMonitoringPage.vue
 │   │   │
 │   │   ├── client/            # Client sayfaları
 │   │   │   ├── DatasetsPage.vue
@@ -127,10 +130,11 @@ frontend/
 │   │       ├── MyContractsPage.vue
 │   │       └── TasksPage.vue
 │   │
-│   ├── types/                 # TypeScript type tanımları (11 dosya)
+│   ├── types/                 # TypeScript type tanımları (12 dosya)
 │   │   ├── index.ts           # Export barrel
 │   │   ├── api.ts             # API response types
 │   │   ├── auth.ts            # Auth types
+│   │   ├── admin.ts           # Admin types
 │   │   ├── dataset.ts         # Dataset types
 │   │   ├── asset.ts           # Asset types
 │   │   ├── labelset.ts        # LabelSet types
@@ -176,6 +180,8 @@ frontend/
 | `/dashboard` | Tümü | Role göre yönlendirme |
 | `/admin` | Admin | Admin dashboard |
 | `/admin/users` | Admin | Kullanıcı listesi & yönetim |
+| `/admin/monitoring/uploads` | Admin | Upload (Asset) Monitoring |
+| `/admin/monitoring/queues` | Admin | Queue (BullMQ) Monitoring |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
@@ -355,6 +361,11 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Frontend enum düzeltmeleri: `ListingsPage` status filtreleri `ListingStatus` enum'una, `ContractsPage` status filtreleri `ContractStatus` enum'una uyumlu hale getirildi
 - [x] QC Preview modülü parser güncellemeleri: Envelope objelerini (`{type: "export", data: [...]}`) algılama, DOM görsel sizing düzeltmeleri (`nextTick` + `rAF`), SVG skeleton loading state ayrıştırması
 - [x] Approved Contract Export mekanizması: Onaylanmış sözleşmelerin çıktılarını BBOX-only olarak COCO (JSON), YOLO (ZIP) veya Pascal VOC (ZIP) formatlarında direkt indirebilme
+- [x] **Admin Faz 1**: Yeni mimari ile AdminLayout / AppLayout ayrımı; `/admin` rotalarında çift layout karmaşası giderildi
+- [x] **Admin Faz 1**: Kırık dashboard çağrıları yerine tek bir yeni `/api/admin/dashboard` endpoint'ini kullanan istatistik paneli eklendi
+- [x] **Admin Faz 1**: UsersPage revizesi - Tablodan DB/Şema'da olmayan `isActive` alanı kaldırıldı; API ve payload güncellendi
+- [x] **Admin Faz 1**: Upload Monitoring sayfası - sistemdeki assetlerin güncel pipeline durumlarını gösteren admin takip ekranı eklendi
+- [x] **Admin Faz 1**: Queue Monitoring sayfası - BullMQ kuyruk özetini, güncel logları ve otomatik yenileme (Auto 15s) desteğini barındıran kontrol paneli eklendi
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

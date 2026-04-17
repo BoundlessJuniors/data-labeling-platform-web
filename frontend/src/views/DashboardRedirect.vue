@@ -11,7 +11,7 @@ onMounted(() => {
   const role = authStore.user?.role
   
   if (role === 'admin') {
-    router.replace('/admin/users')
+    router.replace('/admin')
   } else if (role === 'client') {
     router.replace('/client/datasets')
   } else if (role === 'labeler') {

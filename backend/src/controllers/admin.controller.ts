@@ -103,3 +103,70 @@ export const deleteUser = async (
     next(error);
   }
 };
+
+// Get dashboard statistics (admin only)
+export const getDashboard = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+
+    const stats = await adminService.getDashboardStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get upload monitoring data (admin only)
+export const getUploadMonitoring = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const search = (req.query.search as string) || undefined;
+    const status = (req.query.status as string) || undefined;
+
+    const result = await adminService.getUploadMonitoring(page, limit, search, status);
+
+    res.json({
+      success: true,
+      data: result.assets,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get queue monitoring data (admin only)
+export const getQueueMonitoring = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+    const jobLimit = Math.min(parseInt(req.query.jobLimit as string) || 10, 50);
+
+    const result = await adminService.getQueueMonitoring(jobLimit);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
