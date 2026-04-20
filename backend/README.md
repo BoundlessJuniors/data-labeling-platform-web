@@ -158,6 +158,14 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 > **Faz 2 Mimari Yönelim:** Sözleşme (Contract), Görev (Task) veya Review incelemeleri için admin paneli, gereksiz route kopyalaması yapmak yerine varolan root endpoint'leri (`/contracts`, `/tasks`, `/reviews`) kullanır. Sistemin rol kontrolü, admin yetkisine göre global erişim sağlar. Sadece admin iş akışı için hayati bir yapı olan **Annotation Debug** endpointleri izole olarak `/api/v1/annotations` içerisinde tasarlanmıştır.
 
+#### Admin Faz 2 — Operasyonel Kabiliyetler
+
+Admin paneli, Faz 1'deki monitoring odaklı yapıdan Faz 2 ile operasyonel kontrol paneline genişletilmiştir. Bu aşamada yeni bir paralel backend route seti oluşturulmamış; bunun yerine mevcut root kaynak endpoint'leri admin yetkisiyle yeniden kullanılmıştır.
+
+- **Contracts Operations:** Admin paneli sözleşme listeleme, sözleşme detayı, QC sample inceleme ve normalize retry işlemleri için ağırlıklı olarak `/api/v1/contracts` endpoint grubunu kullanır.
+- **Tasks Operations:** Task listeleme, QC görünümü, accept/reject ve expired lease cleanup işlemleri `/api/v1/tasks` endpoint grubu üzerinden yürütülür.
+- **Reviews Monitoring:** Review kayıtları bağımsız bir domain olarak `/api/v1/reviews` üzerinden izlenir ve güncellenir.
+- **Annotation Debug:** Admin'e özel manuel raw/normalized müdahale ve task annotation okuma işlemleri `/api/v1/annotations` altında izole tutulur.
 ### Dataset Routes (`/api/v1/datasets`)
 
 | Method | Endpoint | Açıklama |

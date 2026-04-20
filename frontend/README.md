@@ -203,6 +203,17 @@ frontend/
 | `/labeler/contracts` | Labeler | Sözleşmelerimi görüntüle |
 | `/labeler/tasks` | Labeler | Görevlerimi yönet |
 
+### Admin Panel Gelişim Özeti
+
+Admin paneli iki aşamada geliştirilmiştir:
+
+- **Faz 1 (Monitoring):** Dashboard, kullanıcı yönetimi, upload monitoring ve queue monitoring ekranları eklenmiştir. Bu aşamada admin paneli sistem görünürlüğü kazanmıştır.
+- **Faz 2 (Operations):** Contracts, Tasks, Reviews ve Annotation Debug ekranları eklenmiştir. Böylece admin paneli yalnızca sistem izleyen bir alan olmaktan çıkıp, sözleşme, görev, kalite kontrol ve annotation debug süreçlerine müdahale edebilen operasyonel bir konsola dönüşmüştür.
+
+> **Mimari Not:** Admin sayfaları `AdminLayout` altında çalışır ve `AppLayout` ile karışmaz. Bu ayrım, admin panelini client/labeler akışlarından görsel ve mantıksal olarak izole eder.
+
+> **Annotation Debug Notu:** Admin annotation ekranı, normal labeler submit akışının yerine geçmez. Buradaki manuel raw/normalized işlemler debug/reprocess amaçlıdır.
+
 ## 🔐 Authentication Sistemi
 
 JWT token `httpOnly` cookie ile yönetilir — frontend token'a doğrudan erişmez.
@@ -380,6 +391,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Admin Faz 2**: Global typescript modellerinden kaynaklı sorunları aşmak için admine özel izole frontend tipleri yaratıldı (`AdminContractStatus`, vb).
 - [x] **Admin Faz 2**: Redundant backend api çağırmaları yerine tekil root endpoint'ler admin aksiyonlarında yeniden kullanıldı.
 - [x] **Admin Faz 2**: Annotation Debug ekranında Lease Token kısıtlamasına takılmadan sisteme manuel raw/normalized data stream edebilme özelliği ve görüntüleme mekanizması (QC View) eklendi.
+- [x] **Admin Faz 2**: Admin paneli için layout, routing ve ekran ayrımı netleştirilerek monitoring ve operasyon alanları tek panel altında düzenli biçimde toplandı.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
