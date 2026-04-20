@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { adminApi } from '@/api/admin';
 import { useToastStore } from '@/stores/toast';
 import { getErrorMessage } from '@/types/api';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseModal from '@/components/ui/BaseModal.vue';
 import QcImageCanvas from '@/components/contracts/QcImageCanvas.vue';
 import type { QcTaskView } from '@/types/qc';
 
@@ -44,6 +46,8 @@ interface TaskAnnotationsLite {
 }
 
 const toastStore = useToastStore();
+const route = useRoute();
+const router = useRouter();
 
 const searchTaskId = ref('');
 const loadedTaskId = ref('');
@@ -56,6 +60,10 @@ const qcViewData = ref<QcTaskView | null>(null);
 // Forms
 const newRawJson = ref('');
 const newNormalizedJson = ref('');
+
+// Modals
+const isConfirmModalOpen = ref(false);
+const confirmAction = ref<'raw' | 'normalized' | null>(null);
 
 async function loadData() {
   const tId = searchTaskId.value.trim();
@@ -158,11 +166,50 @@ async function loadData() {
     }
     
     loadedTaskId.value = tId;
+    
+    // update url
+    router.replace({
+      query: { ...route.query, taskId: tId },
+    }).catch(() => {});
+
   } catch (error) {
     toastStore.error(getErrorMessage(error, 'Veriler yüklenemedi. Task ID geçerli mi?'));
   } finally {
     isLoading.value = false;
   }
+}
+
+function promptSubmitRaw() {
+  if (!loadedTaskId.value) return;
+  try {
+    JSON.parse(newRawJson.value);
+  } catch {
+    toastStore.error('Geçersiz JSON formatı. Lütfen düzeltip tekrar deneyin.');
+    return;
+  }
+  confirmAction.value = 'raw';
+  isConfirmModalOpen.value = true;
+}
+
+function promptSubmitNormalized() {
+  if (!loadedTaskId.value) return;
+  try {
+    JSON.parse(newNormalizedJson.value);
+  } catch {
+    toastStore.error('Geçersiz JSON formatı. Lütfen düzeltip tekrar deneyin.');
+    return;
+  }
+  confirmAction.value = 'normalized';
+  isConfirmModalOpen.value = true;
+}
+
+async function executeConfirmAction() {
+  if (confirmAction.value === 'raw') {
+    await submitRaw();
+  } else if (confirmAction.value === 'normalized') {
+    await submitNormalized();
+  }
+  isConfirmModalOpen.value = false;
 }
 
 async function submitRaw() {
@@ -226,6 +273,13 @@ const rawHistory = computed<AnnotationRawLite[]>(() => {
 
 const normalizedItem = computed(() => {
   return annotations.value?.normalized || null;
+});
+
+onMounted(() => {
+  if (route.query.taskId) {
+    searchTaskId.value = String(route.query.taskId);
+    loadData();
+  }
 });
 </script>
 
@@ -303,7 +357,7 @@ const normalizedItem = computed(() => {
             </div>
             
             <div class="flex justify-end">
-              <BaseButton :disabled="isSubmitting || !newNormalizedJson.trim()" variant="primary" @click="submitNormalized">
+              <BaseButton :disabled="isSubmitting || !newNormalizedJson.trim()" variant="primary" @click="promptSubmitNormalized">
                 Normalized Upsert
               </BaseButton>
             </div>
@@ -342,7 +396,7 @@ const normalizedItem = computed(() => {
                 placeholder='{ "shapes": [] }'
               ></textarea>
               <div class="mt-3 flex justify-end">
-                <BaseButton :disabled="isSubmitting || !newRawJson.trim()" variant="secondary" @click="submitRaw">
+                <BaseButton :disabled="isSubmitting || !newRawJson.trim()" variant="secondary" @click="promptSubmitRaw">
                   Insert Raw
                 </BaseButton>
               </div>
@@ -369,5 +423,32 @@ const normalizedItem = computed(() => {
         </div>
       </div>
     </div>
+
+    <!-- Confirm Modal -->
+    <BaseModal
+      :open="isConfirmModalOpen"
+      :title="confirmAction === 'raw' ? 'Raw Annotation Yükle' : 'Normalized Data Güncelle'"
+      size="sm"
+      @close="isConfirmModalOpen = false"
+    >
+      <div class="space-y-4">
+        <p v-if="confirmAction === 'raw'" class="text-sm text-gray-600 dark:text-gray-300">
+          Bu işlem, işçi ekranlarını simüle etmeden (lease objesi olmadan) DB'ye ham veri ekler. Normalize Worker tarafından YENİDEN İŞLENMEYECEKTİR. Devam etmek istiyor musunuz? 
+        </p>
+        <p v-if="confirmAction === 'normalized'" class="text-sm text-gray-600 dark:text-gray-300">
+          Bu işlem, Normalized Annotation tablosundaki mecvut veriyi manuel girdiğiniz payload ile üstüne yazacaktır (upsert). Müşteri export'larına doğrudan yansıyacaktır. Onaylıyor musunuz?
+        </p>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="isConfirmModalOpen = false">İptal</BaseButton>
+        <BaseButton
+          variant="danger"
+          :loading="isSubmitting"
+          @click="executeConfirmAction"
+        >
+          Onayla ve Yaz
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>

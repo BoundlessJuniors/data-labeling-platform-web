@@ -55,7 +55,60 @@ export interface AdminUserListItem {
     listingsOwned: number;
     contractsAsClient: number;
     contractsAsLabeler: number;
+    taskLeases?: number;
+    reviews?: number;
+    proposals?: number;
   };
+}
+
+/** Subset returned by backend getUserById audit-log summary */
+export interface AdminUserAuditLogSummary {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+}
+
+/** Subset returned by backend getUserById proposal summary */
+export interface AdminUserProposalSummary {
+  id: string;
+  status: string;
+  priceQuote: string | number;
+  createdAt: string;
+}
+
+/** Subset returned by backend getUserById contract summary */
+export interface AdminUserContractSummary {
+  id: string;
+  status: string;
+  agreedPriceTotal: string | number;
+  startedAt: string;
+}
+
+/** Subset returned by backend getUserById review summary */
+export interface AdminUserReviewSummary {
+  id: string;
+  decision: string;
+  taskId: string;
+  createdAt: string;
+}
+
+/**
+ * Full user detail returned by GET /admin/users/:id
+ * Extends the list shape with nested recent-activity arrays.
+ */
+export interface AdminUserDetail extends AdminUserListItem {
+  _count: AdminUserListItem['_count'] & {
+    taskLeases: number;
+    reviews: number;
+    proposals: number;
+  };
+  contractsAsClient?: AdminUserContractSummary[];
+  contractsAsLabeler?: AdminUserContractSummary[];
+  reviews?: AdminUserReviewSummary[];
+  proposals?: AdminUserProposalSummary[];
+  auditLogs?: AdminUserAuditLogSummary[];
 }
 
 export interface AdminUpdateUserPayload {
@@ -274,4 +327,24 @@ export interface AdminAnnotationNormalizedItem {
 export interface AdminTaskAnnotationsResponse {
   raw: AdminAnnotationRawItem[];
   normalized: AdminAnnotationNormalizedItem | null;
+}
+
+// ============================================================================
+// Audit Logs (Admin Phase 3)
+// ============================================================================
+
+export interface AdminAuditLogItem {
+  id: string;
+  actorUserId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metaJson: JsonValue | null;
+  createdAt: string;
+  actor: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    role: string;
+  };
 }

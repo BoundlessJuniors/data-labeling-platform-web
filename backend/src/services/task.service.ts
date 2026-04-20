@@ -6,6 +6,7 @@ import logger from '../lib/logger';
 import crypto from 'crypto';
 import { getSignedUrl } from '../lib/storage';
 import stableStringify from 'fast-json-stable-stringify';
+import { auditService } from './audit.service';
 
 /**
  * Service for task lifecycle: leasing, submission, QC, and batch operations.
@@ -440,6 +441,12 @@ export class TaskService {
       },
     });
 
+    if (userRole === 'admin') {
+      await auditService.logAction(userId, 'task.accept', 'task', taskId, {
+        previousStatus: task.status,
+      });
+    }
+
     logger.info(`Task accepted: ${taskId}`);
 
     return updatedTask;
@@ -479,6 +486,13 @@ export class TaskService {
       },
     });
 
+    if (userRole === 'admin') {
+      await auditService.logAction(userId, 'task.reject', 'task', taskId, {
+        reason: reason || null,
+        previousStatus: task.status,
+      });
+    }
+
     logger.info(`Task rejected: ${taskId}, reason: ${reason || 'No reason provided'}`);
 
     return updatedTask;
@@ -487,7 +501,7 @@ export class TaskService {
   /**
    * Release expired leases (admin cleanup job)
    */
-  async releaseExpiredLeases() {
+  async releaseExpiredLeases(adminUserId?: string) {
     const now = new Date();
 
     // Find expired leases
@@ -512,6 +526,13 @@ export class TaskService {
     }
 
     logger.info(`Released ${expiredLeases.length} expired leases`);
+
+    if (adminUserId && expiredLeases.length > 0) {
+      // Create a single system-level log for the batch using the admin's id
+      await auditService.logAction(adminUserId, 'task.release_expired_leases', 'system', 'leases', {
+        releasedCount: expiredLeases.length,
+      });
+    }
 
     return { releasedCount: expiredLeases.length };
   }

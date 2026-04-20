@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { adminApi, type AdminTaskListParams } from '@/api/admin';
 import type { AdminTaskListItem } from '@/types/admin';
 import { useToastStore } from '@/stores/toast';
@@ -10,9 +11,12 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BasePagination from '@/components/ui/BasePagination.vue';
 import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
 import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
+import BaseModal from '@/components/ui/BaseModal.vue';
 import AdminTaskQcModal from '@/components/admin/AdminTaskQcModal.vue';
 
 const toastStore = useToastStore();
+const route = useRoute();
+const router = useRouter();
 
 const tasks = ref<AdminTaskListItem[]>([]);
 const isLoading = ref(true);
@@ -35,6 +39,13 @@ const statusOptions = [
 
 const isQcModalOpen = ref(false);
 const selectedTaskId = ref<string | null>(null);
+
+// Modals
+const isConfirmModalOpen = ref(false);
+const confirmAction = ref<'accept' | 'reject' | 'release' | null>(null);
+const activeTaskId = ref<string>('');
+const rejectReason = ref<string>('');
+const modalLoading = ref(false);
 
 async function fetchTasks() {
   isLoading.value = true;
@@ -61,72 +72,90 @@ async function fetchTasks() {
   }
 }
 
+function updateQueryAndFetch() {
+  router.replace({
+    query: {
+      ...route.query,
+      page: currentPage.value > 1 ? currentPage.value : undefined,
+      status: statusFilter.value || undefined,
+      contractId: contractIdFilter.value || undefined,
+    }
+  }).catch(() => {});
+  fetchTasks();
+}
+
 onMounted(() => {
+  if (route.query.page) currentPage.value = Number(route.query.page);
+  if (route.query.status) statusFilter.value = String(route.query.status);
+  if (route.query.contractId) contractIdFilter.value = String(route.query.contractId);
   fetchTasks();
 });
 
-// Avoid double fetch: if statusFilter changes and resets page, let page watcher handle fetch.
-watch(statusFilter, () => {
-  if (currentPage.value !== 1) {
+watch([statusFilter, contractIdFilter], (newVals, oldVals) => {
+  if (newVals[0] !== oldVals[0] || newVals[1] !== oldVals[1]) {
     currentPage.value = 1;
-  } else {
-    fetchTasks();
+    updateQueryAndFetch();
   }
 });
 
-watch(currentPage, () => {
-  fetchTasks();
+watch(currentPage, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    updateQueryAndFetch();
+  }
 });
 
 function handleFilter() {
   if (currentPage.value !== 1) {
     currentPage.value = 1;
+    updateQueryAndFetch();
   } else {
-    fetchTasks();
+    updateQueryAndFetch();
   }
 }
 
-async function releaseLeases() {
-  if (!window.confirm('Süresi dolmuş tüm görev kiralamalarını serbest bırakmak istiyor musunuz?')) return;
-  isProcessing.value = true;
+function promptReleaseLeases() {
+  confirmAction.value = 'release';
+  isConfirmModalOpen.value = true;
+}
+
+function promptAccept(id: string) {
+  activeTaskId.value = id;
+  confirmAction.value = 'accept';
+  isConfirmModalOpen.value = true;
+}
+
+function promptReject(id: string) {
+  activeTaskId.value = id;
+  rejectReason.value = '';
+  confirmAction.value = 'reject';
+  isConfirmModalOpen.value = true;
+}
+
+async function executeConfirmAction() {
+  modalLoading.value = true;
   try {
-    const res = await adminApi.releaseExpiredLeases();
-    toastStore.success(`Başarılı: ${res.data.data?.releasedCount || 0} lease serbest bırakıldı`);
+    if (confirmAction.value === 'release') {
+      const res = await adminApi.releaseExpiredLeases();
+      toastStore.success(`Başarılı: ${res.data.data?.releasedCount || 0} lease serbest bırakıldı`);
+    } else if (confirmAction.value === 'accept') {
+      await adminApi.acceptTask(activeTaskId.value);
+      toastStore.success('Görev onaylandı');
+    } else if (confirmAction.value === 'reject') {
+      const trimmedReason = rejectReason.value.trim();
+      if (trimmedReason === '') {
+        toastStore.warning('Reddetme nedeni boş olamaz');
+        modalLoading.value = false;
+        return;
+      }
+      await adminApi.rejectTask(activeTaskId.value, trimmedReason);
+      toastStore.warning('Görev reddedildi');
+    }
     fetchTasks();
+    isConfirmModalOpen.value = false;
   } catch (error: unknown) {
-    toastStore.error(getErrorMessage(error, 'Lease release işlemi başarısız'));
+    toastStore.error(getErrorMessage(error, 'İşlem başarısız'));
   } finally {
-    isProcessing.value = false;
-  }
-}
-
-async function handleAccept(id: string) {
-  try {
-    await adminApi.acceptTask(id);
-    toastStore.success('Görev onaylandı');
-    fetchTasks();
-  } catch (error: unknown) {
-    toastStore.error(getErrorMessage(error, 'Görev onaylanamadı'));
-  }
-}
-
-async function handleReject(id: string) {
-  const reason = window.prompt('Reddetme nedeni (opsiyonel):');
-  if (reason === null) return; // User cancelled
-  
-  const trimmedReason = reason.trim();
-  if (trimmedReason === '' && reason !== '') {
-    // This case is unlikely with window.prompt but good for safety
-    toastStore.warning('Reddetme nedeni boş olamaz');
-    return;
-  }
-
-  try {
-    await adminApi.rejectTask(id, trimmedReason);
-    toastStore.warning('Görev reddedildi');
-    fetchTasks();
-  } catch (error: unknown) {
-    toastStore.error(getErrorMessage(error, 'Görev reddedilemedi'));
+    modalLoading.value = false;
   }
 }
 
@@ -182,7 +211,7 @@ function truncate(str: string | undefined | null, len: number = 8) {
         <BaseButton
           :disabled="isProcessing"
           variant="primary"
-          @click="releaseLeases"
+          @click="promptReleaseLeases"
         >
           <template v-if="isProcessing">İşleniyor...</template>
           <template v-else>Release Expired</template>
@@ -254,13 +283,13 @@ function truncate(str: string | undefined | null, len: number = 8) {
                     <template v-if="task.status === 'submitted'">
                       <button
                         class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                        @click="handleAccept(task.id)"
+                        @click="promptAccept(task.id)"
                       >
                         Accept
                       </button>
                       <button
                         class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                        @click="handleReject(task.id)"
+                        @click="promptReject(task.id)"
                       >
                         Reject
                       </button>
@@ -294,5 +323,40 @@ function truncate(str: string | undefined | null, len: number = 8) {
 
     <!-- QC Modal -->
     <AdminTaskQcModal v-model="isQcModalOpen" :task-id="selectedTaskId" />
+
+    <!-- Confirm Modal -->
+    <BaseModal
+      :open="isConfirmModalOpen"
+      :title="confirmAction === 'accept' ? 'Görevi Kabul Et' : confirmAction === 'reject' ? 'Görevi Reddet' : 'Leaseleri Temizle'"
+      size="sm"
+      @close="isConfirmModalOpen = false"
+    >
+      <div class="space-y-4">
+        <p v-if="confirmAction === 'accept'" class="text-sm text-gray-600 dark:text-gray-300">
+          Bu görevi onaylamak istediğinize emin misiniz?
+        </p>
+        <p v-if="confirmAction === 'release'" class="text-sm text-gray-600 dark:text-gray-300">
+          Süresi dolmuş tüm görev kiralamalarını serbest bırakmak istiyor musunuz?
+        </p>
+        <div v-if="confirmAction === 'reject'">
+          <BaseInput
+            id="reject-reason"
+            v-model="rejectReason"
+            label="Reddetme Nedeni"
+            placeholder="Neden reddediliyor..."
+          />
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="isConfirmModalOpen = false">İptal</BaseButton>
+        <BaseButton
+          :variant="confirmAction === 'reject' ? 'danger' : 'primary'"
+          :loading="modalLoading"
+          @click="executeConfirmAction"
+        >
+          Onayla
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>

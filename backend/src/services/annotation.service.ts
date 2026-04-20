@@ -4,6 +4,7 @@ import { NotFoundError, ForbiddenError } from '../utils/errors';
 import logger from '../lib/logger';
 import crypto from 'crypto';
 import stableStringify from 'fast-json-stable-stringify';
+import { auditService } from './audit.service';
 
 /**
  * Service for admin-only annotation management (debug/reprocess).
@@ -75,6 +76,12 @@ export class AnnotationService {
 
     logger.info(`Raw annotation created for task ${taskId} (admin debug)`);
 
+    if (labelerRole === 'admin') {
+      await auditService.logAction(labelerId, 'annotation.raw_debug_create', 'annotation_raw', annotation.id, {
+        taskId,
+      });
+    }
+
     return annotation;
   }
 
@@ -125,6 +132,12 @@ export class AnnotationService {
     });
 
     logger.info(`Annotation normalized for task ${taskId}`);
+
+    if (userRole === 'admin') {
+      await auditService.logAction(userId, 'annotation.normalized_upsert', 'annotation_normalized', normalized.id, {
+        taskId,
+      });
+    }
 
     return normalized;
   }

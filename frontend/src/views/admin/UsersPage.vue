@@ -8,7 +8,8 @@ import { ref, onMounted, watch, computed } from 'vue';
 import { useSeo } from '@/composables/useSeo';
 import { useToastStore } from '@/stores/toast';
 import { adminApi } from '@/api/admin';
-import type { AdminUserListItem } from '@/types/admin';
+import type { AdminUserListItem, AdminUserDetail } from '@/types/admin';
+import { getErrorMessage } from '@/types/api';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
@@ -50,6 +51,11 @@ const roleOptions = [
   { value: 'labeler', label: 'Labeler' },
   { value: 'admin', label: 'Admin' },
 ];
+
+// Detail modal
+const showDetailModal = ref(false);
+const detailUser = ref<AdminUserDetail | null>(null);
+const detailLoading = ref(false);
 
 async function fetchUsers() {
   loading.value = true;
@@ -111,6 +117,22 @@ async function saveUser() {
     toastStore.error('Kullanıcı güncellenemedi. Lütfen tekrar deneyin.');
   } finally {
     editLoading.value = false;
+  }
+}
+
+async function openDetailModal(user: AdminUserListItem) {
+  // Reset and open modal immediately to show loading state
+  detailUser.value = null;
+  detailLoading.value = true;
+  showDetailModal.value = true;
+  try {
+    const res = await adminApi.getUserById(user.id);
+    detailUser.value = res.data.data;
+  } catch (err: unknown) {
+    toastStore.error(getErrorMessage(err, 'Kullanıcı detayları yüklenemedi'));
+    showDetailModal.value = false;
+  } finally {
+    detailLoading.value = false;
   }
 }
 
@@ -223,10 +245,17 @@ function formatDate(dateString: string) {
           <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
             {{ formatDate(user.createdAt) }}
           </td>
-          <td class="px-4 py-3 whitespace-nowrap text-right">
+          <td class="px-4 py-3 whitespace-nowrap text-right space-x-2">
             <button
               type="button"
-              class="text-primary-600 hover:text-primary-700 text-sm font-medium"
+              class="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              @click="openDetailModal(user)"
+            >
+              İncele
+            </button>
+            <button
+              type="button"
+              class="text-primary-600 hover:text-primary-700 text-sm font-medium border-l border-gray-300 pl-2"
               @click="openEditModal(user)"
             >
               Düzenle
@@ -267,6 +296,59 @@ function formatDate(dateString: string) {
     <template #footer>
       <BaseButton variant="secondary" @click="showEditModal = false">İptal</BaseButton>
       <BaseButton variant="primary" :loading="editLoading" @click="saveUser">Kaydet</BaseButton>
+    </template>
+  </BaseModal>
+
+  <!-- Detail Modal -->
+  <BaseModal :open="showDetailModal" title="Kullanıcı İnceleme Detayları" size="lg" @close="showDetailModal = false">
+    <div v-if="detailLoading" class="py-8 text-center text-slate-500 text-sm">Yükleniyor...</div>
+    <div v-else-if="detailUser" class="space-y-6">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-slate-50 p-3 rounded border border-slate-200">
+          <p class="text-xs text-slate-500 uppercase tracking-wider">Temel Bilgiler</p>
+          <p class="font-medium text-sm mt-1">İsim: {{ detailUser.displayName || 'Yok' }}</p>
+          <p class="font-medium text-sm">Email: {{ detailUser.email }}</p>
+          <p class="font-medium text-sm">Rol: <span class="capitalize">{{ detailUser.role }}</span></p>
+          <p class="font-medium text-sm">Kayıt: {{ formatDate(detailUser.createdAt) }}</p>
+          <p class="font-medium text-sm">Puan: {{ detailUser.ratingAvg || 'Yok' }}</p>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded border border-slate-200">
+          <p class="text-xs text-slate-500 uppercase tracking-wider">İlişki Sayıları</p>
+          <p class="font-medium text-sm mt-1">Datasets: {{ detailUser._count?.datasets ?? 0 }}</p>
+          <p class="font-medium text-sm">Listings: {{ detailUser._count?.listingsOwned ?? 0 }}</p>
+          <p class="font-medium text-sm">Contracts (Client): {{ detailUser._count?.contractsAsClient ?? 0 }}</p>
+          <p class="font-medium text-sm">Contracts (Labeler): {{ detailUser._count?.contractsAsLabeler ?? 0 }}</p>
+          <p class="font-medium text-sm">Task Leases: {{ detailUser._count?.taskLeases ?? 0 }}</p>
+          <p class="font-medium text-sm">Reviews: {{ detailUser._count?.reviews ?? 0 }}</p>
+        </div>
+      </div>
+
+      <!-- Recent interactions snippet if necessary -->
+      <div v-if="detailUser.auditLogs?.length" class="mt-4">
+        <h4 class="text-sm font-semibold mb-2">Son 5 Admin Aktivitesi (Audit Logs)</h4>
+        <ul class="text-xs space-y-1">
+          <li v-for="log in detailUser.auditLogs" :key="log.id" class="flex justify-between bg-white border border-slate-200 rounded px-2 py-1">
+            <span class="font-mono text-blue-600">{{ log.action }}</span>
+            <span class="text-slate-500">{{ formatDate(log.createdAt) }}</span>
+          </li>
+        </ul>
+      </div>
+      <div v-if="detailUser.proposals?.length" class="mt-4">
+        <h4 class="text-sm font-semibold mb-2">Son 5 Teklif (Proposals)</h4>
+        <ul class="text-xs space-y-1">
+          <li v-for="p in detailUser.proposals" :key="p.id" class="flex flex-col bg-white border border-slate-200 rounded px-2 py-1">
+            <div class="flex justify-between">
+              <span class="font-mono">{{ p.status }}</span>
+              <span class="text-slate-500">{{ p.priceQuote }}</span>
+            </div>
+            <span class="text-slate-400 mt-1 line-clamp-1 border-t border-slate-100 pt-1">{{ formatDate(p.createdAt) }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <template #footer>
+      <BaseButton variant="outline" @click="showDetailModal = false">Kapat</BaseButton>
     </template>
   </BaseModal>
 </template>

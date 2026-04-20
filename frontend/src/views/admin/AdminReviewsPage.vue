@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { adminApi, type AdminReviewListParams } from '@/api/admin';
 import type { AdminReviewItem } from '@/types/admin';
 import { useToastStore } from '@/stores/toast';
@@ -13,6 +14,8 @@ import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 
 const toastStore = useToastStore();
+const route = useRoute();
+const router = useRouter();
 
 const reviews = ref<AdminReviewItem[]>([]);
 const isLoading = ref(true);
@@ -54,25 +57,46 @@ async function fetchReviews() {
   }
 }
 
+// Sync with query parameters
+function updateQueryAndFetch() {
+  router.replace({
+    query: {
+      ...route.query,
+      page: currentPage.value > 1 ? currentPage.value : undefined,
+      decision: decisionFilter.value || undefined,
+      taskId: taskIdFilter.value || undefined,
+    }
+  }).catch(() => {});
+  fetchReviews();
+}
+
 onMounted(() => {
+  if (route.query.page) currentPage.value = Number(route.query.page);
+  if (route.query.decision) decisionFilter.value = String(route.query.decision);
+  if (route.query.taskId) taskIdFilter.value = String(route.query.taskId);
   fetchReviews();
 });
 
-watch([currentPage, decisionFilter], () => {
-  if (currentPage.value === 1 || decisionFilter.value) {
-    if (decisionFilter.value && currentPage.value !== 1) {
-      currentPage.value = 1;
-    } else {
-      fetchReviews();
-    }
-  } else {
-    fetchReviews();
+watch([decisionFilter, taskIdFilter], (newVals, oldVals) => {
+  if (newVals[0] !== oldVals[0] || newVals[1] !== oldVals[1]) {
+    currentPage.value = 1;
+    updateQueryAndFetch();
+  }
+});
+
+watch(currentPage, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    updateQueryAndFetch();
   }
 });
 
 function handleFilter() {
-  currentPage.value = 1;
-  fetchReviews();
+  if (currentPage.value !== 1) {
+    currentPage.value = 1;
+    updateQueryAndFetch();
+  } else {
+    updateQueryAndFetch();
+  }
 }
 
 function openResolveModal(review: AdminReviewItem) {

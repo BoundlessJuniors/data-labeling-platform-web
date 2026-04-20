@@ -170,3 +170,37 @@ export const getQueueMonitoring = async (
   }
 };
 
+// Get audit logs
+import { auditService } from '../services/audit.service';
+
+export const getAuditLogs = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+    const params = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 50,
+      action: req.query.action as string | undefined,
+      entityType: req.query.entityType as string | undefined,
+      entityId: req.query.entityId as string | undefined,
+      actorUserId: req.query.actorUserId as string | undefined,
+      actorSearch: req.query.actorSearch as string | undefined,
+      sortBy: req.query.sortBy as 'createdAt' | undefined,
+      sortOrder: req.query.sortOrder as 'asc' | 'desc' | undefined,
+    };
+
+    const result = await auditService.getAuditLogs(params);
+
+    res.json({
+      success: true,
+      data: result.logs,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -2,6 +2,7 @@ import { Prisma, ReviewDecision, TaskStatus, UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import logger from '../lib/logger';
+import { auditService } from './audit.service';
 
 export class ReviewService {
   /**
@@ -62,6 +63,13 @@ export class ReviewService {
     });
 
     logger.info(`Review created for task ${data.taskId}: ${data.decision}`);
+
+    if (reviewerRole === 'admin') {
+      await auditService.logAction(reviewerId, 'review.create', 'review', review.id, {
+        taskId: data.taskId,
+        decision: data.decision,
+      });
+    }
 
     return review;
   }
@@ -227,6 +235,13 @@ export class ReviewService {
     });
 
     logger.info(`Review resolved: ${reviewId} with decision ${data.decision}`);
+
+    if (userRole === 'admin') {
+      await auditService.logAction(userId, 'review.resolve', 'review', reviewId, {
+        taskId: review.taskId,
+        decision: data.decision,
+      });
+    }
 
     return updatedReview;
   }

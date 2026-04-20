@@ -7,6 +7,7 @@ import type { ApiResponse, PaginatedResponse } from '@/types/api';
 import type {
   AdminDashboardStats,
   AdminUserListItem,
+  AdminUserDetail,
   AdminUpdateUserPayload,
   AdminUploadMonitoringItem,
   AdminUploadMonitoringParams,
@@ -20,6 +21,7 @@ import type {
   AdminAnnotationPayload,
   AdminRetryNormalizeResponse,
   AdminTaskQcViewResponse,
+  AdminAuditLogItem,
   JsonValue,
 } from '@/types/admin';
 
@@ -55,6 +57,18 @@ export interface AdminReviewListParams {
   decision?: string;
 }
 
+export interface AdminAuditLogListParams {
+  page?: number;
+  limit?: number;
+  action?: string;
+  entityType?: string;
+  entityId?: string;
+  actorUserId?: string;
+  actorSearch?: string;
+  sortBy?: 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
 export const adminApi = {
   /**
    * Get dashboard statistics
@@ -75,6 +89,13 @@ export const adminApi = {
    */
   updateUser(userId: string, payload: AdminUpdateUserPayload) {
     return apiClient.patch<ApiResponse<AdminUserListItem>>(`/admin/users/${userId}`, payload);
+  },
+
+  /**
+   * Get a single user with detail (relation counts + recent activity)
+   */
+  getUserById(userId: string) {
+    return apiClient.get<ApiResponse<AdminUserDetail>>(`/admin/users/${userId}`);
   },
 
   /**
@@ -159,6 +180,13 @@ export const adminApi = {
   },
   normalizeAnnotation(payload: { taskId: string; normalizedJson: JsonValue }) {
      return apiClient.post<ApiResponse<AdminAnnotationNormalizedItem>>('/annotations/normalize', payload);
+  },
+
+  // ============================================================================
+  // Audit Logs (Admin Phase 3)
+  // ============================================================================
+  getAuditLogs(params: AdminAuditLogListParams = {}) {
+    return apiClient.get<PaginatedResponse<AdminAuditLogItem>>('/admin/audit-logs', { params });
   },
 };
 

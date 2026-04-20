@@ -44,6 +44,7 @@ const navSections: NavSection[] = [
       { label: 'Tasks', path: '/admin/tasks', icon: 'tasks' },
       { label: 'Reviews', path: '/admin/reviews', icon: 'reviews' },
       { label: 'Annotations', path: '/admin/annotations', icon: 'annotations' },
+      { label: 'Audit Logs', path: '/admin/audit-logs', icon: 'audit' },
     ],
   },
 ]
@@ -148,6 +149,12 @@ function handleLogout() {
                   v-else-if="item.icon === 'annotations'"
                   stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                />
+                <!-- Audit -->
+                <path
+                  v-else-if="item.icon === 'audit'"
+                  stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
                 />
               </svg>
             </span>

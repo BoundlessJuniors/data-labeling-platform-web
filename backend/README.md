@@ -61,6 +61,7 @@ backend/
 │   ├── services/          # Business Logic Layer
 │   │   ├── auth.service.ts
 │   │   ├── admin.service.ts
+│   │   ├── audit.service.ts       # Faz 3 — Denetim loglama servisi
 │   │   ├── dataset.service.ts
 │   │   ├── asset.service.ts
 │   │   ├── labelset.service.ts
@@ -149,12 +150,13 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
 | GET | `/dashboard` | İstatistik paneli verileri (20+ metrik) |
-| GET | `/users` | Tüm kullanıcıları listele |
-| GET | `/users/:id` | Kullanıcı detayı |
+| GET | `/users` | Tüm kullanıcıları listele (sayfahlı, filtrelenebilir) |
+| GET | `/users/:id` | Kullanıcı detayı (ilişki sayıları + son auditLog/proposal listesi) |
 | PATCH | `/users/:id` | Kullanıcı rolünü vs. güncelle |
 | DELETE | `/users/:id` | Kullanıcı sil |
 | GET | `/monitoring/uploads` | Asset / upload pipeline metriklerini ve statülerini al |
 | GET | `/monitoring/queues` | BullMQ kuyruk özetini ve son işleri al |
+| GET | `/audit-logs` | Denetim loglarını listele (`?action`, `?entityType`, `?entityId`, `?actorSearch`, sayfalama) |
 
 > **Faz 2 Mimari Yönelim:** Sözleşme (Contract), Görev (Task) veya Review incelemeleri için admin paneli, gereksiz route kopyalaması yapmak yerine varolan root endpoint'leri (`/contracts`, `/tasks`, `/reviews`) kullanır. Sistemin rol kontrolü, admin yetkisine göre global erişim sağlar. Sadece admin iş akışı için hayati bir yapı olan **Annotation Debug** endpointleri izole olarak `/api/v1/annotations` içerisinde tasarlanmıştır.
 
@@ -166,6 +168,14 @@ Admin paneli, Faz 1'deki monitoring odaklı yapıdan Faz 2 ile operasyonel kontr
 - **Tasks Operations:** Task listeleme, QC görünümü, accept/reject ve expired lease cleanup işlemleri `/api/v1/tasks` endpoint grubu üzerinden yürütülür.
 - **Reviews Monitoring:** Review kayıtları bağımsız bir domain olarak `/api/v1/reviews` üzerinden izlenir ve güncellenir.
 - **Annotation Debug:** Admin'e özel manuel raw/normalized müdahale ve task annotation okuma işlemleri `/api/v1/annotations` altında izole tutulur.
+
+#### Admin Faz 3 — Operational Hardening
+
+Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenliği bu fazda sağlamlaştırılmıştır.
+
+- **AuditService** (`services/audit.service.ts`): `logAction()` metodu; hem standalone hem de Prisma transaction context destekler. Tüm kritik admin mutasyonları —kullanıcı güncelleme/silme, sözleşme onaylama/reddetme/normalize retry, görev kabul/red/lease temizleme, annotation debug kaydetme— otomatik olarak `AuditLog` tablosuna yazılır.
+- **GET `/admin/audit-logs`**: Denetim loglarını sayfalama ve çoklu filtreleme (`action`, `entityType`, `entityId`, `actorSearch`) desteğiyle listeler.
+- **GET `/admin/users/:id` genişletmesi**: Kullanıcı detay endpoint'i artık ilişki sayılarını (datasets, contracts, taskLeases vb.), son 5 proposal özetini ve bu kullanıcıyı hedef alan son 5 audit log özetini döner.
 ### Dataset Routes (`/api/v1/datasets`)
 
 | Method | Endpoint | Açıklama |
@@ -324,7 +334,7 @@ Admin paneli, Faz 1'deki monitoring odaklı yapıdan Faz 2 ile operasyonel kontr
 - **EscrowLedger** - Para hareketi muhasebesi (hold, release_to_labeler, refund_to_client, platform_fee)
 
 ### System Models
-- **AuditLog** - Denetim logları
+- **AuditLog** - Denetim logları; `actorUserId`, `action`, `entityType`, `entityId`, `metaJson` (JSON diff/özet), `createdAt` alanları. Tüm kritik admin mutasyonları bu tabloya yazılır (Faz 3).
 - **Review** - QC review kayıtları (accept, reject)
 
 ## 🛡️ Middleware Pipeline

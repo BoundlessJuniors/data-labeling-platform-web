@@ -3,6 +3,7 @@ import prisma from '../lib/db';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/errors';
 import logger from '../lib/logger';
 import { assetQueue, normalizeQueue } from '../lib/queue';
+import { auditService } from './audit.service';
 
 export class AdminService {
   /**
@@ -88,8 +89,14 @@ export class AdminService {
             contractsAsLabeler: true,
             taskLeases: true,
             reviews: true,
+            proposals: true,
           },
         },
+        contractsAsClient: { take: 3, orderBy: { startedAt: 'desc' }, select: { id: true, status: true, agreedPriceTotal: true, startedAt: true } },
+        contractsAsLabeler: { take: 3, orderBy: { startedAt: 'desc' }, select: { id: true, status: true, agreedPriceTotal: true, startedAt: true } },
+        reviews: { take: 3, orderBy: { createdAt: 'desc' }, select: { id: true, decision: true, taskId: true, createdAt: true } },
+        proposals: { take: 3, orderBy: { createdAt: 'desc' }, select: { id: true, status: true, priceQuote: true, createdAt: true } },
+        auditLogs: { take: 3, orderBy: { createdAt: 'desc' }, select: { id: true, action: true, createdAt: true, entityType: true, entityId: true } },
       },
     });
 
@@ -149,6 +156,11 @@ export class AdminService {
       },
     });
 
+    await auditService.logAction(adminUserId, 'user.update', 'user', targetUserId, {
+      role: { before: existingUser.role, after: updatedUser.role },
+      displayName: { before: existingUser.displayName, after: updatedUser.displayName },
+    });
+
     logger.info(`User updated by admin: ${targetUserId}, new role: ${data.role || 'unchanged'}`);
 
     return updatedUser;
@@ -189,6 +201,11 @@ export class AdminService {
 
     await prisma.user.delete({
       where: { id: targetUserId },
+    });
+
+    await auditService.logAction(adminUserId, 'user.delete', 'user', targetUserId, {
+      role: existingUser.role,
+      email: existingUser.email,
     });
 
     logger.info(`User deleted by admin: ${targetUserId}`);

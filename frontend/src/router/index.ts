@@ -105,6 +105,12 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminAnnotationsPage.vue'),
           meta: { title: 'Annotation Debug' },
         },
+        {
+          path: 'audit-logs',
+          name: 'admin-audit-logs',
+          component: () => import('@/views/admin/AdminAuditLogsPage.vue'),
+          meta: { title: 'Audit Logs' },
+        },
       ],
     },
     // Client routes

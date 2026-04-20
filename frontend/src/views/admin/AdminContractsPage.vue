@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { adminApi, type AdminContractListParams } from '@/api/admin';
 import type { AdminContractListItem } from '@/types/admin';
 import { useToastStore } from '@/stores/toast';
@@ -9,8 +10,12 @@ import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BasePagination from '@/components/ui/BasePagination.vue';
 import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
 import BaseEmptyState from '@/components/ui/BaseEmptyState.vue';
+import BaseModal from '@/components/ui/BaseModal.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
 
 const toastStore = useToastStore();
+const route = useRoute();
+const router = useRouter();
 
 const contracts = ref<AdminContractListItem[]>([]);
 const isLoading = ref(true);
@@ -28,6 +33,13 @@ const statusOptions = [
   { value: 'revision_requested', label: 'Revision Requested' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
+
+// Modals
+const isConfirmModalOpen = ref(false);
+const confirmAction = ref<'approve' | 'retry' | 'revision' | null>(null);
+const activeContractId = ref<string>('');
+const revisionReason = ref<string>('');
+const modalLoading = ref(false);
 
 async function fetchContracts() {
   isLoading.value = true;
@@ -55,61 +67,82 @@ async function fetchContracts() {
   }
 }
 
+function updateQueryAndFetch() {
+  router.replace({
+    query: {
+      ...route.query,
+      page: currentPage.value > 1 ? currentPage.value : undefined,
+      status: statusFilter.value || undefined,
+    }
+  }).catch(() => {});
+  fetchContracts();
+}
+
 onMounted(() => {
+  if (route.query.page) currentPage.value = Number(route.query.page);
+  if (route.query.status) statusFilter.value = String(route.query.status);
   fetchContracts();
 });
 
-watch(statusFilter, () => {
-  if (currentPage.value !== 1) {
+watch(statusFilter, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
     currentPage.value = 1;
-  } else {
-    fetchContracts();
+    updateQueryAndFetch();
   }
 });
 
-watch(currentPage, () => {
-  fetchContracts();
+watch(currentPage, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    updateQueryAndFetch();
+  }
 });
 
-async function handleApprove(id: string) {
-  if (!window.confirm('Bu sözleşmeyi onaylamak istediğinize emin misiniz?')) return;
-  try {
-    await adminApi.approveContract(id);
-    toastStore.success('Sözleşme başarıyla onaylandı');
-    fetchContracts();
-  } catch (error: unknown) {
-    toastStore.error(getErrorMessage(error, 'Onaylama başarısız'));
-  }
+function promptApprove(id: string) {
+  activeContractId.value = id;
+  confirmAction.value = 'approve';
+  isConfirmModalOpen.value = true;
 }
 
-async function handleRevision(id: string) {
-  const reason = window.prompt('Revizyon talebi için bir açıklama girin:');
-  if (reason === null) return; // User cancelled
+function promptRevision(id: string) {
+  activeContractId.value = id;
+  revisionReason.value = '';
+  confirmAction.value = 'revision';
+  isConfirmModalOpen.value = true;
+}
+
+function promptRetryNormalize(id: string) {
+  activeContractId.value = id;
+  confirmAction.value = 'retry';
+  isConfirmModalOpen.value = true;
+}
+
+async function executeConfirmAction() {
+  if (!activeContractId.value || !confirmAction.value) return;
   
-  const trimmedReason = reason.trim();
-  if (trimmedReason === '') {
-    toastStore.warning('Revizyon açıklaması boş olamaz');
-    return;
-  }
-
+  modalLoading.value = true;
   try {
-    await adminApi.rejectContract(id, trimmedReason);
-    toastStore.success('Revizyon talebi gönderildi');
+    if (confirmAction.value === 'approve') {
+      await adminApi.approveContract(activeContractId.value);
+      toastStore.success('Sözleşme başarıyla onaylandı');
+    } else if (confirmAction.value === 'revision') {
+      const trimmedReason = revisionReason.value.trim();
+      if (trimmedReason === '') {
+        toastStore.warning('Revizyon açıklaması boş olamaz');
+        modalLoading.value = false;
+        return;
+      }
+      await adminApi.rejectContract(activeContractId.value, trimmedReason);
+      toastStore.success('Revizyon talebi gönderildi');
+    } else if (confirmAction.value === 'retry') {
+      await adminApi.retryNormalize(activeContractId.value);
+      toastStore.success('Normalize işlemi yeniden başlatıldı');
+    }
     fetchContracts();
+    isConfirmModalOpen.value = false;
   } catch (error: unknown) {
-    toastStore.error(getErrorMessage(error, 'Revizyon talebi başarısız'));
-  }
-}
-
-async function handleRetryNormalize(id: string) {
-  try {
-    await adminApi.retryNormalize(id);
-    toastStore.success('Normalize işlemi yeniden başlatıldı');
-    // We don't necessarily need to fetchContracts here unless the status changes immediately on backend
-    // but usually normalize is a background job.
-    fetchContracts(); 
-  } catch (error: unknown) {
-    toastStore.error(getErrorMessage(error, 'Normalize hatası'));
+    toastStore.error(getErrorMessage(error, 'İşlem başarısız'));
+  } finally {
+    modalLoading.value = false;
   }
 }
 
@@ -215,14 +248,14 @@ function truncateString(str: string, len: number = 10) {
                     <button
                       v-if="contract.status === 'submitted'"
                       class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                      @click="handleApprove(contract.id)"
+                      @click="promptApprove(contract.id)"
                     >
                       Approve
                     </button>
                     <button
                       v-if="contract.status === 'submitted'"
                       class="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
-                      @click="handleRevision(contract.id)"
+                      @click="promptRevision(contract.id)"
                     >
                       Revizyon İste
                     </button>
@@ -230,7 +263,7 @@ function truncateString(str: string, len: number = 10) {
                       v-if="contract.status === 'submitted' || contract.status === 'revision_requested' || contract.status === 'active'"
                       class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                       title="Normalize işlemini kuyruğa tekrar ekle"
-                      @click="handleRetryNormalize(contract.id)"
+                      @click="promptRetryNormalize(contract.id)"
                     >
                       Retry Normalize
                     </button>
@@ -260,5 +293,40 @@ function truncateString(str: string, len: number = 10) {
         />
       </div>
     </div>
+
+    <!-- Confirm Modal -->
+    <BaseModal
+      :open="isConfirmModalOpen"
+      :title="confirmAction === 'approve' ? 'Sözleşmeyi Onayla' : confirmAction === 'revision' ? 'Revizyon Talebi' : 'Normalize Yeniden Başlat'"
+      size="sm"
+      @close="isConfirmModalOpen = false"
+    >
+      <div class="space-y-4">
+        <p v-if="confirmAction === 'approve'" class="text-sm text-gray-600 dark:text-gray-300">
+          Bu sözleşmeyi onaylamak istediğinize emin misiniz? Müşteriye aktarım sağlanacaktır.
+        </p>
+        <p v-if="confirmAction === 'retry'" class="text-sm text-gray-600 dark:text-gray-300">
+          Bu sözleşmedeki taskları tekrar normalize kuyruğuna almak istediğinize emin misiniz?
+        </p>
+        <div v-if="confirmAction === 'revision'">
+          <BaseInput
+            id="revision-reason"
+            v-model="revisionReason"
+            label="Revizyon Sebebi"
+            placeholder="Neden revizyon isteniyor..."
+          />
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton variant="outline" @click="isConfirmModalOpen = false">İptal</BaseButton>
+        <BaseButton
+          :variant="confirmAction === 'approve' ? 'primary' : 'danger'"
+          :loading="modalLoading"
+          @click="executeConfirmAction"
+        >
+          Onayla
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>

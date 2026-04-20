@@ -164,7 +164,7 @@ export const releaseExpiredLeases = async (
       return next(new (await import('../utils/errors')).ForbiddenError('Only admin can release expired leases'));
     }
 
-    const result = await taskService.releaseExpiredLeases();
+    const result = await taskService.releaseExpiredLeases(req.user.id);
 
     res.json({
       success: true,

@@ -60,5 +60,11 @@ router.get(
   adminController.getQueueMonitoring
 );
 
+// GET /api/admin/audit-logs - Admin audit logs
+router.get(
+  '/audit-logs',
+  adminController.getAuditLogs
+);
+
 export default router;
 

@@ -10,6 +10,7 @@ import { extractBboxes } from '../utils/export/export.helpers';
 import { exportCoco } from '../utils/export/coco.export';
 import { exportYolo } from '../utils/export/yolo.export';
 import { exportVoc } from '../utils/export/voc.export';
+import { auditService } from './audit.service';
 /**
  * Service layer for contract lifecycle management.
  *
@@ -383,6 +384,12 @@ export class ContractService {
       data: { status: ListingStatus.completed },
     });
 
+    if (userRole === 'admin') {
+      await auditService.logAction(userId, 'contract.approve', 'contract', contractId, {
+        clientUserId: contract.clientUserId,
+      });
+    }
+
     logger.info(`Contract approved: ${contractId}`);
 
     return updatedContract;
@@ -462,6 +469,13 @@ export class ContractService {
       data: { status: ListingStatus.in_progress },
     });
 
+    if (userRole === 'admin') {
+      await auditService.logAction(userId, 'contract.reject', 'contract', contractId, {
+        reason: reason || null,
+        clientUserId: contract.clientUserId,
+      });
+    }
+
     return updatedContract;
   }
 
@@ -510,6 +524,12 @@ export class ContractService {
     });
 
     logger.info(`Contract cancelled: ${contractId}, reason: ${reason || 'No reason provided'}`);
+
+    if (userRole === 'admin') {
+      await auditService.logAction(userId, 'contract.cancel', 'contract', contractId, {
+        reason: reason || null,
+      });
+    }
 
     return updatedContract;
   }
@@ -641,6 +661,11 @@ export class ContractService {
     try {
       await addNormalizeJob(contractId, submission.id);
       logger.info(`Normalize retry enqueued for contract ${contractId}, submission ${submission.id}`);
+      
+      await auditService.logAction(userId, 'contract.normalize_retry', 'contract', contractId, {
+        submissionId: submission.id,
+      });
+      
     } catch (enqueueError: unknown) {
       const errorMessage = enqueueError instanceof Error ? enqueueError.message : 'Unknown enqueue error';
       await prisma.submission.update({

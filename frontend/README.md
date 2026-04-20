@@ -120,7 +120,8 @@ frontend/
 │   │   │   ├── AdminContractsPage.vue
 │   │   │   ├── AdminTasksPage.vue
 │   │   │   ├── AdminReviewsPage.vue
-│   │   │   └── AdminAnnotationsPage.vue
+│   │   │   ├── AdminAnnotationsPage.vue
+│   │   │   └── AdminAuditLogsPage.vue    # Faz 3 — Denetim log izleme
 │   │   │
 │   │   ├── client/            # Client sayfaları
 │   │   │   ├── DatasetsPage.vue
@@ -192,6 +193,7 @@ frontend/
 | `/admin/tasks` | Admin | Görev detayları ve lease kontrolü |
 | `/admin/reviews` | Admin | Revizyon kararlarının bağımsız izlenmesi |
 | `/admin/annotations` | Admin | Annotation debug ve manuel raw/normalize akışı |
+| `/admin/audit-logs` | Admin | Yönetimsel işlem denetim kayıtları (filtreli, sayfalı) |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
@@ -205,10 +207,11 @@ frontend/
 
 ### Admin Panel Gelişim Özeti
 
-Admin paneli iki aşamada geliştirilmiştir:
+Admin paneli üç aşamada geliştirilmiştir:
 
 - **Faz 1 (Monitoring):** Dashboard, kullanıcı yönetimi, upload monitoring ve queue monitoring ekranları eklenmiştir. Bu aşamada admin paneli sistem görünürlüğü kazanmıştır.
 - **Faz 2 (Operations):** Contracts, Tasks, Reviews ve Annotation Debug ekranları eklenmiştir. Böylece admin paneli yalnızca sistem izleyen bir alan olmaktan çıkıp, sözleşme, görev, kalite kontrol ve annotation debug süreçlerine müdahale edebilen operasyonel bir konsola dönüşmüştür.
+- **Faz 3 (Operational Hardening):** Admin paneli operasyonel güvenilirlik, denetlenebilirlik ve tip güvenliği açısından sertleştirilmiştir. Audit log sistemi, kullanıcı detay modal'ı, URL tabanlı durum senkronizasyonu, kontrollü onay iş akışları ve kapsamlı TypeScript düzeltmeleri bu fazda tamamlanmıştır.
 
 > **Mimari Not:** Admin sayfaları `AdminLayout` altında çalışır ve `AppLayout` ile karışmaz. Bu ayrım, admin panelini client/labeler akışlarından görsel ve mantıksal olarak izole eder.
 
@@ -392,6 +395,15 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Admin Faz 2**: Redundant backend api çağırmaları yerine tekil root endpoint'ler admin aksiyonlarında yeniden kullanıldı.
 - [x] **Admin Faz 2**: Annotation Debug ekranında Lease Token kısıtlamasına takılmadan sisteme manuel raw/normalized data stream edebilme özelliği ve görüntüleme mekanizması (QC View) eklendi.
 - [x] **Admin Faz 2**: Admin paneli için layout, routing ve ekran ayrımı netleştirilerek monitoring ve operasyon alanları tek panel altında düzenli biçimde toplandı.
+- [x] **Admin Faz 3**: Merkezi `AuditService` ile tüm kritik admin mutasyonları (`user.update/delete`, `contract.approve/reject/normalize_retry`, `task.accept/reject/release_leases`, `annotation.raw_debug_create`, `annotation.normalized_upsert`) denetim loglarına yazılmaya başlandı.
+- [x] **Admin Faz 3**: `AdminAuditLogsPage` eklendi — action, entityType, entityId, actorSearch filtre desteği; sayfalama; meta JSON inceleme modalı; URL query param senkronizasyonu.
+- [x] **Admin Faz 3**: `UsersPage` kullanıcı detay modalı `getUserById` API çağrısıyla `AdminUserDetail` tipiyle çalışır hale getirildi — auditLogs ve proposals type-safe olarak gösterilmektedir.
+- [x] **Admin Faz 3**: `AdminContractsPage`, `AdminTasksPage`, `AdminReviewsPage`, `AdminAnnotationsPage` sayfalarında URL query param senkronizasyonu eklendi (deep-link ve sayfa yenileme kalıcılığı).
+- [x] **Admin Faz 3**: Tüm yıkıcı admin aksiyonlarında `window.confirm/prompt` kaldırılarak `BaseModal` kontrollü onay iş akışlarına geçildi.
+- [x] **Admin Faz 3**: `AdminAnnotationsPage`'de `?taskId=` ile deep-link desteği eklendi.
+- [x] **Admin Faz 3**: `BaseModal` API standardizasyonu — tüm admin sayfalarında `v-model` kullanımı `open` + `@close` event API'sine dönüştürüldü.
+- [x] **Admin Faz 3**: `AdminUserDetail` ve ilişkili summary tipleri (`AdminUserAuditLogSummary`, `AdminUserProposalSummary` vb.) `types/admin.ts`'e eklendi; `AdminUserListItem` bozulmadan korundu.
+- [x] **Admin Faz 3**: `AdminAuditLogsPage`'de `AuditLogRow` view-model ile recursive `JsonValue` tipi template'ten izole edilerek "Type instantiation is excessively deep" hatası kalıcı olarak çözüldü.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
@@ -414,5 +426,6 @@ Frontend, backend API'ye şu endpoint'ler üzerinden bağlanır:
 | Contracts | `/api/v1/contracts` | Client & Labeler |
 | Tasks | `/api/v1/tasks` | Labeler görevleri |
 | Admin | `/api/v1/admin` | Admin sayfaları |
+| Admin (Audit) | `/api/v1/admin/audit-logs` | Audit Logs sayfası |
 
 Detaylı API dokümantasyonu için: [Backend README](../backend/README.md)
