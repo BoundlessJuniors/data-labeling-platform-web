@@ -156,6 +156,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/monitoring/uploads` | Asset / upload pipeline metriklerini ve statülerini al |
 | GET | `/monitoring/queues` | BullMQ kuyruk özetini ve son işleri al |
 
+> **Faz 2 Mimari Yönelim:** Sözleşme (Contract), Görev (Task) veya Review incelemeleri için admin paneli, gereksiz route kopyalaması yapmak yerine varolan root endpoint'leri (`/contracts`, `/tasks`, `/reviews`) kullanır. Sistemin rol kontrolü, admin yetkisine göre global erişim sağlar. Sadece admin iş akışı için hayati bir yapı olan **Annotation Debug** endpointleri izole olarak `/api/v1/annotations` içerisinde tasarlanmıştır.
+
 ### Dataset Routes (`/api/v1/datasets`)
 
 | Method | Endpoint | Açıklama |
@@ -261,14 +263,17 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 ### Annotation Routes (`/api/v1/annotations`) 🔒 Admin Only
 
+*(Faz 2 - Operasyonel Debug Modülü)*
+
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
 | POST | `/raw` | Ham annotation kaydet (debug/reprocess — admin only, leaseToken yok) |
 | POST | `/normalize` | Normalize annotation kaydet (debug — admin only, object veya array kabul eder) |
+| GET | `/task/:id` | Göreve (task) ait raw ve normalized dataları okuma (debug amaçlı) |
 
 > **İki Ayrı Annotation Akışı:**
-> - **Kanonik labeler akışı:** `POST /tasks/:id/submit` — leaseToken ile raw kayıt oluşturur → normalize pipeline'a dahil
-> - **Admin debug akışı:** `POST /annotations/raw` — leaseToken olmadan kayıt oluşturur → normalize worker tarafından yok sayılır (`lease_token IS NOT NULL` filtresi)
+> - **Kanonik labeler akışı:** `POST /tasks/:id/submit` — leaseToken ile raw kayıt oluşturur → normalize pipeline'a dahil edilir.
+> - **Admin debug akışı:** `POST /annotations/raw` — leaseToken olmadan kayıt oluşturur → normalize worker bu kayıtları işlemeye **almaz** (`lease_token IS NOT NULL` kısıtlaması nedeniyle). Bu sınır, admin test/onarım işlemlerinin asıl etiketleme döngüsünü etkilememesini garanti eder.
 
 ### Review Routes (`/api/v1/reviews`)
 

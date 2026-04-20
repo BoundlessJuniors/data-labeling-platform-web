@@ -81,6 +81,8 @@ frontend/
 │   │   └── index.ts           # Export barrel
 │   │
 │   ├── components/            # Reusable bileşenler
+│   │   ├── admin/             # Admin'e özel bileşenler
+│   │   │   └── AdminTaskQcModal.vue
 │   │   ├── ui/                # 8 UI bileşeni
 │   │   │   ├── BaseButton.vue
 │   │   │   ├── BaseInput.vue
@@ -114,7 +116,11 @@ frontend/
 │   │   │   ├── AdminDashboardPage.vue
 │   │   │   ├── UsersPage.vue
 │   │   │   ├── UploadMonitoringPage.vue
-│   │   │   └── QueueMonitoringPage.vue
+│   │   │   ├── QueueMonitoringPage.vue
+│   │   │   ├── AdminContractsPage.vue
+│   │   │   ├── AdminTasksPage.vue
+│   │   │   ├── AdminReviewsPage.vue
+│   │   │   └── AdminAnnotationsPage.vue
 │   │   │
 │   │   ├── client/            # Client sayfaları
 │   │   │   ├── DatasetsPage.vue
@@ -182,6 +188,10 @@ frontend/
 | `/admin/users` | Admin | Kullanıcı listesi & yönetim |
 | `/admin/monitoring/uploads` | Admin | Upload (Asset) Monitoring |
 | `/admin/monitoring/queues` | Admin | Queue (BullMQ) Monitoring |
+| `/admin/contracts` | Admin | Sözleşmelerin genel sağlık kontrolü |
+| `/admin/tasks` | Admin | Görev detayları ve lease kontrolü |
+| `/admin/reviews` | Admin | Revizyon kararlarının bağımsız izlenmesi |
+| `/admin/annotations` | Admin | Annotation debug ve manuel raw/normalize akışı |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
@@ -366,6 +376,10 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Admin Faz 1**: UsersPage revizesi - Tablodan DB/Şema'da olmayan `isActive` alanı kaldırıldı; API ve payload güncellendi
 - [x] **Admin Faz 1**: Upload Monitoring sayfası - sistemdeki assetlerin güncel pipeline durumlarını gösteren admin takip ekranı eklendi
 - [x] **Admin Faz 1**: Queue Monitoring sayfası - BullMQ kuyruk özetini, güncel logları ve otomatik yenileme (Auto 15s) desteğini barındıran kontrol paneli eklendi
+- [x] **Admin Faz 2**: Admin paneli izleme modundan operasyon moduna devredildi (Contracts, Tasks, Reviews, Annotations sayfaları).
+- [x] **Admin Faz 2**: Global typescript modellerinden kaynaklı sorunları aşmak için admine özel izole frontend tipleri yaratıldı (`AdminContractStatus`, vb).
+- [x] **Admin Faz 2**: Redundant backend api çağırmaları yerine tekil root endpoint'ler admin aksiyonlarında yeniden kullanıldı.
+- [x] **Admin Faz 2**: Annotation Debug ekranında Lease Token kısıtlamasına takılmadan sisteme manuel raw/normalized data stream edebilme özelliği ve görüntüleme mekanizması (QC View) eklendi.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

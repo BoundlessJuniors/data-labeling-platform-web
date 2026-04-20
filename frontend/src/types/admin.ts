@@ -1,7 +1,13 @@
 /**
  * Admin module types — aligned with backend response shapes
  */
+export type JsonPrimitive = string | number | boolean | null;
 
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 // ============================================================================
 // Dashboard
 // ============================================================================
@@ -125,4 +131,147 @@ export interface AdminQueueSummary {
 
 export interface AdminQueueMonitoringResponse {
   queues: AdminQueueSummary[];
+}
+
+// ============================================================================
+// Contracts (Admin Phase 2)
+// ============================================================================
+
+export type AdminContractStatus = 'active' | 'submitted' | 'approved' | 'revision_requested' | 'cancelled';
+
+export interface AdminContractListItem {
+  id: string;
+  listingId: string;
+  clientUserId: string;
+  labelerUserId: string;
+  status: AdminContractStatus;
+  agreedPriceTotal: string | number; // Prisma Decimal
+  currency: string;
+  startedAt: string;
+  completedAt: string | null;
+  revisionCount: number;
+  listing?: { id: string; title: string };
+  client?: { id: string; email: string; displayName: string | null };
+  labeler?: { id: string; email: string; displayName: string | null };
+  _count?: { tasks: number };
+  tasks?: { status: string }[];
+}
+
+// ============================================================================
+// Tasks (Admin Phase 2)
+// ============================================================================
+
+export type AdminTaskStatus = 'ready' | 'leased' | 'submitted' | 'accepted' | 'rejected';
+
+export interface AdminTaskQcViewResponse {
+  id: string;
+  status: AdminTaskStatus;
+  asset: {
+    id: string;
+    objectKey: string;
+    mimeType: string;
+    width: number | null;
+    height: number | null;
+  } | null;
+  imageUrl: string | null;
+  latestRaw: AdminAnnotationRawItem | null;
+  normalized: AdminAnnotationNormalizedItem | null;
+  normalizeReady: boolean;
+  labelSet: {
+    id: string;
+    name: string;
+    version: number;
+    labels: {
+      id: string;
+      name: string;
+      color: string | null;
+      attributesSchemaJson?: JsonValue | null;
+    }[];
+  } | null;
+}
+
+export interface AdminTaskListItem {
+  id: string;
+  contractId: string;
+  assetId: string;
+  status: AdminTaskStatus;
+  attemptCount: number;
+  annotationCount: number;
+  lastLeasedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  asset?: {
+    id: string;
+    objectKey: string;
+    mimeType: string;
+    width: number | null;
+    height: number | null;
+  };
+  contract?: { id: string; listingId: string };
+  taskLease?: { labelerUserId: string; leasedUntil: string } | null;
+}
+
+// ============================================================================
+// Reviews (Admin Phase 2)
+// ============================================================================
+
+export type AdminReviewDecision = 'accept' | 'reject';
+
+export interface AdminReviewItem {
+  id: string;
+  taskId: string;
+  reviewerUserId: string;
+  decision: AdminReviewDecision;
+  notes: string | null;
+  createdAt: string;
+  task?: { id: string; status: string; assetId: string };
+  reviewer?: { id: string; email: string; displayName: string | null };
+}
+
+// ============================================================================
+// Annotations (Admin Phase 2)
+// ============================================================================
+export type AdminAnnotationType =
+  | 'bbox'
+  | 'polygon'
+  | 'polyline'
+  | 'keypoint'
+  | 'circle'
+  | 'export';
+
+export interface AdminAnnotationPayload {
+  type: AdminAnnotationType;
+  data: JsonValue;
+}
+
+export interface AdminRetryNormalizeResponse {
+  submissionId: string;
+  status: 'processing';
+}
+
+export interface AdminAnnotationRawItem {
+  id: string;
+  taskId: string;
+  labelerUserId: string;
+  leaseToken: string | null;
+  payloadHash: string;
+  payloadJson: AdminAnnotationPayload;
+  createdAt: string;
+  labeler?: { id: string; email: string; displayName: string | null };
+}
+
+export interface AdminAnnotationNormalizedItem {
+  id: string;
+  taskId: string;
+  labelerUserId: string;
+  normalizedJson: JsonValue;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  labeler?: { id: string; email: string; displayName: string | null };
+}
+
+export interface AdminTaskAnnotationsResponse {
+  raw: AdminAnnotationRawItem[];
+  normalized: AdminAnnotationNormalizedItem | null;
 }

@@ -81,6 +81,30 @@ const router = createRouter({
           component: () => import('@/views/admin/QueueMonitoringPage.vue'),
           meta: { title: 'Queue Monitoring' },
         },
+        {
+          path: 'contracts',
+          name: 'admin-contracts',
+          component: () => import('@/views/admin/AdminContractsPage.vue'),
+          meta: { title: 'Contracts' },
+        },
+        {
+          path: 'tasks',
+          name: 'admin-tasks',
+          component: () => import('@/views/admin/AdminTasksPage.vue'),
+          meta: { title: 'Tasks' },
+        },
+        {
+          path: 'reviews',
+          name: 'admin-reviews',
+          component: () => import('@/views/admin/AdminReviewsPage.vue'),
+          meta: { title: 'Reviews' },
+        },
+        {
+          path: 'annotations',
+          name: 'admin-annotations',
+          component: () => import('@/views/admin/AdminAnnotationsPage.vue'),
+          meta: { title: 'Annotation Debug' },
+        },
       ],
     },
     // Client routes

@@ -53,5 +53,12 @@ router.post(
   annotationController.normalizeAnnotation
 );
 
+// GET /api/annotations/task/:id - Get annotations for a task (admin-only)
+router.get(
+  '/task/:id',
+  adminOnly,
+  annotationController.getTaskAnnotations
+);
+
 export default router;
 
