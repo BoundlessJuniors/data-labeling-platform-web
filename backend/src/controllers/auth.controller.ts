@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AuthService } from '../services/auth.service';
 import { UserRole } from '@prisma/client';
+import { JWT_EXPIRES_IN, parseExpirationToMs } from '../utils/auth.util';
 
 const authService = new AuthService();
 
@@ -10,7 +11,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxAge: parseExpirationToMs(JWT_EXPIRES_IN),
 };
 
 export const register = async (

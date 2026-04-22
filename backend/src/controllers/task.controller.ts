@@ -77,6 +77,7 @@ export const leaseTask = async (
       data: {
         ...result.task,
         leaseToken: result.leaseToken,
+        leasedUntil: result.task.taskLease?.leasedUntil || null,
       },
     });
   } catch (error) {
@@ -189,9 +190,16 @@ export const leaseTaskBatch = async (
 
     const result = await taskService.leaseTaskBatch(contractId, labelerId, labelerRole, count);
 
+    // Align batch response shape with top-level leaseToken and leasedUntil
+    const formattedData = result.map((task) => ({
+      ...task,
+      leaseToken: task.taskLease?.leaseToken || null,
+      leasedUntil: task.taskLease?.leasedUntil || null,
+    }));
+
     res.json({
       success: true,
-      data: result,
+      data: formattedData,
       count: result.length,
     });
   } catch (error) {

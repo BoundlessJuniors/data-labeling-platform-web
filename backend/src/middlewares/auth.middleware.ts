@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { UnauthorizedError } from '../utils/errors';
 import prisma from '../lib/db';
 import { UserRole } from '@prisma/client';
-
+import { JWT_EXPIRES_IN } from '../utils/auth.util';
 // Extended Express Request with user info
 export interface AuthRequest extends Request {
   user?: {
@@ -98,5 +98,5 @@ export const optionalAuth = async (
 };
 
 export const generateToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
 };

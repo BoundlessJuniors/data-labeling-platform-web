@@ -111,6 +111,7 @@ export class TaskService {
         },
         taskLease: true,
         annotationsRaw: {
+          where: { leaseToken: { not: null } },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
@@ -681,6 +682,7 @@ export class TaskService {
           },
         },
         annotationsRaw: {
+          where: { leaseToken: { not: null } },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },

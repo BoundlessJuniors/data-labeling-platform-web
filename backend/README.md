@@ -35,6 +35,12 @@ npm run dev
 
 **API:** `http://localhost:3000`
 
+## 📝 Son Güncellemeler (Patch Notes)
+
+- **Auth Session Uyumlaştırılması:** JWT token `expiresIn` süresi ile çerez `maxAge` süresi tek bir kaynaktan (`JWT_EXPIRES_IN`) yönetilerek senkronize edildi.
+- **QC Canonical Raw Düzeltmesi:** Read ve QC endpoint'lerinde (`getTaskQcView` ve `getTaskById`) dönen en güncel ham verinin admin debug kayıtları değil, kanonik kayıt (`leaseToken != null`) olması sağlandı.
+- **Lease Response Tutarlılığı:** `POST /tasks/lease-batch` ve `POST /tasks/:id/lease` endpoint'lerinin yanıt yapısı düzleştirilerek, istemciler için `leaseToken` ve `leasedUntil` alanları `task` objesinin root seviyesine çıkarıldı.
+
 ## 📁 Proje Yapısı
 
 ```
@@ -116,6 +122,7 @@ backend/
 │   │   │   ├── yolo.export.ts
 │   │   │   └── voc.export.ts
 │   │   ├── errors.ts      # Custom error classes
+│   │   ├── auth.util.ts       # Auth ve session ömrü helper'ları (YENİ)
 │   │   └── normalize.util.ts  # Normalize raw → normalized transform
 │   └── index.ts           # App entry point
 │
