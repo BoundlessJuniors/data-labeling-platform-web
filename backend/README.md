@@ -175,6 +175,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/monitoring/uploads` | Asset / upload pipeline metriklerini ve statülerini al |
 | GET | `/monitoring/queues` | BullMQ kuyruk özetini ve son işleri al |
 | GET | `/audit-logs` | Denetim loglarını listele (`?action`, `?entityType`, `?entityId`, `?actorSearch`, sayfalama) |
+| GET | `/payments/dashboard` | Platform ödeme istatistikleri ve escrow özetleri (Faz 10) |
+| GET | `/payments` | Ödeme kayıtlarını filtreli ve sayfalı olarak listele (Faz 10) |
 
 > **Faz 2 Mimari Yönelim:** Sözleşme (Contract), Görev (Task) veya Review incelemeleri için admin paneli, gereksiz route kopyalaması yapmak yerine varolan root endpoint'leri (`/contracts`, `/tasks`, `/reviews`) kullanır. Sistemin rol kontrolü, admin yetkisine göre global erişim sağlar. Sadece admin iş akışı için hayati bir yapı olan **Annotation Debug** endpointleri izole olarak `/api/v1/annotations` içerisinde tasarlanmıştır.
 
@@ -194,6 +196,11 @@ Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenli
 - **AuditService** (`services/audit.service.ts`): `logAction()` metodu; hem standalone hem de Prisma transaction context destekler. Tüm kritik admin mutasyonları —kullanıcı güncelleme/silme, sözleşme onaylama/reddetme/normalize retry, görev kabul/red/lease temizleme, annotation debug kaydetme— otomatik olarak `AuditLog` tablosuna yazılır.
 - **GET `/admin/audit-logs`**: Denetim loglarını sayfalama ve çoklu filtreleme (`action`, `entityType`, `entityId`, `actorSearch`) desteğiyle listeler.
 - **GET `/admin/users/:id` genişletmesi**: Kullanıcı detay endpoint'i artık ilişki sayılarını (datasets, contracts, taskLeases vb.), son 5 proposal özetini ve bu kullanıcıyı hedef alan son 5 audit log özetini döner.
+
+#### Admin Faz 10 — Payment Dashboard
+
+- **Platform Finansal Gözlem**: `/admin/payments/dashboard` endpoint'i eklenerek Prisma aggregate metodlarıyla aktif escrow, iade, kesinti ve başarıyla serbest bırakılmış fonların toplam bakiyelerinin raporlanması sağlandı.
+- **Ödeme Kayıtları**: `/admin/payments` endpoint'i eklenerek mock veya gerçek tüm ödeme hareketleri sisteme güvenli (UUID ve contains filtreleme opsiyonlarıyla) listelenebilir hale geldi. Hiçbir existing mock payment statü akışı bozulmadı.
 ### Dataset Routes (`/api/v1/datasets`)
 
 | Method | Endpoint | Açıklama |

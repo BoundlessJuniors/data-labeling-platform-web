@@ -381,6 +381,14 @@ export const updateUserSchema = Joi.object({
   'object.min': 'At least one field must be provided for update',
 });
 
+export const adminPaymentQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  status: Joi.string().valid('pending', 'paid', 'failed', 'expired', 'refunded', 'released').optional(),
+  provider: Joi.string().max(50).optional(),
+  search: Joi.string().max(255).optional().allow(''),
+});
+
 // ============================================================================
 // Proposal Schemas
 // ============================================================================

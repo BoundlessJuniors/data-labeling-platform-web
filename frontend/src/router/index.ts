@@ -106,6 +106,12 @@ const router = createRouter({
           meta: { title: 'Annotation Debug' },
         },
         {
+          path: 'payments',
+          name: 'admin-payments',
+          component: () => import('@/views/admin/AdminPaymentsPage.vue'),
+          meta: { title: 'Payments' },
+        },
+        {
           path: 'audit-logs',
           name: 'admin-audit-logs',
           component: () => import('@/views/admin/AdminAuditLogsPage.vue'),

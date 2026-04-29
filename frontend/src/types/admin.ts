@@ -358,3 +358,79 @@ export interface AdminAuditLogItem {
     role: string;
   };
 }
+
+// ============================================================================
+// Payments (Admin Payment Dashboard)
+// ============================================================================
+
+export type AdminPaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'refunded' | 'released';
+
+export interface AdminPaymentDashboardStats {
+  totalPayments: number;
+  pendingPayments: number;
+  paidPayments: number;
+  failedPayments: number;
+  expiredPayments: number;
+  refundedPayments: number;
+  releasedPayments: number;
+  totalPaidAmount: string | number;
+  totalEscrowHeld: string | number;
+  totalReleasedAmount: string | number;
+  totalPlatformFeeAmount: string | number;
+  totalRefundedAmount: string | number;
+}
+
+export interface AdminPaymentListItem {
+  id: string;
+  contractId: string;
+  payerUserId: string;
+  labelerUserId: string | null;
+  amount: string | number;
+  currency: string;
+  provider: string;
+  providerRef: string | null;
+  providerPaymentId: string | null;
+  providerConversationId: string | null;
+  providerTransactionId: string | null;
+  platformFeeAmount: string | number;
+  labelerEarningAmount: string | number;
+  checkoutUrl: string | null;
+  status: AdminPaymentStatus;
+  paymentExpiresAt: string | null;
+  paidAt: string | null;
+  failedAt: string | null;
+  releasedAt: string | null;
+  refundedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  payer?: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    role: string;
+  };
+  labeler?: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    role: string;
+  };
+  contract?: {
+    id: string;
+    status: string;
+    listingId: string;
+    listing?: {
+      id: string;
+      title: string;
+      status: string;
+    };
+  };
+}
+
+export interface AdminPaymentListParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  provider?: string;
+  search?: string;
+}

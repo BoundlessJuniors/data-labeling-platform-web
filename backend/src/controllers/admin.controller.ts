@@ -204,3 +204,52 @@ export const getAuditLogs = async (
   }
 };
 
+// Get payment dashboard statistics (admin only)
+export const getPaymentDashboardStats = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+
+    const stats = await adminService.getPaymentDashboardStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get paginated payments (admin only)
+export const getPayments = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    
+    const filters = {
+      status: req.query.status as string | undefined,
+      provider: req.query.provider as string | undefined,
+      search: req.query.search as string | undefined,
+    };
+
+    const result = await adminService.getPayments(page, limit, filters);
+
+    res.json({
+      success: true,
+      data: result.payments,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

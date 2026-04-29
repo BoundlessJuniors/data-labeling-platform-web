@@ -122,7 +122,8 @@ frontend/
 │   │   │   ├── AdminTasksPage.vue
 │   │   │   ├── AdminReviewsPage.vue
 │   │   │   ├── AdminAnnotationsPage.vue
-│   │   │   └── AdminAuditLogsPage.vue    # Faz 3 — Denetim log izleme
+│   │   │   ├── AdminAuditLogsPage.vue    # Faz 3 — Denetim log izleme
+│   │   │   └── AdminPaymentsPage.vue     # Admin Ödeme Dashboard (Faz 10)
 │   │   │
 │   │   ├── client/            # Client sayfaları
 │   │   │   ├── DatasetsPage.vue
@@ -198,6 +199,7 @@ frontend/
 | `/admin/reviews` | Admin | Revizyon kararlarının bağımsız izlenmesi |
 | `/admin/annotations` | Admin | Annotation debug ve manuel raw/normalize akışı |
 | `/admin/audit-logs` | Admin | Yönetimsel işlem denetim kayıtları (filtreli, sayfalı) |
+| `/admin/payments` | Admin | Admin ödeme dashboard ve işlemleri (Faz 10) |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
@@ -216,6 +218,7 @@ Admin paneli üç aşamada geliştirilmiştir:
 - **Faz 1 (Monitoring):** Dashboard, kullanıcı yönetimi, upload monitoring ve queue monitoring ekranları eklenmiştir. Bu aşamada admin paneli sistem görünürlüğü kazanmıştır.
 - **Faz 2 (Operations):** Contracts, Tasks, Reviews ve Annotation Debug ekranları eklenmiştir. Böylece admin paneli yalnızca sistem izleyen bir alan olmaktan çıkıp, sözleşme, görev, kalite kontrol ve annotation debug süreçlerine müdahale edebilen operasyonel bir konsola dönüşmüştür.
 - **Faz 3 (Operational Hardening):** Admin paneli operasyonel güvenilirlik, denetlenebilirlik ve tip güvenliği açısından sertleştirilmiştir. Audit log sistemi, kullanıcı detay modal'ı, URL tabanlı durum senkronizasyonu, kontrollü onay iş akışları ve kapsamlı TypeScript düzeltmeleri bu fazda tamamlanmıştır.
+- **Faz 10 (Payment Dashboard):** Admin paneline mock payment lifecycle'ı etkilemeyecek şekilde sadece read-only listeleme ve analiz imkanı sunan detaylı `AdminPaymentsPage` eklenmiştir. Escrow durumları, labeler kazançları, platform ücretleri gibi kırılımların takibi sağlanmıştır.
 
 > **Mimari Not:** Admin sayfaları `AdminLayout` altında çalışır ve `AppLayout` ile karışmaz. Bu ayrım, admin panelini client/labeler akışlarından görsel ve mantıksal olarak izole eder.
 
@@ -415,10 +418,11 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Faz 4 (Lifecycle Hardening)**: Regresyon testleri için manuel kontrol listesi (`docs/lifecycle-regression-checklist.md`) standartlaştırıldı.
 - [x] **UI İyileştirmeleri**: Koyu/Açık Tema (Dark/Light mode) geçişleri `useTheme.ts` composable ile sisteme kalıcı olarak entegre edildi. Tüm public, auth, client, labeler ve admin sayfaları masaüstü uygulaması renk paletine hizalandı.
 
+- [x] **Faz 10 (Payment Dashboard)**: Admin paneline mock payment lifecycle'ı değiştirmeyen read-only listeleme, analiz ve escrow raporlama dashboard'u eklendi. Backend tarafında yeni `getPayments` API'leri Prisma aggregation desteğiyle yazıldı.
+
 ### Geliştirme Bekleyen Özellikler 🔄
 
 - [ ] Real-time bildirimler
-- [ ] Payment dashboard
 
 ## 🤝 Backend API Bağlantısı
 

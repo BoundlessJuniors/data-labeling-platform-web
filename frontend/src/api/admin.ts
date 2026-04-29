@@ -23,6 +23,9 @@ import type {
   AdminTaskQcViewResponse,
   AdminAuditLogItem,
   JsonValue,
+  AdminPaymentDashboardStats,
+  AdminPaymentListItem,
+  AdminPaymentListParams,
 } from '@/types/admin';
 
 export interface AdminUserListParams {
@@ -187,6 +190,16 @@ export const adminApi = {
   // ============================================================================
   getAuditLogs(params: AdminAuditLogListParams = {}) {
     return apiClient.get<PaginatedResponse<AdminAuditLogItem>>('/admin/audit-logs', { params });
+  },
+
+  // ============================================================================
+  // Payments (Admin Phase 10)
+  // ============================================================================
+  getPaymentDashboardStats() {
+    return apiClient.get<ApiResponse<AdminPaymentDashboardStats>>('/admin/payments/dashboard');
+  },
+  getPayments(params: AdminPaymentListParams = {}) {
+    return apiClient.get<PaginatedResponse<AdminPaymentListItem>>('/admin/payments', { params });
   },
 };
 

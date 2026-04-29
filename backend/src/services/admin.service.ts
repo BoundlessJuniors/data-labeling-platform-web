@@ -1,4 +1,4 @@
-import { Prisma, UserRole, AssetStatus, ContractStatus, TaskStatus, SubmissionStatus, ListingStatus } from '@prisma/client';
+import { Prisma, UserRole, AssetStatus, ContractStatus, TaskStatus, SubmissionStatus, ListingStatus, PaymentStatus } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/errors';
 import logger from '../lib/logger';
@@ -444,5 +444,197 @@ export class AdminService {
     );
 
     return { queues: results };
+  }
+
+  // ========================================================================
+  // Payments
+  // ========================================================================
+
+  /**
+   * Get payment dashboard statistics.
+   */
+  async getPaymentDashboardStats() {
+    const [
+      totalPayments,
+      pendingPayments,
+      paidPayments,
+      failedPayments,
+      expiredPayments,
+      refundedPayments,
+      releasedPayments,
+    ] = await Promise.all([
+      prisma.payment.count(),
+      prisma.payment.count({ where: { status: 'pending' as PaymentStatus } }),
+      prisma.payment.count({ where: { status: 'paid' as PaymentStatus } }),
+      prisma.payment.count({ where: { status: 'failed' as PaymentStatus } }),
+      prisma.payment.count({ where: { status: 'expired' as PaymentStatus } }),
+      prisma.payment.count({ where: { status: 'refunded' as PaymentStatus } }),
+      prisma.payment.count({ where: { status: 'released' as PaymentStatus } }),
+    ]);
+
+    // Financial aggregates
+    // Note: Since Prisma doesn't natively sum Decimals well into a plain number in aggregate without raw query,
+    // we can either use aggregate with _sum or fetch them and sum them. _sum is better, but it returns Decimal.
+    // We will convert it to string safely.
+    const [
+      totalPaidAgg,
+      totalEscrowAgg,
+      totalReleasedAgg,
+      totalPlatformFeeAgg,
+      totalRefundedAgg,
+    ] = await Promise.all([
+      // totalPaidAmount: status in [paid, released, refunded]
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: { in: ['paid', 'released', 'refunded'] } },
+      }),
+      // totalEscrowHeld: status = paid
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: 'paid' as PaymentStatus },
+      }),
+      // totalReleasedAmount: status = released
+      prisma.payment.aggregate({
+        _sum: { labelerEarningAmount: true },
+        where: { status: 'released' as PaymentStatus },
+      }),
+      // totalPlatformFeeAmount: status = released
+      prisma.payment.aggregate({
+        _sum: { platformFeeAmount: true },
+        where: { status: 'released' as PaymentStatus },
+      }),
+      // totalRefundedAmount: status = refunded
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: 'refunded' as PaymentStatus },
+      }),
+    ]);
+
+    return {
+      totalPayments,
+      pendingPayments,
+      paidPayments,
+      failedPayments,
+      expiredPayments,
+      refundedPayments,
+      releasedPayments,
+      totalPaidAmount: totalPaidAgg._sum.amount?.toString() || '0',
+      totalEscrowHeld: totalEscrowAgg._sum.amount?.toString() || '0',
+      totalReleasedAmount: totalReleasedAgg._sum.labelerEarningAmount?.toString() || '0',
+      totalPlatformFeeAmount: totalPlatformFeeAgg._sum.platformFeeAmount?.toString() || '0',
+      totalRefundedAmount: totalRefundedAgg._sum.amount?.toString() || '0',
+    };
+  }
+
+  /**
+   * Get paginated payment records.
+   */
+  async getPayments(
+    page: number,
+    limit: number,
+    filters?: {
+      status?: string;
+      provider?: string;
+      search?: string;
+    }
+  ) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const skip = (safePage - 1) * safeLimit;
+
+    const where: Prisma.PaymentWhereInput = {};
+
+    if (filters?.status) {
+      where.status = filters.status as PaymentStatus;
+    }
+
+    if (filters?.provider) {
+      where.provider = filters.provider;
+    }
+
+    if (filters?.search && filters.search.trim()) {
+      const term = filters.search.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+
+      if (isUuid) {
+        where.OR = [
+          { id: term },
+          { contractId: term },
+          { contract: { id: term } },
+        ];
+      } else {
+        where.OR = [
+          { payer: { email: { contains: term, mode: 'insensitive' } } },
+          { payer: { displayName: { contains: term, mode: 'insensitive' } } },
+          { labeler: { email: { contains: term, mode: 'insensitive' } } },
+          { labeler: { displayName: { contains: term, mode: 'insensitive' } } },
+          { contract: { listing: { title: { contains: term, mode: 'insensitive' } } } },
+          { providerPaymentId: { contains: term, mode: 'insensitive' } },
+          { providerTransactionId: { contains: term, mode: 'insensitive' } },
+          { providerConversationId: { contains: term, mode: 'insensitive' } },
+          { providerRef: { contains: term, mode: 'insensitive' } },
+        ];
+      }
+    }
+
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        skip,
+        take: safeLimit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          contractId: true,
+          payerUserId: true,
+          labelerUserId: true,
+          amount: true,
+          currency: true,
+          provider: true,
+          providerRef: true,
+          providerPaymentId: true,
+          providerConversationId: true,
+          providerTransactionId: true,
+          platformFeeAmount: true,
+          labelerEarningAmount: true,
+          checkoutUrl: true,
+          status: true,
+          paymentExpiresAt: true,
+          paidAt: true,
+          failedAt: true,
+          releasedAt: true,
+          refundedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          payer: {
+            select: { id: true, email: true, displayName: true, role: true },
+          },
+          labeler: {
+            select: { id: true, email: true, displayName: true, role: true },
+          },
+          contract: {
+            select: {
+              id: true,
+              status: true,
+              listingId: true,
+              listing: {
+                select: { id: true, title: true, status: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.payment.count({ where }),
+    ]);
+
+    return {
+      payments,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      },
+    };
   }
 }

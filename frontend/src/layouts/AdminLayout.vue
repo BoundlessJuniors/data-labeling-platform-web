@@ -43,6 +43,7 @@ const navSections: NavSection[] = [
     title: 'Operations',
     items: [
       { label: 'Contracts', path: '/admin/contracts', icon: 'contracts' },
+      { label: 'Payments', path: '/admin/payments', icon: 'payments' },
       { label: 'Tasks', path: '/admin/tasks', icon: 'tasks' },
       { label: 'Reviews', path: '/admin/reviews', icon: 'reviews' },
       { label: 'Annotations', path: '/admin/annotations', icon: 'annotations' },
@@ -133,6 +134,12 @@ function handleLogout() {
                   v-else-if="item.icon === 'contracts'"
                   stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+                <!-- Payments -->
+                <path
+                  v-else-if="item.icon === 'payments'"
+                  stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                 />
                 <!-- Tasks -->
                 <path
