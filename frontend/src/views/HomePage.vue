@@ -17,7 +17,7 @@ useSeo({
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#0f172a] dark:to-[#0f172a]">
     <!-- Skip to content link for keyboard users -->
     <a
       href="#main-content"
@@ -27,7 +27,7 @@ useSeo({
     </a>
 
     <!-- Header -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm">
+    <header class="bg-white dark:bg-[#111827] shadow-sm dark:border-b dark:border-[#334155]">
       <nav
         class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between"
         aria-label="Ana navigasyon"
@@ -48,7 +48,7 @@ useSeo({
           <template v-else>
             <RouterLink
               to="/login"
-              class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium"
+              class="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white font-medium"
             >
               Giriş Yap
             </RouterLink>
@@ -69,7 +69,7 @@ useSeo({
             Veri Etiketleme
             <span class="text-primary-600 block">Platformu</span>
           </h1>
-          <p class="mt-6 text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <p class="mt-6 text-xl text-gray-600 dark:text-slate-300 max-w-2xl mx-auto">
             Görsel veri etiketleme projelerinizi kolayca yönetin.
             Dataset yükleyin, labeler'lara görev atayın ve kaliteli etiketli veri elde edin.
           </p>
@@ -99,7 +99,7 @@ useSeo({
               </svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Dataset Yönetimi</h3>
-            <p class="text-gray-600 dark:text-gray-400">
+            <p class="text-gray-600 dark:text-slate-400">
               Görsellerinizi kolayca yükleyin ve organize edin. Farklı formatları destekler.
             </p>
           </article>
@@ -112,7 +112,7 @@ useSeo({
               </svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Görev Yönetimi</h3>
-            <p class="text-gray-600 dark:text-gray-400">
+            <p class="text-gray-600 dark:text-slate-400">
               Etiketleme görevlerini oluşturun, dağıtın ve takip edin. Gerçek zamanlı ilerleme.
             </p>
           </article>
@@ -125,7 +125,7 @@ useSeo({
               </svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Kalite Kontrol</h3>
-            <p class="text-gray-600 dark:text-gray-400">
+            <p class="text-gray-600 dark:text-slate-400">
               Etiketleme kalitesini review sistemiyle kontrol edin. Onay ve red mekanizması.
             </p>
           </article>
@@ -138,7 +138,7 @@ useSeo({
               </svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Güvenli Ödeme</h3>
-            <p class="text-gray-600 dark:text-gray-400">
+            <p class="text-gray-600 dark:text-slate-400">
               Escrow sistemi ile güvenli ödeme. İş tamamlandığında labeler'a ödeme yapılır.
             </p>
           </article>
@@ -151,7 +151,7 @@ useSeo({
               </svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Labeler Ağı</h3>
-            <p class="text-gray-600 dark:text-gray-400">
+            <p class="text-gray-600 dark:text-slate-400">
               Yetenekli labeler'larla çalışın. Rating sistemiyle en iyi etiketleyicileri bulun.
             </p>
           </article>
@@ -164,7 +164,7 @@ useSeo({
               </svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Export</h3>
-            <p class="text-gray-600 dark:text-gray-400">
+            <p class="text-gray-600 dark:text-slate-400">
               Etiketli verileri COCO, YOLO ve diğer formatlarda dışa aktarın.
             </p>
           </article>
@@ -191,7 +191,7 @@ useSeo({
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-400 py-12">
+    <footer class="bg-gray-900 dark:bg-[#111827] dark:border-t dark:border-[#334155] text-gray-400 dark:text-slate-400 py-12">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col md:flex-row justify-between items-center">
           <div class="flex items-center space-x-2 mb-4 md:mb-0">

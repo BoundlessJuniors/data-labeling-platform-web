@@ -59,7 +59,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-primary-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4 py-12">
+  <div class="min-h-screen bg-gradient-to-br from-primary-50 to-gray-100 dark:from-[#0f172a] dark:to-[#0f172a] flex items-center justify-center px-4 py-12">
     <main class="max-w-md w-full">
       <!-- Logo -->
       <div class="text-center mb-8">
@@ -90,7 +90,7 @@ async function handleSubmit() {
         <!-- Form -->
         <form class="space-y-4" novalidate @submit.prevent="handleSubmit">
           <div>
-            <label for="register-displayName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="register-displayName" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Görünen Ad (Opsiyonel)
             </label>
             <input
@@ -104,7 +104,7 @@ async function handleSubmit() {
           </div>
 
           <div>
-            <label for="register-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="register-email" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               E-posta
             </label>
             <input
@@ -119,7 +119,7 @@ async function handleSubmit() {
           </div>
 
           <div>
-            <label for="register-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="register-password" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Şifre
             </label>
             <input
@@ -135,7 +135,7 @@ async function handleSubmit() {
           </div>
 
           <div>
-            <label for="register-confirmPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="register-confirmPassword" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Şifre Tekrar
             </label>
             <input
@@ -151,7 +151,7 @@ async function handleSubmit() {
 
           <!-- Role Selection -->
           <fieldset>
-            <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <legend class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
               Hesap Türü
             </legend>
             <div class="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Hesap türü seçimi">
@@ -159,8 +159,8 @@ async function handleSubmit() {
                 :class="[
                   'flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all',
                   role === 'client'
-                    ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500',
+                    ? 'border-primary-600 bg-primary-50 dark:bg-blue-500/10 text-primary-700 dark:text-primary-300'
+                    : 'border-gray-300 dark:border-[#334155] hover:border-gray-400 dark:hover:border-[#516585]',
                 ]"
               >
                 <input
@@ -175,15 +175,15 @@ async function handleSubmit() {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                   <span class="text-sm font-medium">Client</span>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">Veri etiketletmek istiyorum</p>
+                  <p class="text-xs text-gray-500 dark:text-slate-400">Veri etiketletmek istiyorum</p>
                 </div>
               </label>
               <label
                 :class="[
                   'flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all',
                   role === 'labeler'
-                    ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500',
+                    ? 'border-primary-600 bg-primary-50 dark:bg-blue-500/10 text-primary-700 dark:text-primary-300'
+                    : 'border-gray-300 dark:border-[#334155] hover:border-gray-400 dark:hover:border-[#516585]',
                 ]"
               >
                 <input
@@ -198,7 +198,7 @@ async function handleSubmit() {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
                   <span class="text-sm font-medium">Labeler</span>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">Veri etiketlemek istiyorum</p>
+                  <p class="text-xs text-gray-500 dark:text-slate-400">Veri etiketlemek istiyorum</p>
                 </div>
               </label>
             </div>
@@ -216,7 +216,7 @@ async function handleSubmit() {
         </form>
 
         <!-- Login Link -->
-        <p class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+        <p class="mt-6 text-center text-sm text-gray-600 dark:text-slate-400">
           Zaten hesabınız var mı?
           <RouterLink to="/login" class="text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium">
             Giriş Yap

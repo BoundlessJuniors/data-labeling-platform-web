@@ -20,7 +20,7 @@ function goToPage(page: number) {
 <template>
   <nav
     v-if="totalPages > 1"
-    class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6"
+    class="flex items-center justify-between border-t border-gray-200 dark:border-[#334155] px-4 py-3 sm:px-6"
     aria-label="Sayfalama"
   >
     <div class="hidden sm:block">
@@ -33,7 +33,7 @@ function goToPage(page: number) {
       <button
         type="button"
         :disabled="currentPage <= 1 || loading"
-        class="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        class="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#334155] bg-white dark:bg-[#111827] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#1f2937] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         @click="goToPage(currentPage - 1)"
       >
         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -45,7 +45,7 @@ function goToPage(page: number) {
       <button
         type="button"
         :disabled="currentPage >= totalPages || loading"
-        class="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        class="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#334155] bg-white dark:bg-[#111827] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#1f2937] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         @click="goToPage(currentPage + 1)"
       >
         Sonraki

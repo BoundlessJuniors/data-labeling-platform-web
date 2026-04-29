@@ -7,9 +7,9 @@ import { RouterLink } from 'vue-router';
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+  <div class="min-h-screen bg-gray-50 dark:bg-[#0f172a] flex flex-col">
     <!-- Header -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm">
+    <header class="bg-white dark:bg-[#111827] shadow-sm dark:border-b dark:border-[#334155]">
       <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
         <div class="flex justify-between h-16">
           <!-- Logo -->
@@ -26,7 +26,7 @@ import { RouterLink } from 'vue-router';
           <div class="flex items-center gap-4">
             <RouterLink
               to="/login"
-              class="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              class="text-gray-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
               Giriş Yap
             </RouterLink>
@@ -47,9 +47,9 @@ import { RouterLink } from 'vue-router';
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+    <footer class="bg-white dark:bg-[#111827] border-t border-gray-200 dark:border-[#334155]">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <p class="text-center text-sm text-gray-500 dark:text-gray-400">
+        <p class="text-center text-sm text-gray-500 dark:text-slate-400">
           © {{ new Date().getFullYear() }} DataLabel Platform. BoundlessJuniors.
         </p>
       </div>

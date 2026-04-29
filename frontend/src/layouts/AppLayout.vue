@@ -6,9 +6,11 @@
 import { computed } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useTheme } from '@/composables/useTheme';
 
 const authStore = useAuthStore();
 const route = useRoute();
+const { isDark, toggleTheme } = useTheme();
 
 interface NavItem {
   label: string;
@@ -57,14 +59,14 @@ function handleLogout() {
 </script>
 
 <template>
-  <div class="h-screen h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-900 p-4 md:p-6 flex gap-6 shrink-0">
+  <div class="h-screen h-[100dvh] overflow-hidden bg-gray-50 dark:bg-[#0f172a] p-4 md:p-6 flex gap-6 shrink-0">
     <!-- Sidebar -->
     <aside
-      class="w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-sm flex flex-col overflow-hidden shrink-0"
+      class="w-64 bg-white dark:bg-[#111827] rounded-2xl shadow-sm flex flex-col overflow-hidden shrink-0"
       aria-label="Sidebar navigation"
     >
       <!-- Logo -->
-      <div class="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-700">
+      <div class="h-16 flex items-center px-6 border-b border-gray-100 dark:border-[#334155]">
         <RouterLink
           to="/dashboard"
           class="text-xl font-bold text-primary-600 dark:text-primary-400"
@@ -83,7 +85,7 @@ function handleLogout() {
             'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors',
             isActive(item.to)
               ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700',
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#1f2937]',
           ]"
           :aria-current="isActive(item.to) ? 'page' : undefined"
         >
@@ -153,7 +155,7 @@ function handleLogout() {
       </nav>
 
       <!-- User section -->
-      <div class="px-4 py-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
+      <div class="px-4 py-4 border-t border-gray-100 dark:border-[#334155] bg-white dark:bg-[#111827] shrink-0">
         <div class="flex items-center gap-3">
           <div
             class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center shrink-0"
@@ -170,31 +172,48 @@ function handleLogout() {
               {{ authStore.user?.role }}
             </p>
           </div>
-          <button
-            type="button"
-            class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 shrink-0"
-            aria-label="Çıkış yap"
-            @click="handleLogout"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </button>
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#1f2937] transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              aria-label="Temayı değiştir"
+              @click="toggleTheme"
+            >
+              <!-- Sun Icon (for Dark Mode to switch to Light) -->
+              <svg v-if="isDark" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <!-- Moon Icon (for Light Mode to switch to Dark) -->
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#1f2937] transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              aria-label="Çıkış yap"
+              @click="handleLogout"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </aside>
 
     <!-- Main content -->
-    <div class="flex-1 flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden min-w-0">
+    <div class="flex-1 flex flex-col bg-white dark:bg-[#111827] rounded-2xl shadow-sm overflow-hidden min-w-0">
       <!-- Top bar -->
       <header 
         v-if="$slots.header" 
-        class="h-16 px-6 py-2 flex items-center border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 z-20 text-lg font-semibold text-gray-900 dark:text-white"
+        class="h-16 px-6 py-2 flex items-center border-b border-gray-100 dark:border-[#334155] bg-white dark:bg-[#111827] shrink-0 z-20 text-lg font-semibold text-gray-900 dark:text-white"
       >
         <div class="w-full">
           <slot name="header" />

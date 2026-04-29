@@ -154,6 +154,8 @@ frontend/
 │   │   └── qc.ts              # QC Preview types ve yardımcı fonksiyonlar (extractAnnotationShapes vb.)
 │   │
 │   ├── composables/           # Vue composables
+│   │   ├── useTheme.ts        # Dark/Light mode yönetimi
+│   │   └── useSeo.ts          # SEO ve meta yönetimi
 │   │
 │   ├── assets/                # Proje assets
 │   ├── App.vue                # Root component
@@ -411,12 +413,12 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Faz 4 (Lifecycle Hardening)**: İptal (Cancel) ve iade (Refund) suistimalini önlemek için `ContractsPage` UI üzerinde zorunlu neden belirterek iptal akışı (dispute mekanizması) eklendi.
 - [x] **Faz 4 (Lifecycle Hardening)**: Labeler UI güncellemeleri — `MyContractsPage` ve `TasksPage` üzerinde `pending_payment` durumu için bilgilendirme eklendi, ödemesi tamamlanmayan işlerde task işlemleri engellendi.
 - [x] **Faz 4 (Lifecycle Hardening)**: Regresyon testleri için manuel kontrol listesi (`docs/lifecycle-regression-checklist.md`) standartlaştırıldı.
+- [x] **UI İyileştirmeleri**: Koyu/Açık Tema (Dark/Light mode) geçişleri `useTheme.ts` composable ile sisteme kalıcı olarak entegre edildi. Tüm public, auth, client, labeler ve admin sayfaları masaüstü uygulaması renk paletine hizalandı.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
 - [ ] Real-time bildirimler
 - [ ] Payment dashboard
-- [ ] Dark mode desteği
 
 ## 🤝 Backend API Bağlantısı
 

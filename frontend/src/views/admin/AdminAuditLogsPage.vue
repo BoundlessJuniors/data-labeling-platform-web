@@ -197,7 +197,7 @@ watch(() => route.query, (newQ, oldQ) => {
     </div>
 
     <!-- Filters -->
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white dark:bg-[#111827] p-4 rounded-xl shadow-sm border border-slate-200 dark:border-[#334155] grid grid-cols-1 md:grid-cols-4 gap-4">
       <BaseSelect
         id="audit-action-filter"
         v-model="filters.action"
@@ -233,7 +233,7 @@ watch(() => route.query, (newQ, oldQ) => {
     </div>
 
     <!-- Table -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="bg-white dark:bg-[#111827] rounded-xl shadow-sm border border-slate-200 dark:border-[#334155] overflow-hidden">
       <div v-if="isLoading" class="p-8 flex justify-center">
         <div class="animate-spin text-blue-600">
           <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24">
@@ -245,43 +245,43 @@ watch(() => route.query, (newQ, oldQ) => {
       <BaseEmptyState
         v-else-if="logs.length === 0"
         title="No Logs Found"
-        message="No audit logs matched your search criteria."
+        description="No audit logs matched your search criteria."
       />
       <div v-else class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200">
-          <thead class="bg-slate-50">
+        <table class="min-w-full divide-y divide-slate-200 dark:divide-[#334155]">
+          <thead class="bg-slate-50 dark:bg-[#1f2937]">
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Action</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actor</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Target Entity</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Meta</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actor</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Target Entity</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Meta</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-slate-200">
-            <tr v-for="log in logs" :key="log.id" class="hover:bg-slate-50 transition-colors">
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+          <tbody class="bg-white dark:bg-[#111827] divide-y divide-slate-200 dark:divide-[#334155]">
+            <tr v-for="log in logs" :key="log.id" class="hover:bg-slate-50 dark:hover:bg-[#1f2937] transition-colors">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                 {{ formatDate(log.createdAt) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/10 dark:text-blue-300">
                   {{ log.action }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-slate-900">{{ log.actor?.displayName || 'Unknown' }}</div>
-                <div class="text-sm text-slate-500">{{ log.actor?.email }}</div>
-                <div class="text-xs text-slate-400 capitalize">{{ log.actor?.role }}</div>
+                <div class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ log.actor?.displayName || 'Unknown' }}</div>
+                <div class="text-sm text-slate-500 dark:text-slate-400">{{ log.actor?.email }}</div>
+                <div class="text-xs text-slate-400 dark:text-slate-500 capitalize">{{ log.actor?.role }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-slate-900">{{ log.entityType }}</div>
-                <div class="text-xs text-slate-500 font-mono">{{ log.entityId }}</div>
+                <div class="text-sm text-slate-900 dark:text-slate-100">{{ log.entityType }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ log.entityId }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm">
                 <BaseButton v-if="log.hasMeta" variant="outline" size="sm" @click="openMetaDetail(log.metaJson)">
                   View Data
                 </BaseButton>
-                <span v-else class="text-slate-400 italic">None</span>
+                <span v-else class="text-slate-400 dark:text-slate-500 italic">None</span>
               </td>
             </tr>
           </tbody>
@@ -289,7 +289,7 @@ watch(() => route.query, (newQ, oldQ) => {
       </div>
       
       <!-- Pagination -->
-      <div v-if="logs.length > 0 && totalPages > 1" class="px-6 py-4 border-t border-slate-200">
+      <div v-if="logs.length > 0 && totalPages > 1" class="px-6 py-4 border-t border-slate-200 dark:border-[#334155]">
         <BasePagination
           :current-page="filters.page"
           :total-pages="totalPages"

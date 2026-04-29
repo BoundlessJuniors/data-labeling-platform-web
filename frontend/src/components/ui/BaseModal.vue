@@ -112,7 +112,7 @@ onUnmounted(() => {
               ref="modalRef"
               tabindex="-1"
               :class="[
-                'relative bg-white dark:bg-gray-800 rounded-xl shadow-xl',
+                'relative bg-white dark:bg-[#111827] rounded-xl shadow-xl',
                 'focus:outline-none',
                 {
                   'w-full max-w-sm': size === 'sm',
@@ -126,7 +126,7 @@ onUnmounted(() => {
               <!-- Header -->
               <div
                 v-if="title || closable"
-                class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#334155]"
               >
                 <h2
                   v-if="title"
@@ -163,7 +163,7 @@ onUnmounted(() => {
               <!-- Footer -->
               <div
                 v-if="$slots.footer"
-                class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3"
+                class="px-6 py-4 border-t border-gray-200 dark:border-[#334155] flex justify-end gap-3"
               >
                 <slot name="footer" />
               </div>

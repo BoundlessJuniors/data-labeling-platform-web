@@ -56,10 +56,10 @@ function handleChange(event: Event) {
         :class="[
           'w-full px-4 py-2 pr-10 border rounded-lg appearance-none transition-colors duration-200',
           'focus:outline-none focus:ring-2 focus:ring-offset-0',
-          'disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800',
+          'disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-[#111827]',
           error
             ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-            : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white',
+            : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500 dark:border-[#334155] dark:bg-[#111827] dark:text-white',
         ]"
         @change="handleChange"
       >

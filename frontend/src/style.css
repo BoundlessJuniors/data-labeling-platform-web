@@ -38,11 +38,23 @@
 
   .dark {
     /* Dark mode overrides */
+    --ev-c-text-1: rgba(255, 255, 245, 0.86);
+    --ev-c-text-2: rgba(235, 235, 245, 0.6);
+    --ev-c-text-3: rgba(235, 235, 245, 0.38);
+
+    --ev-button-alt-bg: var(--ev-c-gray-3);
+    --ev-button-alt-hover-bg: var(--ev-c-gray-2);
+
+    --color-background: #0f172a;
+    --color-background-soft: #111827;
+    --color-background-mute: #1f2937;
+    --color-text: var(--ev-c-text-1);
+
     --color-surface: 17 24 39;
     --color-surface-elevated: 31 41 55;
-    --color-text-primary: 249 250 251;
+    --color-text-primary: 255 255 245;
     --color-text-secondary: 156 163 175;
-    --color-border: 55 65 81;
+    --color-border: 51 65 85;
   }
 
   /* Base element styles */
@@ -51,9 +63,9 @@
   }
 
   body {
-    @apply font-sans antialiased;
+    @apply font-sans antialiased transition-colors duration-300;
     @apply bg-gray-50 text-gray-900;
-    @apply dark:bg-gray-900 dark:text-gray-100;
+    @apply dark:bg-[#0f172a] dark:text-gray-100;
   }
 
   /* Focus visible for accessibility */
@@ -117,7 +129,7 @@
   /* Card styles */
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
-    @apply dark:bg-gray-800 dark:border-gray-700;
+    @apply dark:bg-[#111827] dark:border-[#334155];
   }
 
   .card-hover {
@@ -161,16 +173,16 @@
 
   .table th {
     @apply px-4 py-3 font-medium text-gray-500 uppercase tracking-wider;
-    @apply bg-gray-50 dark:bg-gray-800 dark:text-gray-400;
+    @apply bg-gray-50 dark:bg-[#1f2937] dark:text-slate-400;
   }
 
   .table td {
     @apply px-4 py-3 border-b border-gray-100;
-    @apply dark:border-gray-700;
+    @apply dark:border-[#334155];
   }
 
   .table tr:hover td {
-    @apply bg-gray-50 dark:bg-gray-800/50;
+    @apply bg-gray-50 dark:bg-[#1f2937];
   }
 
   /* Empty state */

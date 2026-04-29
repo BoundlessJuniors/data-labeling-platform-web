@@ -47,7 +47,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-primary-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
+  <div class="min-h-screen bg-gradient-to-br from-primary-50 to-gray-100 dark:from-[#0f172a] dark:to-[#0f172a] flex items-center justify-center px-4">
     <main class="max-w-md w-full">
       <!-- Logo -->
       <div class="text-center mb-8">
@@ -78,7 +78,7 @@ async function handleSubmit() {
         <!-- Form -->
         <form class="space-y-4" novalidate @submit.prevent="handleSubmit">
           <div>
-            <label for="login-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="login-email" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               E-posta
             </label>
             <input
@@ -93,7 +93,7 @@ async function handleSubmit() {
           </div>
 
           <div>
-            <label for="login-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="login-password" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Şifre
             </label>
             <input
@@ -120,7 +120,7 @@ async function handleSubmit() {
         </form>
 
         <!-- Register Link -->
-        <p class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+        <p class="mt-6 text-center text-sm text-gray-600 dark:text-slate-400">
           Hesabınız yok mu?
           <RouterLink to="/register" class="text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium">
             Kayıt Ol
