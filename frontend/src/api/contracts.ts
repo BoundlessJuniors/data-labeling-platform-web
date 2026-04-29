@@ -51,8 +51,8 @@ export const contractsApi = {
   /**
    * Cancel a contract
    */
-  cancel(id: string) {
-    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/cancel`);
+  cancel(id: string, reason?: string) {
+    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/cancel`, { reason });
   },
 
   /**
@@ -79,6 +79,16 @@ export const contractsApi = {
       params: { format },
       responseType: 'blob',
     });
+  },
+
+  /**
+   * Resolve a disputed contract (admin only)
+   */
+  resolveDispute(
+    id: string,
+    data: { decision: 'refund_client' | 'release_to_labeler'; reason: string }
+  ) {
+    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/resolve-dispute`, data);
   },
 };
 

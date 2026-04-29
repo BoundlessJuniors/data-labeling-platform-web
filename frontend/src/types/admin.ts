@@ -190,7 +190,17 @@ export interface AdminQueueMonitoringResponse {
 // Contracts (Admin Phase 2)
 // ============================================================================
 
-export type AdminContractStatus = 'active' | 'submitted' | 'approved' | 'revision_requested' | 'cancelled';
+export type AdminContractStatus =
+  | 'pending_payment'
+  | 'active'
+  | 'overdue'
+  | 'submitted'
+  | 'approved'
+  | 'revision_requested'
+  | 'disputed'
+  | 'refunded'
+  | 'cancelled';
+
 
 export interface AdminContractListItem {
   id: string;
@@ -200,7 +210,7 @@ export interface AdminContractListItem {
   status: AdminContractStatus;
   agreedPriceTotal: string | number; // Prisma Decimal
   currency: string;
-  startedAt: string;
+  startedAt: string | null;
   completedAt: string | null;
   revisionCount: number;
   listing?: { id: string; title: string };

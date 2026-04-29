@@ -6,10 +6,8 @@
 import { onMounted, computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useSeo } from '@/composables/useSeo';
-import { useToastStore } from '@/stores/toast';
 import { useTasksStore } from '@/stores/tasks';
 import type { Task } from '@/types/task';
-import apiClient from '@/api/client';
 import AppLayout from '@/layouts/AppLayout.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
@@ -23,7 +21,6 @@ useSeo({
 });
 
 const route = useRoute();
-const toastStore = useToastStore();
 const tasksStore = useTasksStore();
 
 // Filter by contract
@@ -49,16 +46,6 @@ watch(contractId, () => {
 function openDetail(task: Task) {
   selectedTask.value = task;
   showDetailModal.value = true;
-}
-
-async function startTask(taskId: string) {
-  try {
-    await apiClient.patch(`/tasks/${taskId}/start`);
-    toastStore.success('Görev başlatıldı');
-    fetchTasks();
-  } catch (_err) {
-    toastStore.error('Görev başlatılamadı');
-  }
 }
 
 /** Extract file name from asset objectKey or fallback */
@@ -216,13 +203,6 @@ function getStatusLabel(status: string) {
           <p class="text-gray-600 dark:text-gray-400 text-sm">
             Etiketleme işlemi için desktop uygulamasını kullanın.
           </p>
-        </div>
-
-        <!-- Action buttons -->
-        <div v-if="['assigned', 'pending'].includes(selectedTask.status)" class="flex justify-end">
-          <BaseButton variant="primary" @click="startTask(selectedTask.id)">
-            Göreve Başla
-          </BaseButton>
         </div>
       </div>
       <template #footer>

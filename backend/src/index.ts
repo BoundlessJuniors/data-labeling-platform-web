@@ -22,6 +22,8 @@ import redis from './lib/redis';
 import { ensureBucket } from './lib/storage';
 import { startAssetWorker } from './workers/asset.worker';
 import { startNormalizeWorker } from './workers/normalize.worker';
+import { startDeadlineWorker } from './workers/deadline.worker';
+import { addDeadlineScanJob } from './lib/queue';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,6 +79,8 @@ const startServer = async () => {
     // Start background workers
     startAssetWorker();
     startNormalizeWorker();
+    startDeadlineWorker();
+    await addDeadlineScanJob().catch(err => logger.warn('Failed to add deadline scan job:', err));
 
     // Ensure the storage bucket exists (creates it on MinIO if missing)
     await ensureBucket();

@@ -1,4 +1,4 @@
-import { ContractStatus, ListingStatus, Prisma, SubmissionStatus, TaskStatus } from '@prisma/client';
+import { ContractStatus, EscrowType, ListingStatus, PaymentStatus, Prisma, SubmissionStatus, TaskStatus } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
@@ -11,6 +11,24 @@ import { exportCoco } from '../utils/export/coco.export';
 import { exportYolo } from '../utils/export/yolo.export';
 import { exportVoc } from '../utils/export/voc.export';
 import { auditService } from './audit.service';
+
+// ── Local helpers ─────────────────────────────────────────────────────────────
+
+function addHours(date: Date, hours: number): Date {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function isPast(date: Date | null | undefined, now: Date): boolean {
+  return !!date && date <= now;
+}
+
+function decimalToNumber(value: unknown): number {
+  return Number(value);
+}
+
+function roundMoney(value: number): number {
+  return Number(value.toFixed(2));
+}
 /**
  * Service layer for contract lifecycle management.
  *
@@ -232,18 +250,51 @@ export class ContractService {
       throw new ForbiddenError('Only the labeler can submit this contract');
     }
 
-    // Can only submit active or revision_requested contracts
-    if (contract.status !== ContractStatus.active && contract.status !== ContractStatus.revision_requested) {
+    // Extended allowed statuses: active, overdue, revision_requested
+    const submittableStatuses: ContractStatus[] = [
+      ContractStatus.active,
+      ContractStatus.overdue,
+      ContractStatus.revision_requested,
+    ];
+    if (!submittableStatuses.includes(contract.status)) {
       throw new BadRequestError(`Cannot submit contract with status: ${contract.status}`);
+    }
+
+    // Payment must be paid before submission is allowed
+    const paidPayment = await prisma.payment.findFirst({
+      where: { contractId, status: PaymentStatus.paid },
+    });
+    if (!paidPayment) {
+      throw new BadRequestError('Contract cannot be submitted before payment is completed.');
+    }
+
+    const now = new Date();
+
+    // Overdue deadline check
+    if (contract.status === ContractStatus.overdue) {
+      if (!contract.autoCancelAt) {
+        throw new BadRequestError('Contract is overdue but autoCancelAt is missing.');
+      }
+      if (isPast(contract.autoCancelAt, now)) {
+        throw new BadRequestError('Contract auto-cancel deadline has passed. Submission is no longer allowed.');
+      }
+    }
+
+    // Revision deadline check
+    if (contract.status === ContractStatus.revision_requested) {
+      if (!contract.revisionDueAt) {
+        throw new BadRequestError('Contract is in revision but revisionDueAt is missing.');
+      }
+      if (isPast(contract.revisionDueAt, now)) {
+        throw new BadRequestError('Revision deadline has passed. Submission is no longer allowed.');
+      }
     }
 
     // Check if any tasks are still incomplete (ready, leased, or rejected)
     const incompleteTasks = await prisma.task.count({
       where: {
         contractId,
-        status: {
-          in: ['ready', 'leased', 'rejected'],
-        },
+        status: { in: ['ready', 'leased', 'rejected'] },
       },
     });
 
@@ -252,8 +303,6 @@ export class ContractService {
     }
 
     // Validate every task has at least 1 valid raw annotation.
-    // "Valid" = leaseToken IS NOT NULL (not admin debug) AND labelerUserId matches contract.
-    // This aligns with the normalize worker's lease_token IS NOT NULL filter.
     const tasksWithoutValidRaw = await prisma.task.findMany({
       where: {
         contractId,
@@ -274,11 +323,15 @@ export class ContractService {
       );
     }
 
-    // Update contract status to submitted
+    const reviewDueAt = addHours(now, contract.reviewWindowHours);
+
+    // Update contract status to submitted with SLA timestamps
     const updatedContract = await prisma.contract.update({
       where: { id: contractId },
       data: {
         status: ContractStatus.submitted,
+        submittedAt: now,
+        reviewDueAt,
       },
       include: {
         listing: { select: { id: true, title: true } },
@@ -336,28 +389,21 @@ export class ContractService {
 
   /**
    * Approve a contract (client approves labeler's work).
-   * Requires normalization to be completed first.
+   * Phase 4: Releases the escrowed payment to the labeler/platform.
    */
   async approveContract(contractId: string, userId: string, userRole: UserRole) {
-    const contract = await prisma.contract.findUnique({
-      where: { id: contractId },
-    });
+    const contract = await prisma.contract.findUnique({ where: { id: contractId } });
 
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
+    if (!contract) throw new NotFoundError('Contract');
 
-    // Only client or admin can approve
     if (userRole !== 'admin' && contract.clientUserId !== userId) {
       throw new ForbiddenError('Only the client can approve this contract');
     }
 
-    // Can only approve submitted contracts
     if (contract.status !== ContractStatus.submitted) {
       throw new BadRequestError(`Cannot approve contract with status: ${contract.status}`);
     }
 
-    // Gate: normalization must be completed
     const completedSubmission = await prisma.submission.findFirst({
       where: { contractId, format: 'CUSTOM_JSON', status: 'completed' },
     });
@@ -365,29 +411,94 @@ export class ContractService {
       throw new BadRequestError('Normalization is not completed yet. Cannot approve contract.');
     }
 
-    const updatedContract = await prisma.contract.update({
-      where: { id: contractId },
-      data: {
-        status: ContractStatus.approved,
-        completedAt: new Date(),
-      },
-      include: {
-        listing: { select: { id: true, title: true } },
-        client: { select: { id: true, email: true, displayName: true } },
-        labeler: { select: { id: true, email: true, displayName: true } },
-      },
+    const paidPayment = await prisma.payment.findFirst({
+      where: { contractId, status: PaymentStatus.paid },
+      orderBy: { paidAt: 'desc' },
+    });
+    if (!paidPayment) {
+      throw new BadRequestError('Cannot approve contract because no paid payment exists.');
+    }
+
+    const now = new Date();
+    const labelerAmount = roundMoney(decimalToNumber(paidPayment.labelerEarningAmount));
+    const platformAmount = roundMoney(decimalToNumber(paidPayment.platformFeeAmount));
+
+    const updatedContract = await prisma.$transaction(async (tx) => {
+      // Release payment
+      await tx.payment.update({
+        where: { id: paidPayment.id },
+        data: { status: PaymentStatus.released, releasedAt: now },
+      });
+
+      // Approve contract
+      const approved = await tx.contract.update({
+        where: { id: contractId },
+        data: {
+          status: ContractStatus.approved,
+          approvedAt: now,
+          completedAt: now,
+        },
+        include: {
+          listing: { select: { id: true, title: true } },
+          client: { select: { id: true, email: true, displayName: true } },
+          labeler: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+
+      // Complete listing
+      await tx.listing.update({
+        where: { id: contract.listingId },
+        data: { status: ListingStatus.completed },
+      });
+
+      const ledgerMeta = {
+        source: 'contract_approve',
+        paymentId: paidPayment.id,
+        provider: paidPayment.provider,
+        providerPaymentId: paidPayment.providerPaymentId,
+      };
+
+      // Labeler payout ledger entry
+      await tx.escrowLedger.create({
+        data: {
+          contractId,
+          paymentId: paidPayment.id,
+          type: EscrowType.release_to_labeler,
+          amount: labelerAmount,
+          currency: paidPayment.currency,
+          metaJson: ledgerMeta,
+        },
+      });
+
+      // Platform fee ledger entry
+      await tx.escrowLedger.create({
+        data: {
+          contractId,
+          paymentId: paidPayment.id,
+          type: EscrowType.platform_fee,
+          amount: platformAmount,
+          currency: paidPayment.currency,
+          metaJson: ledgerMeta,
+        },
+      });
+
+      return approved;
     });
 
-    // Update listing status to completed
-    await prisma.listing.update({
-      where: { id: contract.listingId },
-      data: { status: ListingStatus.completed },
-    });
+    logger.info(`Contract approved: ${contractId}, payment ${paidPayment.id} released`);
 
-    if (userRole === 'admin') {
+    try {
       await auditService.logAction(userId, 'contract.approve', 'contract', contractId, {
         clientUserId: contract.clientUserId,
+        paymentId: paidPayment.id,
       });
+      await auditService.logAction(userId, 'payment.released', 'payment', paidPayment.id, {
+        contractId,
+        labelerAmount,
+        platformAmount,
+      });
+    } catch (auditErr) {
+      logger.warn('Audit log failed for contract.approve', auditErr);
     }
 
     logger.info(`Contract approved: ${contractId}`);
@@ -396,30 +507,23 @@ export class ContractService {
   }
 
   /**
-   * Reject a contract (client rejects labeler's work → revision_requested).
-   * Requires normalization to be completed first.
-   * Resets all submitted/accepted task statuses to 'rejected' so labeler can re-lease.
+  /**
+   * Reject a contract (client rejects labeler's work).
+   * Phase 4: revision_requested or disputed when max revisions exceeded.
    */
   async rejectContract(contractId: string, userId: string, userRole: UserRole, reason?: string) {
-    const contract = await prisma.contract.findUnique({
-      where: { id: contractId },
-    });
+    const contract = await prisma.contract.findUnique({ where: { id: contractId } });
 
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
+    if (!contract) throw new NotFoundError('Contract');
 
-    // Only client or admin can reject
     if (userRole !== 'admin' && contract.clientUserId !== userId) {
       throw new ForbiddenError('Only the client can reject this contract');
     }
 
-    // Can only reject submitted contracts
     if (contract.status !== ContractStatus.submitted) {
       throw new BadRequestError(`Cannot reject contract with status: ${contract.status}`);
     }
 
-    // Gate: normalization must be completed
     const completedSubmission = await prisma.submission.findFirst({
       where: { contractId, format: 'CUSTOM_JSON', status: 'completed' },
     });
@@ -427,71 +531,114 @@ export class ContractService {
       throw new BadRequestError('Normalization is not completed yet. Cannot reject contract.');
     }
 
-    const updatedContract = await prisma.contract.update({
-      where: { id: contractId },
-      data: {
-        status: ContractStatus.revision_requested,
-        revisionReason: reason || null,
-        revisionRequestedAt: new Date(),
-        revisionCount: { increment: 1 },
-      },
-      include: {
-        listing: { select: { id: true, title: true } },
-        client: { select: { id: true, email: true, displayName: true } },
-        labeler: { select: { id: true, email: true, displayName: true } },
-      },
-    });
+    const now = new Date();
+    const nextRevisionCount = contract.revisionCount + 1;
 
-    // Reset task statuses so labeler can re-lease and re-work them.
-    // Submitted/accepted tasks → rejected (eligible for re-lease).
-    await prisma.task.updateMany({
-      where: {
-        contractId,
-        status: { in: [TaskStatus.submitted, TaskStatus.accepted] },
-      },
-      data: { status: TaskStatus.rejected },
-    });
+    // ── Dispute path: max revisions exceeded ─────────────────────────────
+    if (nextRevisionCount > contract.maxRevisionCount) {
+      const updatedContract = await prisma.$transaction(async (tx) => {
+        const disputed = await tx.contract.update({
+          where: { id: contractId },
+          data: {
+            status: ContractStatus.disputed,
+            disputedAt: now,
+            disputeReason: reason || 'Maximum revision count exceeded',
+            revisionReason: reason || null,
+            revisionRequestedAt: now,
+            revisionCount: nextRevisionCount,
+          },
+          include: {
+            listing: { select: { id: true, title: true } },
+            client: { select: { id: true, email: true, displayName: true } },
+            labeler: { select: { id: true, email: true, displayName: true } },
+          },
+        });
 
-    // Invalidate the old completed submission so a new normalize cycle can run
-    // after re-submission.
-    if (completedSubmission) {
-      await prisma.submission.update({
+        // Listing stays in_progress while disputed
+        await tx.listing.update({
+          where: { id: contract.listingId },
+          data: { status: ListingStatus.in_progress },
+        });
+
+        return disputed;
+      });
+
+      logger.info(`Contract disputed: ${contractId} (revision ${nextRevisionCount}/${contract.maxRevisionCount})`);
+
+      try {
+        await auditService.logAction(userId, 'contract.disputed', 'contract', contractId, {
+          reason: reason || null, revisionCount: nextRevisionCount,
+        });
+      } catch (auditErr) { logger.warn('Audit log failed for contract.disputed', auditErr); }
+
+      return updatedContract;
+    }
+
+    // ── Revision path ─────────────────────────────────────────────────────
+    const revisionDueAt = addHours(now, contract.revisionWindowHours);
+
+    const updatedContract = await prisma.$transaction(async (tx) => {
+      const revised = await tx.contract.update({
+        where: { id: contractId },
+        data: {
+          status: ContractStatus.revision_requested,
+          revisionReason: reason || null,
+          revisionRequestedAt: now,
+          revisionDueAt,
+          revisionCount: nextRevisionCount,
+        },
+        include: {
+          listing: { select: { id: true, title: true } },
+          client: { select: { id: true, email: true, displayName: true } },
+          labeler: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+
+      // Reset submitted/accepted tasks so labeler can re-lease
+      await tx.task.updateMany({
+        where: {
+          contractId,
+          status: { in: [TaskStatus.submitted, TaskStatus.accepted] },
+        },
+        data: { status: TaskStatus.rejected },
+      });
+
+      // Invalidate completed submission for new normalize cycle
+      await tx.submission.update({
         where: { id: completedSubmission.id },
         data: { status: SubmissionStatus.failed, errorMessage: 'Invalidated due to contract revision' },
       });
-    }
+
+      // Listing stays in_progress
+      await tx.listing.update({
+        where: { id: contract.listingId },
+        data: { status: ListingStatus.in_progress },
+      });
+
+      return revised;
+    });
 
     logger.info(`Contract revision requested: ${contractId}, reason: ${reason || 'No reason provided'}`);
 
-    // Ensure listing remains in_progress during revision cycle
-    await prisma.listing.update({
-      where: { id: contract.listingId },
-      data: { status: ListingStatus.in_progress },
-    });
-
-    if (userRole === 'admin') {
+    try {
       await auditService.logAction(userId, 'contract.reject', 'contract', contractId, {
-        reason: reason || null,
-        clientUserId: contract.clientUserId,
+        reason: reason || null, clientUserId: contract.clientUserId, revisionCount: nextRevisionCount,
       });
-    }
+    } catch (auditErr) { logger.warn('Audit log failed for contract.reject', auditErr); }
 
     return updatedContract;
   }
 
+
   /**
-   * Cancel a contract (client, labeler, or admin)
+   * Cancel a contract (client, labeler, or admin).
+   * Phase 4: refunds paid payment for active/overdue/revision_requested.
    */
   async cancelContract(contractId: string, userId: string, userRole: UserRole, reason?: string) {
-    const contract = await prisma.contract.findUnique({
-      where: { id: contractId },
-    });
+    const contract = await prisma.contract.findUnique({ where: { id: contractId } });
 
-    if (!contract) {
-      throw new NotFoundError('Contract');
-    }
+    if (!contract) throw new NotFoundError('Contract');
 
-    // Client, labeler, or admin can cancel
     if (
       userRole !== 'admin' &&
       contract.clientUserId !== userId &&
@@ -500,39 +647,220 @@ export class ContractService {
       throw new ForbiddenError('You do not have permission to cancel this contract');
     }
 
-    // Can only cancel active contracts
-    if (contract.status !== ContractStatus.active) {
+    const now = new Date();
+    const previousStatus = contract.status;
+
+    // ── Submitted: block direct cancel ────────────────────────────────────
+    if (contract.status === ContractStatus.submitted) {
+      throw new BadRequestError('Submitted contracts cannot be cancelled directly. Please approve, reject, or open a dispute.');
+    }
+
+    // ── Terminal statuses: already done ───────────────────────────────────
+    const terminalStatuses: ContractStatus[] = [
+      ContractStatus.approved,
+      ContractStatus.refunded,
+      ContractStatus.cancelled,
+      ContractStatus.disputed,
+    ];
+    if (terminalStatuses.includes(contract.status)) {
       throw new BadRequestError(`Cannot cancel contract with status: ${contract.status}`);
     }
 
-    const updatedContract = await prisma.contract.update({
-      where: { id: contractId },
-      data: {
-        status: ContractStatus.cancelled,
-      },
-      include: {
-        listing: { select: { id: true, title: true } },
-        client: { select: { id: true, email: true, displayName: true } },
-        labeler: { select: { id: true, email: true, displayName: true } },
-      },
-    });
+    // ── pending_payment: cancel without refund ────────────────────────────
+    if (contract.status === ContractStatus.pending_payment) {
+      const updatedContract = await prisma.$transaction(async (tx) => {
+        // Expire any pending payment so it cannot be used
+        const pendingPayment = await tx.payment.findFirst({
+          where: { contractId, status: PaymentStatus.pending },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (pendingPayment) {
+          await tx.payment.update({
+            where: { id: pendingPayment.id },
+            data: { status: PaymentStatus.expired },
+          });
+        }
 
-    // Reopen the listing
-    await prisma.listing.update({
-      where: { id: contract.listingId },
-      data: { status: ListingStatus.open },
-    });
+        // Cancel contract
+        const cancelled = await tx.contract.update({
+          where: { id: contractId },
+          data: { status: ContractStatus.cancelled, cancelledAt: now },
+          include: {
+            listing: { select: { id: true, title: true } },
+            client: { select: { id: true, email: true, displayName: true } },
+            labeler: { select: { id: true, email: true, displayName: true } },
+          },
+        });
 
-    logger.info(`Contract cancelled: ${contractId}, reason: ${reason || 'No reason provided'}`);
+        // Reopen listing
+        await tx.listing.update({
+          where: { id: contract.listingId },
+          data: { status: ListingStatus.open },
+        });
 
-    if (userRole === 'admin') {
-      await auditService.logAction(userId, 'contract.cancel', 'contract', contractId, {
-        reason: reason || null,
+        // Restore accepted proposal to pending (payment never succeeded)
+        if (contract.proposalId) {
+          const proposal = await tx.proposal.findUnique({ where: { id: contract.proposalId } });
+          if (proposal && proposal.status === 'accepted') {
+            await tx.proposal.update({
+              where: { id: contract.proposalId },
+              data: { status: 'pending' },
+            });
+          }
+        }
+
+        return cancelled;
       });
+
+      logger.info(`Contract ${contractId} cancelled (pending_payment path, no refund)`);
+
+      try {
+        await auditService.logAction(userId, 'contract.cancel', 'contract', contractId, {
+          reason: reason || null, previousStatus,
+        });
+      } catch (auditErr) { logger.warn('Audit log failed for contract.cancel (pending_payment)', auditErr); }
+
+      return updatedContract;
     }
 
-    return updatedContract;
+    // ── active / overdue / revision_requested: dispute or refund ──────────
+    const refundableStatuses: ContractStatus[] = [
+      ContractStatus.active,
+      ContractStatus.overdue,
+      ContractStatus.revision_requested,
+    ];
+    if (refundableStatuses.includes(contract.status)) {
+      const trimmedReason = reason?.trim();
+      if (!trimmedReason) {
+        throw new BadRequestError('Cancellation reason is required for paid contracts.');
+      }
+      if (userRole === 'client') {
+        // Phase 9: Client cannot get automatic refund. Move to disputed.
+        const updatedContract = await prisma.$transaction(async (tx) => {
+          const disputed = await tx.contract.update({
+            where: { id: contractId },
+            data: {
+              status: ContractStatus.disputed,
+              disputedAt: now,
+              disputeReason: trimmedReason,
+              // No cancelledAt, no refundedAt
+            },
+            include: {
+              listing: { select: { id: true, title: true } },
+              client: { select: { id: true, email: true, displayName: true } },
+              labeler: { select: { id: true, email: true, displayName: true } },
+            },
+          });
+          // Listing stays in_progress, payment stays paid, no ledger created
+          return disputed;
+        });
+
+        logger.info(`Contract ${contractId} disputed by client cancel (was ${previousStatus})`);
+        try {
+          await auditService.logAction(userId, 'contract.disputed', 'contract', contractId, {
+            reason: trimmedReason,
+            previousStatus,
+            initiatedBy: 'client',
+          });
+        } catch (auditErr) { logger.warn('Audit log failed for contract.disputed (client cancel)', auditErr); }
+
+        return updatedContract;
+      }
+
+      // Labeler or Admin: Proceed with refund
+      const paidPayment = await prisma.payment.findFirst({
+        where: { contractId, status: PaymentStatus.paid },
+        orderBy: { paidAt: 'desc' },
+      });
+
+      if (!paidPayment) {
+        throw new BadRequestError('Cannot refund contract because no paid payment exists.');
+      }
+
+      const updatedContract = await prisma.$transaction(async (tx) => {
+        // Refund payment
+        await tx.payment.update({
+          where: { id: paidPayment.id },
+          data: { status: PaymentStatus.refunded, refundedAt: now },
+        });
+
+        // Move contract to refunded
+        const refunded = await tx.contract.update({
+          where: { id: contractId },
+          data: {
+            status: ContractStatus.refunded,
+            refundedAt: now,
+            cancelledAt: now,
+          },
+          include: {
+            listing: { select: { id: true, title: true } },
+            client: { select: { id: true, email: true, displayName: true } },
+            labeler: { select: { id: true, email: true, displayName: true } },
+          },
+        });
+
+        // Reopen listing
+        await tx.listing.update({
+          where: { id: contract.listingId },
+          data: { status: ListingStatus.open },
+        });
+
+        // Update linked proposal status so the listing can be re-applied to
+        // Labeler-initiated → withdrawn; Admin-initiated → rejected
+        if (contract.proposalId) {
+          const proposal = await tx.proposal.findUnique({ where: { id: contract.proposalId } });
+          if (proposal && proposal.status === 'accepted') {
+            const nextProposalStatus = userRole === 'labeler' ? 'withdrawn' : 'rejected';
+            await tx.proposal.update({
+              where: { id: contract.proposalId },
+              data: { status: nextProposalStatus },
+            });
+          }
+        }
+
+        // EscrowLedger: refund_to_client
+        await tx.escrowLedger.create({
+          data: {
+            contractId,
+            paymentId: paidPayment.id,
+            type: EscrowType.refund_to_client,
+            amount: paidPayment.amount,
+            currency: paidPayment.currency,
+            metaJson: {
+              source: 'contract_cancel',
+              reason: trimmedReason,
+              previousContractStatus: previousStatus,
+              initiatedBy: userRole,
+            },
+          },
+        });
+
+        return refunded;
+      });
+
+      logger.info(`Contract ${contractId} refunded by ${userRole} (was ${previousStatus}), payment ${paidPayment.id} refunded`);
+
+      try {
+        await auditService.logAction(userId, 'contract.refunded', 'contract', contractId, {
+          reason: trimmedReason,
+          previousStatus,
+          paymentId: paidPayment.id,
+          initiatedBy: userRole,
+        });
+        await auditService.logAction(userId, 'payment.refunded', 'payment', paidPayment.id, {
+          contractId,
+          reason: trimmedReason,
+          initiatedBy: userRole,
+        });
+      } catch (auditErr) { logger.warn('Audit log failed for contract.refunded', auditErr); }
+
+      return updatedContract;
+    }
+
+    // Fallback (should not be reached)
+    throw new BadRequestError(`Cannot cancel contract with status: ${contract.status}`);
   }
+
 
   /**
    * Get a QC sample of tasks for a submitted contract.
@@ -764,5 +1092,217 @@ export class ContractService {
       default:
         throw new BadRequestError(`Unsupported export format: ${format}`);
     }
+  }
+
+  /**
+   * Resolve a disputed contract (admin only).
+   *
+   * decision: 'refund_client'
+   *   - payment → refunded, contract → refunded, listing → open
+   *   - linked proposal → rejected (admin-initiated)
+   *   - escrowLedger: refund_to_client
+   *   - audit: contract.dispute_refunded, payment.refunded
+   *
+   * decision: 'release_to_labeler'
+   *   - payment → released, contract → approved, listing → completed
+   *   - escrowLedger: release_to_labeler + platform_fee
+   *   - audit: contract.dispute_released, payment.released
+   */
+  async resolveDispute(
+    contractId: string,
+    adminUserId: string,
+    userRole: UserRole,
+    decision: 'refund_client' | 'release_to_labeler',
+    reason: string
+  ) {
+    if (userRole !== 'admin') {
+      throw new ForbiddenError('Only admin can resolve disputes');
+    }
+
+    const contract = await prisma.contract.findUnique({ where: { id: contractId } });
+    if (!contract) throw new NotFoundError('Contract');
+
+    if (contract.status !== ContractStatus.disputed) {
+      throw new BadRequestError(`Cannot resolve dispute for contract with status: ${contract.status}`);
+    }
+
+    const paidPayment = await prisma.payment.findFirst({
+      where: { contractId, status: PaymentStatus.paid },
+      orderBy: { paidAt: 'desc' },
+    });
+
+    if (!paidPayment) {
+      throw new BadRequestError('Cannot resolve dispute: no paid payment found for this contract.');
+    }
+
+    const now = new Date();
+    const labelerAmount = roundMoney(decimalToNumber(paidPayment.labelerEarningAmount));
+    const platformAmount = roundMoney(decimalToNumber(paidPayment.platformFeeAmount));
+
+    if (decision === 'refund_client') {
+      const updatedContract = await prisma.$transaction(async (tx) => {
+        // Refund payment
+        await tx.payment.update({
+          where: { id: paidPayment.id },
+          data: { status: PaymentStatus.refunded, refundedAt: now },
+        });
+
+        // Move contract to refunded
+        const resolved = await tx.contract.update({
+          where: { id: contractId },
+          data: {
+            status: ContractStatus.refunded,
+            refundedAt: now,
+            cancelledAt: now,
+            // disputeReason stays intact (original dispute reason preserved)
+          },
+          include: {
+            listing: { select: { id: true, title: true } },
+            client: { select: { id: true, email: true, displayName: true } },
+            labeler: { select: { id: true, email: true, displayName: true } },
+          },
+        });
+
+        // Reopen listing
+        await tx.listing.update({
+          where: { id: contract.listingId },
+          data: { status: ListingStatus.open },
+        });
+
+        // Linked proposal → rejected (admin-initiated, labeler may re-apply)
+        if (contract.proposalId) {
+          const proposal = await tx.proposal.findUnique({ where: { id: contract.proposalId } });
+          if (proposal && proposal.status === 'accepted') {
+            await tx.proposal.update({
+              where: { id: contract.proposalId },
+              data: { status: 'rejected' },
+            });
+          }
+        }
+
+        // EscrowLedger: refund_to_client
+        await tx.escrowLedger.create({
+          data: {
+            contractId,
+            paymentId: paidPayment.id,
+            type: EscrowType.refund_to_client,
+            amount: paidPayment.amount,
+            currency: paidPayment.currency,
+            metaJson: {
+              source: 'admin_dispute_resolution',
+              decision: 'refund_client',
+              reason,
+              previousContractStatus: 'disputed',
+            },
+          },
+        });
+
+        return resolved;
+      });
+
+      logger.info(`Dispute resolved (refund_client): contract ${contractId}, payment ${paidPayment.id} refunded by admin ${adminUserId}`);
+
+      try {
+        await auditService.logAction(adminUserId, 'contract.dispute_refunded', 'contract', contractId, {
+          decision: 'refund_client',
+          reason,
+          paymentId: paidPayment.id,
+        });
+        await auditService.logAction(adminUserId, 'payment.refunded', 'payment', paidPayment.id, {
+          contractId,
+          reason,
+          source: 'admin_dispute_resolution',
+        });
+      } catch (auditErr) { logger.warn('Audit log failed for contract.dispute_refunded', auditErr); }
+
+      return updatedContract;
+    }
+
+    // decision === 'release_to_labeler'
+    const updatedContract = await prisma.$transaction(async (tx) => {
+      // Release payment
+      await tx.payment.update({
+        where: { id: paidPayment.id },
+        data: { status: PaymentStatus.released, releasedAt: now },
+      });
+
+      // Approve contract
+      const resolved = await tx.contract.update({
+        where: { id: contractId },
+        data: {
+          status: ContractStatus.approved,
+          approvedAt: now,
+          completedAt: now,
+        },
+        include: {
+          listing: { select: { id: true, title: true } },
+          client: { select: { id: true, email: true, displayName: true } },
+          labeler: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+
+      // Complete listing
+      await tx.listing.update({
+        where: { id: contract.listingId },
+        data: { status: ListingStatus.completed },
+      });
+
+      // EscrowLedger: release_to_labeler
+      await tx.escrowLedger.create({
+        data: {
+          contractId,
+          paymentId: paidPayment.id,
+          type: EscrowType.release_to_labeler,
+          amount: labelerAmount,
+          currency: paidPayment.currency,
+          metaJson: {
+            source: 'admin_dispute_resolution',
+            decision: 'release_to_labeler',
+            reason,
+            previousContractStatus: 'disputed',
+          },
+        },
+      });
+
+      // EscrowLedger: platform_fee
+      await tx.escrowLedger.create({
+        data: {
+          contractId,
+          paymentId: paidPayment.id,
+          type: EscrowType.platform_fee,
+          amount: platformAmount,
+          currency: paidPayment.currency,
+          metaJson: {
+            source: 'admin_dispute_resolution',
+            decision: 'release_to_labeler',
+            reason,
+            previousContractStatus: 'disputed',
+          },
+        },
+      });
+
+      return resolved;
+    });
+
+    logger.info(`Dispute resolved (release_to_labeler): contract ${contractId}, payment ${paidPayment.id} released by admin ${adminUserId}`);
+
+    try {
+      await auditService.logAction(adminUserId, 'contract.dispute_released', 'contract', contractId, {
+        decision: 'release_to_labeler',
+        reason,
+        paymentId: paidPayment.id,
+        labelerAmount,
+        platformAmount,
+      });
+      await auditService.logAction(adminUserId, 'payment.released', 'payment', paidPayment.id, {
+        contractId,
+        reason,
+        source: 'admin_dispute_resolution',
+        labelerAmount,
+        platformAmount,
+      });
+    } catch (auditErr) { logger.warn('Audit log failed for contract.dispute_released', auditErr); }
+
+    return updatedContract;
   }
 }

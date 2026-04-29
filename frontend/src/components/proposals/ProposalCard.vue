@@ -103,6 +103,9 @@ function truncateText(text: string, maxLength: number) {
           <span class="font-bold text-green-600 dark:text-green-400">
             Teklif: {{ formatPrice(proposal.priceQuote, currency) }}
           </span>
+          <span class="text-blue-600 dark:text-blue-400 font-medium">
+            Teslim: {{ proposal.deliveryDays ?? 7 }} gün
+          </span>
           <span class="text-gray-500 dark:text-gray-400">
             {{ formatDate(proposal.createdAt) }}
           </span>
@@ -163,7 +166,7 @@ function truncateText(text: string, maxLength: number) {
             {{ proposal.labeler.displayName || 'İsimsiz Kullanıcı' }}
           </h4>
           <p class="text-xs text-gray-500 dark:text-gray-400">
-            {{ formatPrice(proposal.priceQuote, currency) }} · {{ formatDate(proposal.createdAt) }}
+            {{ formatPrice(proposal.priceQuote, currency) }} · Teslim: {{ proposal.deliveryDays ?? 7 }} gün · {{ formatDate(proposal.createdAt) }}
           </p>
         </div>
       </div>

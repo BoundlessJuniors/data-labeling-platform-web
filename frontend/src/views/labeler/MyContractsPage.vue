@@ -4,7 +4,8 @@
  */
 import { ref, onMounted, computed } from 'vue';
 import { useSeo } from '@/composables/useSeo';
-import apiClient from '@/api/client';
+import { contractsApi } from '@/api/contracts';
+import type { Contract, ContractStatus } from '@/types/contract';
 import AppLayout from '@/layouts/AppLayout.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseSkeleton from '@/components/ui/BaseSkeleton.vue';
@@ -23,11 +24,22 @@ interface MyContract {
   id: string;
   listingTitle: string;
   clientName: string;
-  status: string;
+  status: ContractStatus;
   assignedAssets: number;
   totalPayment: number;
   currency: string;
-  startedAt: string;
+  startedAt?: string | null;
+  dueAt?: string | null;
+  autoCancelAt?: string | null;
+  revisionDueAt?: string | null;
+  revisionReason?: string | null;
+  submittedAt?: string | null;
+  reviewDueAt?: string | null;
+  approvedAt?: string | null;
+  refundedAt?: string | null;
+  disputedAt?: string | null;
+  disputeReason?: string | null;
+  cancelledAt?: string | null;
 }
 
 // State
@@ -44,13 +56,14 @@ async function fetchContracts() {
   error.value = null;
 
   try {
-    const response = await apiClient.get('/contracts', {
-      params: { page: page.value, limit: limit.value },
+    const response = await contractsApi.list({
+      page: page.value,
+      limit: limit.value,
     });
 
-    // Map nested backend response to flat MyContract shape
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    contracts.value = (response.data.data as Record<string, any>[]).map((item) => ({
+    const data: Contract[] = response.data.data;
+
+    contracts.value = data.map((item) => ({
       id: item.id,
       listingTitle: item.listing?.title ?? '',
       clientName: item.client?.displayName ?? item.client?.email ?? '',
@@ -59,8 +72,20 @@ async function fetchContracts() {
       totalPayment: item.agreedPriceTotal ?? 0,
       currency: item.currency,
       startedAt: item.startedAt,
+      dueAt: item.dueAt,
+      autoCancelAt: item.autoCancelAt,
+      revisionDueAt: item.revisionDueAt,
+      revisionReason: item.revisionReason,
+      submittedAt: item.submittedAt,
+      reviewDueAt: item.reviewDueAt,
+      approvedAt: item.approvedAt,
+      refundedAt: item.refundedAt,
+      disputedAt: item.disputedAt,
+      disputeReason: item.disputeReason,
+      cancelledAt: item.cancelledAt,
     }));
-    total.value = response.data.pagination?.total ?? response.data.data.length;
+
+    total.value = response.data.pagination?.total ?? data.length;
   } catch (_err) {
     error.value = 'Sözleşmeler yüklenemedi';
   } finally {
@@ -83,26 +108,34 @@ function viewTasks(contractId: string) {
 
 function getStatusBadge(status: string) {
   const badges: Record<string, string> = {
+    pending_payment: 'badge-warning',
     active: 'badge-info',
+    overdue: 'badge-error',
     submitted: 'badge-warning',
-    approved: 'badge-success',
     revision_requested: 'badge-warning',
-    completed: 'badge-success',
+    approved: 'badge-success',
     cancelled: 'badge-error',
-    rejected: 'badge-error',
+    refunded: 'badge-error',
+    disputed: 'badge-error',
+    completed: 'badge-success', // legacy
+    rejected: 'badge-error',    // legacy
   };
   return badges[status] || 'badge-neutral';
 }
 
 function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
+    pending_payment: 'Ödeme Bekleniyor',
     active: 'Aktif',
-    submitted: 'Gönderildi',
+    overdue: 'Gecikmiş',
+    submitted: 'Teslim Edildi',
+    revision_requested: 'Revizyon İstendi',
     approved: 'Onaylandı',
-    revision_requested: 'Revizyon',
-    completed: 'Tamamlandı',
     cancelled: 'İptal Edildi',
-    rejected: 'Reddedildi',
+    refunded: 'İade Edildi',
+    disputed: 'İtirazda',
+    completed: 'Tamamlandı', // legacy
+    rejected: 'Reddedildi',  // legacy
   };
   return labels[status] || status;
 }
@@ -111,8 +144,15 @@ function formatPrice(amount: number, currency: string) {
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount);
 }
 
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('tr-TR');
+function formatDate(dateString?: string | null) {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 </script>
 
@@ -165,19 +205,63 @@ function formatDate(dateString: string) {
               <span :class="getStatusBadge(contract.status)">{{ getStatusLabel(contract.status) }}</span>
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400">
-              Müşteri: {{ contract.clientName }} • {{ formatDate(contract.startedAt) }}
+              Müşteri: {{ contract.clientName }}
+              <span v-if="contract.startedAt"> • Başlangıç: {{ formatDate(contract.startedAt) }}</span>
+              <span v-if="['active', 'overdue'].includes(contract.status) && contract.dueAt"> • Teslim Tarihi: {{ formatDate(contract.dueAt) }}</span>
+              <span v-if="contract.status === 'revision_requested' && contract.revisionDueAt"> • Revizyon Teslimi: {{ formatDate(contract.revisionDueAt) }}</span>
+              <span v-if="contract.status === 'submitted' && contract.submittedAt"> • Teslim: {{ formatDate(contract.submittedAt) }}</span>
+              <span v-if="contract.status === 'approved' && contract.approvedAt"> • Onay: {{ formatDate(contract.approvedAt) }}</span>
+              <span v-if="contract.status === 'refunded' && contract.refundedAt"> • İade: {{ formatDate(contract.refundedAt) }}</span>
+              <span v-if="contract.status === 'cancelled' && contract.cancelledAt"> • İptal: {{ formatDate(contract.cancelledAt) }}</span>
             </p>
             <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
               {{ contract.assignedAssets }} görev
             </p>
+            
+            <div v-if="contract.status === 'overdue' && contract.autoCancelAt" class="mt-2 text-xs text-red-500">
+              Teslim süresi geçmiş. {{ formatDate(contract.autoCancelAt) }} tarihinden önce teslim etmezseniz iptal edilecek.
+            </div>
+            <div v-if="contract.status === 'revision_requested' && contract.revisionReason" class="mt-2 text-xs text-yellow-600">
+              Revizyon nedeni: {{ contract.revisionReason }}
+            </div>
+            <div v-if="contract.status === 'disputed' && contract.disputeReason" class="mt-2 text-xs text-red-500">
+              İtiraz nedeni: {{ contract.disputeReason }}
+            </div>
           </div>
-          <div class="flex flex-col items-end gap-2">
+          <div class="flex flex-col items-end gap-2 text-right">
             <p class="text-lg font-bold text-gray-900 dark:text-white">
               {{ formatPrice(contract.totalPayment, contract.currency) }}
             </p>
-            <BaseButton variant="primary" size="sm" @click="viewTasks(contract.id)">
-              Görevlere Git
-            </BaseButton>
+            
+            <template v-if="contract.status === 'pending_payment'">
+              <p class="text-sm text-yellow-600 dark:text-yellow-400 max-w-xs">Müşteri ödemeyi tamamladıktan sonra işe başlayabilirsiniz.</p>
+            </template>
+            
+            <template v-else-if="contract.status === 'submitted'">
+              <p class="text-sm text-yellow-600 dark:text-yellow-400">Teslim edildi, müşteri incelemesi bekleniyor.</p>
+            </template>
+            
+            <template v-else-if="contract.status === 'approved' || contract.status === 'completed'">
+              <p class="text-sm text-green-600 dark:text-green-400">Onaylandı / tamamlandı.</p>
+            </template>
+            
+            <template v-else-if="contract.status === 'refunded'">
+              <p class="text-sm text-red-600 dark:text-red-400">İade edildi.</p>
+            </template>
+            
+            <template v-else-if="contract.status === 'disputed'">
+              <p class="text-sm text-red-600 dark:text-red-400">Admin incelemesi gerekiyor.</p>
+            </template>
+            
+            <template v-else-if="contract.status === 'cancelled' || contract.status === 'rejected'">
+              <p class="text-sm text-gray-500">İptal edildi.</p>
+            </template>
+
+            <template v-else>
+              <BaseButton variant="primary" size="sm" @click="viewTasks(contract.id)">
+                Görevlere Git
+              </BaseButton>
+            </template>
           </div>
         </div>
       </article>

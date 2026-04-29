@@ -55,3 +55,33 @@ export const addNormalizeJob = async (contractId: string, submissionId: string) 
     removeOnFail: 100,
   });
 };
+
+// ---------- Deadline Queue ----------
+
+export const deadlineQueue = new Queue('deadline-processing', {
+  connection: {
+    host: redisConfig.host,
+    port: redisConfig.port,
+    password: redisConfig.password,
+    db: redisConfig.db
+  },
+});
+
+deadlineQueue.on('error', (err) => {
+  logger.error('Deadline Queue Error:', err);
+});
+
+export const addDeadlineScanJob = async () => {
+  await deadlineQueue.add(
+    'scan-deadlines',
+    {},
+    {
+      jobId: 'deadline-scan',
+      repeat: {
+        every: Number(process.env.DEADLINE_SCAN_INTERVAL_MS || 60000),
+      },
+      removeOnComplete: true,
+      removeOnFail: 100,
+    }
+  );
+};

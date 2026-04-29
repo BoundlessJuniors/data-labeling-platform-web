@@ -50,14 +50,8 @@ export const useProposalsStore = defineStore('proposals', () => {
       if (index > -1) {
         proposals.value[index] = { ...proposals.value[index]!, status: 'accepted' as const };
       }
-      // Reject all other pending proposals locally
-      proposals.value = proposals.value.map((p) => {
-        if (p.id !== id && p.status === 'pending') {
-          return { ...p, status: 'rejected' as const };
-        }
-        return p;
-      });
-      toastStore.success('Teklif kabul edildi ve sözleşme oluşturuldu');
+      // Do NOT reject other pending proposals locally anymore, as they are kept pending until payment succeeds.
+      toastStore.success('Teklif kabul edildi. Sözleşme oluşturuldu ve ödeme bekleniyor.');
       return response.data.data;
     } catch (_err) {
       error.value = getErrorMessage(_err, 'Teklif kabul edilemedi');

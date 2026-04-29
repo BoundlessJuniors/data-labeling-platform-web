@@ -40,6 +40,9 @@ npm run dev
 - **Auth Session Uyumlaştırılması:** JWT token `expiresIn` süresi ile çerez `maxAge` süresi tek bir kaynaktan (`JWT_EXPIRES_IN`) yönetilerek senkronize edildi.
 - **QC Canonical Raw Düzeltmesi:** Read ve QC endpoint'lerinde (`getTaskQcView` ve `getTaskById`) dönen en güncel ham verinin admin debug kayıtları değil, kanonik kayıt (`leaseToken != null`) olması sağlandı.
 - **Lease Response Tutarlılığı:** `POST /tasks/lease-batch` ve `POST /tasks/:id/lease` endpoint'lerinin yanıt yapısı düzleştirilerek, istemciler için `leaseToken` ve `leasedUntil` alanları `task` objesinin root seviyesine çıkarıldı.
+- **Payment-Gated Lifecycle (Faz 4):** Sözleşmeler için ödeme bariyeri (`pending_payment` durumu) eklendi. Ödeme yapılmadan görevlere başlanması engellendi.
+- **Deadline Automation (Faz 4):** Süresi dolan ödemelerin iptali, geciken sözleşmelerin (`overdue`) yönetimi ve otomatik iade süreçleri için `deadline.worker.ts` ve BullMQ entegrasyonu sağlandı.
+- **Refund Abuse Hardening (Faz 4):** Müşterilerin devam eden işlerde haksız iade taleplerini engellemek için doğrudan iptal işlemi kısıtlandı, zorunlu iptal nedeni ve `disputed` (ihtilaflı) durumu zorunlu kılındı.
 
 ## 📁 Proje Yapısı
 
@@ -60,6 +63,7 @@ backend/
 │   │   ├── listing.controller.ts
 │   │   ├── contract.controller.ts
 │   │   ├── proposal.controller.ts
+│   │   ├── payment.controller.ts  # YENİ
 │   │   ├── task.controller.ts
 │   │   ├── annotation.controller.ts
 │   │   └── review.controller.ts
@@ -74,13 +78,19 @@ backend/
 │   │   ├── listing.service.ts
 │   │   ├── contract.service.ts
 │   │   ├── proposal.service.ts
+│   │   ├── payment.service.ts     # YENİ (Ödeme işlemleri)
+│   │   ├── deadline.service.ts    # YENİ (SLA ve süre yönetimi)
+│   │   ├── payments/              # YENİ (Ödeme sağlayıcıları)
+│   │   │   ├── mock-payment.provider.ts
+│   │   │   └── payment-provider.interface.ts
 │   │   ├── task.service.ts
 │   │   ├── annotation.service.ts
 │   │   └── review.service.ts
 │   │
 │   ├── workers/           # Background Workers
 │   │   ├── asset.worker.ts         # BullMQ worker for image processing
-│   │   └── normalize.worker.ts     # BullMQ worker for annotation normalization
+│   │   ├── normalize.worker.ts     # BullMQ worker for annotation normalization
+│   │   └── deadline.worker.ts      # YENİ (BullMQ worker for SLA deadlines)
 │   │
 │   ├── routes/            # Express route tanımları
 │   │   ├── index.ts       # Route aggregator
@@ -92,6 +102,7 @@ backend/
 │   │   ├── listing.routes.ts
 │   │   ├── contract.routes.ts
 │   │   ├── proposal.routes.ts  # YENİ
+│   │   ├── payment.routes.ts   # YENİ
 │   │   ├── task.routes.ts
 │   │   ├── annotation.routes.ts
 │   │   └── review.routes.ts
@@ -245,7 +256,17 @@ Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenli
 | PATCH | `/:id/reject` | Başvuruyu reddet |
 | PATCH | `/:id/withdraw` | Başvuruyu geri çek (labeler) |
 
-> **Mimari Not:** `acceptProposal` — sözleşme oluşturmanın tek kanonik yoludur. Transaction içinde: Proposal kabul → Contract oluştur → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `in_progress`'e güncelle
+> **Mimari Not:** `acceptProposal` — sözleşme oluşturmanın tek kanonik yoludur. Transaction içinde: Proposal kabul → Contract oluştur → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `in_progress`'e güncelle. Yeni sistemde Contract ilk olarak `pending_payment` statüsünde oluşur.
+
+### Payment Routes (`/api/v1/payments`)
+
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| POST | `/:contractId/intent` | Sözleşme için ödeme niyeti (intent) oluştur |
+| POST | `/:contractId/confirm` | Mock ödemeyi onayla ve sözleşmeyi `active` yap |
+
+> **Mimari Not:** Faz 4 ile sözleşmeler onaylandığında işleme başlayabilmek için ödemenin başarılı olması gerekir. Ödemesi tamamlanan sözleşmelerin statüsü `active`'e çekilir ve Labeler için çalışılabilir hale gelir.
+
 
 ### Contract Routes (`/api/v1/contracts`)
 
@@ -259,7 +280,7 @@ Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenli
 | PATCH | `/:id/submit` | Sözleşmeyi teslim et (labeler) → normalize job enqueue |
 | PATCH | `/:id/approve` | Sözleşmeyi onayla (client) — normalize completed gerektirir |
 | PATCH | `/:id/reject` | Sözleşmeyi revision_requested'a çevir (client) — task statülerini sıfırlar |
-| PATCH | `/:id/cancel` | Sözleşmeyi iptal et |
+| PATCH | `/:id/cancel` | Sözleşmeyi iptal et (client/admin). İhtilaflı (disputed) durumuna çekebilir. |
 | POST | `/:id/normalize-retry` | Normalize job'ı tekrar enqueue et (admin only) |
 
 > **Mimari Not:** Doğrudan `POST /contracts` endpoint'i yoktur. Contract oluşturma yalnızca `PATCH /proposals/:id/accept` ile gerçekleşir.
@@ -325,7 +346,7 @@ Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenli
 ### Marketplace Models
 - **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom), `qcMode` (none, client_approval, internal_reviewer)
 - **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 
-- **Contract** - İş sözleşmeleri (active, submitted, approved, revision_requested, cancelled) — `revisionReason`, `revisionRequestedAt`, `revisionCount` alanları ile revizyon takibi. Submit → async normalize → QC → approve/reject pipeline'ı
+- **Contract** - İş sözleşmeleri (pending_payment, active, submitted, approved, revision_requested, disputed, cancelled) — `revisionReason`, `revisionRequestedAt`, `revisionCount` alanları ile revizyon takibi. Ödeme sonrası aktif olma mekanizması.
 - **Submission** - Normalize pipeline tracking (pending, processing, completed, failed) — contract submit'te oluşturulur, normalize worker tarafından güncellenir
 
 ### Task Models

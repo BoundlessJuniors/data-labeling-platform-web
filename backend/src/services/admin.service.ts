@@ -2,7 +2,7 @@ import { Prisma, UserRole, AssetStatus, ContractStatus, TaskStatus, SubmissionSt
 import prisma from '../lib/db';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/errors';
 import logger from '../lib/logger';
-import { assetQueue, normalizeQueue } from '../lib/queue';
+import { assetQueue, normalizeQueue, deadlineQueue } from '../lib/queue';
 import { auditService } from './audit.service';
 
 export class AdminService {
@@ -399,6 +399,7 @@ export class AdminService {
     const queues = [
       { name: 'asset-processing', queue: assetQueue },
       { name: 'normalize-processing', queue: normalizeQueue },
+      { name: 'deadline-processing', queue: deadlineQueue },
     ];
 
     const results = await Promise.all(

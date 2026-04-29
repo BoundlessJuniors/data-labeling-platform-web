@@ -1,4 +1,4 @@
-import { TaskStatus, ContractStatus, Prisma } from '@prisma/client';
+import { TaskStatus, ContractStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
@@ -7,6 +7,79 @@ import crypto from 'crypto';
 import { getSignedUrl } from '../lib/storage';
 import stableStringify from 'fast-json-stable-stringify';
 import { auditService } from './audit.service';
+
+// ---------------------------------------------------------------------------
+// Phase 5 — contract workability helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true for the three statuses in which a labeler may work on tasks.
+ */
+function isContractWorkableStatus(status: ContractStatus): boolean {
+  return (
+    status === ContractStatus.active ||
+    status === ContractStatus.overdue ||
+    status === ContractStatus.revision_requested
+  );
+}
+
+/**
+ * Returns true when `date` is defined and is in the past relative to `now`.
+ */
+function isPast(date: Date | null | undefined, now: Date): boolean {
+  return !!date && date <= now;
+}
+
+/**
+ * Throws a BadRequestError if the contract is not in a workable state
+ * or if a relevant deadline (autoCancelAt / revisionDueAt) has passed.
+ *
+ * @param contract - Minimal contract fields needed for the check.
+ * @param context  - 'lease' | 'submit' (used in error messages).
+ */
+function assertContractWorkable(
+  contract: {
+    id: string;
+    status: ContractStatus;
+    autoCancelAt?: Date | null;
+    revisionDueAt?: Date | null;
+  },
+  context: 'lease' | 'submit'
+): void {
+  const now = new Date();
+
+  if (!isContractWorkableStatus(contract.status)) {
+    throw new BadRequestError(
+      `Cannot ${context} task because contract status is ${contract.status}`
+    );
+  }
+
+  if (contract.status === ContractStatus.overdue) {
+    if (!contract.autoCancelAt) {
+      throw new BadRequestError(
+        `Cannot ${context} task because contract is overdue but autoCancelAt is missing`
+      );
+    }
+    if (isPast(contract.autoCancelAt, now)) {
+      throw new BadRequestError(
+        `Cannot ${context} task because contract auto-cancel deadline has passed`
+      );
+    }
+  }
+
+  if (contract.status === ContractStatus.revision_requested) {
+    if (!contract.revisionDueAt) {
+      throw new BadRequestError(
+        `Cannot ${context} task because revision deadline is missing`
+      );
+    }
+    if (isPast(contract.revisionDueAt, now)) {
+      throw new BadRequestError(
+        `Cannot ${context} task because revision deadline has passed`
+      );
+    }
+  }
+}
 
 /**
  * Service for task lifecycle: leasing, submission, QC, and batch operations.
@@ -153,6 +226,26 @@ export class TaskService {
    *   taskLease has a unique constraint on taskId. If two concurrent requests
    *   try to create a lease, one will get P2002. The loser receives ConflictError.
   */
+  // -------------------------------------------------------------------------
+  // Private payment guard helpers
+  // -------------------------------------------------------------------------
+
+  /**
+   * Throws if no paid Payment exists for the given contract.
+   * Use this outside transactions.
+   */
+  private async assertContractHasPaidPayment(contractId: string): Promise<void> {
+    const paidPayment = await prisma.payment.findFirst({
+      where: { contractId, status: PaymentStatus.paid },
+      select: { id: true },
+    });
+    if (!paidPayment) {
+      throw new BadRequestError(
+        'Cannot work on tasks before contract payment is completed.'
+      );
+    }
+  }
+
   async leaseTask(taskId: string, labelerId: string, labelerRole: UserRole, leaseDurationMinutes: number = 30) {
     const result = await prisma.$transaction(async (tx) => {
       const task = await tx.task.findUnique({
@@ -171,6 +264,20 @@ export class TaskService {
       if (labelerRole !== 'admin' && task.contract.labelerUserId !== labelerId) {
         throw new ForbiddenError('You are not the labeler for this contract');
       }
+
+      // --- Phase 5: contract lifecycle + payment guard ---
+      assertContractWorkable(task.contract, 'lease');
+
+      const paidPaymentCheck = await tx.payment.findFirst({
+        where: { contractId: task.contractId, status: PaymentStatus.paid },
+        select: { id: true },
+      });
+      if (!paidPaymentCheck) {
+        throw new BadRequestError(
+          'Cannot lease task before contract payment is completed.'
+        );
+      }
+      // --- End Phase 5 guard ---
 
       const now = new Date();
       const leaseToken = crypto.randomUUID();
@@ -309,12 +416,23 @@ export class TaskService {
       throw new ForbiddenError('You are not the labeler for this contract');
     }
 
+    // --- Phase 5: terminal contract fast-fail + guarded idempotent shortcut ---
+    const terminalStatuses: ContractStatus[] = [
+      ContractStatus.cancelled,
+      ContractStatus.refunded,
+      ContractStatus.disputed,
+      ContractStatus.approved,
+    ];
+    const contractIsTerminal = terminalStatuses.includes(preCheck.contract.status);
+
     // Idempotent shortcut: if already submitted/accepted with same hash, return directly
     if (preCheck.status === TaskStatus.submitted || preCheck.status === TaskStatus.accepted) {
       const existingRaw = await prisma.annotationRaw.findFirst({
         where: { taskId, payloadHash },
       });
       if (existingRaw) {
+        // Allow retry even if contract is in a terminal/submitted state — the
+        // work was already recorded before the state changed.
         logger.info(`Idempotent submit for task ${taskId} (already ${preCheck.status}, same hash)`);
         const currentTask = await prisma.task.findUnique({
           where: { id: taskId },
@@ -324,17 +442,43 @@ export class TaskService {
       }
     }
 
+    // Hard block for terminal contracts (no idempotent shortcut matched)
+    if (contractIsTerminal) {
+      throw new BadRequestError(
+        `Cannot submit task because contract status is ${preCheck.contract.status}`
+      );
+    }
+
+    // Enforce workability for all other cases
+    assertContractWorkable(preCheck.contract, 'submit');
+    await this.assertContractHasPaidPayment(preCheck.contractId);
+    // --- End Phase 5 guard ---
+
     // --- Atomic transaction: raw insert + task update + lease delete ---
     const updatedTask = await prisma.$transaction(async (tx) => {
-      // Re-read task inside transaction for consistency
+      // Re-read task inside transaction for consistency (include contract for double-check)
       const task = await tx.task.findUnique({
         where: { id: taskId },
-        include: { taskLease: true },
+        include: { taskLease: true, contract: true },
       });
 
       if (!task) {
         throw new NotFoundError('Task');
       }
+
+      // --- Phase 5 double-check inside transaction (race-condition guard) ---
+      assertContractWorkable(task.contract, 'submit');
+
+      const paidPaymentTx = await tx.payment.findFirst({
+        where: { contractId: task.contractId, status: PaymentStatus.paid },
+        select: { id: true },
+      });
+      if (!paidPaymentTx) {
+        throw new BadRequestError(
+          'Cannot submit task before contract payment is completed.'
+        );
+      }
+      // --- End Phase 5 double-check ---
 
       // Only leased tasks can be submitted (first time)
       if (task.status !== TaskStatus.leased) {
@@ -565,9 +709,11 @@ export class TaskService {
       throw new ForbiddenError('You are not the labeler for this contract');
     }
 
-    if (contract.status !== ContractStatus.active && contract.status !== ContractStatus.revision_requested) {
-      throw new BadRequestError('Contract must be active or in revision_requested status');
-    }
+    // --- Phase 5: contract lifecycle + payment guard ---
+    assertContractWorkable(contract, 'lease');
+
+    await this.assertContractHasPaidPayment(contractId);
+    // --- End Phase 5 guard ---
 
     // Retry loop for race-condition safety
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {

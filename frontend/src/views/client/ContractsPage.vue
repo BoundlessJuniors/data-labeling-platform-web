@@ -4,6 +4,7 @@
  */
 import { onMounted, ref, computed } from 'vue';
 import { useContractsStore } from '@/stores/contracts';
+import { useToastStore } from '@/stores/toast';
 import { useSeo } from '@/composables/useSeo';
 import type { ContractStatus } from '@/types/contract';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -21,14 +22,17 @@ useSeo({
 
 const contractsStore = useContractsStore();
 
-// Status filter options
 const statusOptions = [
   { value: '', label: 'Tüm Durumlar' },
+  { value: 'pending_payment', label: 'Ödeme Bekliyor' },
   { value: 'active', label: 'Aktif' },
+  { value: 'overdue', label: 'Gecikmiş' },
   { value: 'submitted', label: 'Gönderildi' },
+  { value: 'revision_requested', label: 'Revizyon İstendi' },
   { value: 'approved', label: 'Onaylandı' },
-  { value: 'rejected', label: 'Reddedildi' },
   { value: 'cancelled', label: 'İptal Edildi' },
+  { value: 'refunded', label: 'İade Edildi' },
+  { value: 'disputed', label: 'İtirazda' },
 ];
 
 // Fetch on mount
@@ -46,6 +50,11 @@ const showRejectReasonModal = ref(false);
 const rejectContractId = ref<string | null>(null);
 const rejectReason = ref('');
 
+// ── Cancel reason modal ─────────────────────────────────────────
+const showCancelReasonModal = ref(false);
+const cancelContractId = ref<string | null>(null);
+const cancelReason = ref('');
+
 // ── Export Format Map ───────────────────────────────────────────
 const formatMap = ref<Record<string, 'COCO' | 'YOLO' | 'VOC'>>({});
 
@@ -55,6 +64,13 @@ function openConfirm(action: 'approve' | 'reject' | 'cancel', contractId: string
     rejectContractId.value = contractId;
     rejectReason.value = '';
     showRejectReasonModal.value = true;
+    return;
+  }
+  if (action === 'cancel') {
+    // Open cancel reason modal instead
+    cancelContractId.value = contractId;
+    cancelReason.value = '';
+    showCancelReasonModal.value = true;
     return;
   }
   confirmAction.value = action;
@@ -67,7 +83,6 @@ async function handleConfirm() {
 
   const actions = {
     approve: () => contractsStore.approveContract(confirmContractId.value!),
-    cancel: () => contractsStore.cancelContract(confirmContractId.value!),
   } as const;
 
   const actionFn = actions[confirmAction.value as keyof typeof actions];
@@ -78,6 +93,19 @@ async function handleConfirm() {
   showConfirmModal.value = false;
   confirmAction.value = null;
   confirmContractId.value = null;
+}
+
+async function handleCancelWithReason() {
+  if (!cancelContractId.value) return;
+  const reason = cancelReason.value.trim();
+  if (!reason) {
+    useToastStore().error('İptal nedeni zorunludur.');
+    return;
+  }
+  await contractsStore.cancelContract(cancelContractId.value, reason);
+  showCancelReasonModal.value = false;
+  cancelContractId.value = null;
+  cancelReason.value = '';
 }
 
 async function handleRejectWithReason() {
@@ -97,24 +125,30 @@ async function openQcPreview(contractId: string) {
 // ── Helpers ─────────────────────────────────────────────────────
 function getStatusBadge(status: string) {
   const badges: Record<string, string> = {
+    pending_payment: 'badge-warning',
     active: 'badge-info',
+    overdue: 'badge-warning',
     submitted: 'badge-warning',
-    approved: 'badge-success',
-    cancelled: 'badge-error',
-    rejected: 'badge-error',
     revision_requested: 'badge-warning',
+    approved: 'badge-success',
+    cancelled: 'badge-neutral',
+    refunded: 'badge-neutral',
+    disputed: 'badge-error',
   };
   return badges[status] || 'badge-neutral';
 }
 
 function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
+    pending_payment: 'Ödeme Bekliyor',
     active: 'Aktif',
+    overdue: 'Gecikmiş',
     submitted: 'Gönderildi',
+    revision_requested: 'Revizyon İstendi',
     approved: 'Onaylandı',
     cancelled: 'İptal Edildi',
-    rejected: 'Reddedildi',
-    revision_requested: 'Revizyon İstendi',
+    refunded: 'İade Edildi',
+    disputed: 'İtirazda',
   };
   return labels[status] || status;
 }
@@ -123,24 +157,13 @@ function formatPrice(amount: number, currency: string) {
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount);
 }
 
-function formatDate(dateString: string) {
+function formatDate(dateString?: string | null) {
+  if (!dateString) return 'Henüz başlamadı';
   return new Date(dateString).toLocaleDateString('tr-TR');
-}
-
-function getProgressPercent(contract: { tasks?: { status: string }[]; _count?: { tasks: number } }) {
-  const total = contract._count?.tasks ?? 0;
-  if (total === 0) return 0;
-  const completed = (contract.tasks ?? []).filter(t => t.status === 'accepted' || t.status === 'approved').length;
-  return Math.round((completed / total) * 100);
-}
-
-function getCompletedCount(contract: { tasks?: { status: string }[] }) {
-  return (contract.tasks ?? []).filter(t => t.status === 'accepted' || t.status === 'approved').length;
 }
 
 const confirmMessages: Record<string, { title: string; message: string; buttonText: string; buttonVariant: 'primary' | 'danger' | 'secondary' }> = {
   approve: { title: 'Sözleşmeyi Onayla', message: 'Bu sözleşmeyi onaylamak istediğinizden emin misiniz? Bu işlem geri alınamaz.', buttonText: 'Onayla', buttonVariant: 'primary' },
-  cancel: { title: 'Sözleşmeyi İptal Et', message: 'Bu sözleşmeyi iptal etmek istediğinizden emin misiniz?', buttonText: 'İptal Et', buttonVariant: 'danger' },
 };
 
 const currentConfirmMessage = computed(() => {
@@ -199,44 +222,100 @@ const currentConfirmMessage = computed(() => {
       <article
         v-for="contract in contractsStore.contracts"
         :key="contract.id"
-        class="card hover:shadow-lg transition-shadow"
+        class="group rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all duration-200 p-2"
       >
-        <div class="flex flex-col sm:flex-row justify-between gap-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <!-- Left content -->
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-2">
-              <span :class="getStatusBadge(contract.status)">{{ getStatusLabel(contract.status) }}</span>
-            </div>
-            <div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-              <span>{{ contract._count?.tasks ?? 0 }} görev</span>
-              <span>{{ formatDate(contract.startedAt) }}</span>
-            </div>
-            <!-- Progress bar -->
-            <div class="mt-3">
-              <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                <span>{{ getCompletedCount(contract) }} / {{ contract._count?.tasks ?? 0 }} tamamlandı</span>
-                <span>{{ getProgressPercent(contract) }}%</span>
+            <div class="flex items-start gap-4">
+              <div class="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6M7 4h7l3 3v13a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z" />
+                </svg>
               </div>
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <span class="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    Sözleşme
+                  </span>
+                  <span :class="getStatusBadge(contract.status)">
+                    {{ getStatusLabel(contract.status) }}
+                  </span>
+                </div>
+
+                <h2
+                  class="text-xl font-bold text-gray-900 dark:text-white tracking-tight truncate group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors"
+                  :title="contract.listing?.title || 'İsimsiz Sözleşme'"
+                >
+                  {{ contract.listing?.title || 'İsimsiz Sözleşme' }}
+                </h2>
+
+                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
+                  <div class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h7" />
+                    </svg>
+                    <span>{{ contract._count?.tasks ?? 0 }} görev</span>
+                  </div>
+
+                  <div class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Başlangıç: {{ formatDate(contract.startedAt) }}</span>
+                  </div>
+                </div>
+
                 <div
-                  class="bg-primary-600 h-2 rounded-full transition-all"
-                  :style="{ width: getProgressPercent(contract) + '%' }"
-                ></div>
+                  v-if="contract.status === 'overdue'"
+                  class="mt-3 inline-flex items-center rounded-lg bg-orange-50 dark:bg-orange-900/20 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300"
+                >
+                  Teslim süresi geçmiş olabilir.
+                </div>
               </div>
             </div>
           </div>
-          <div class="flex flex-col items-end gap-2">
-            <p class="text-lg font-bold text-gray-900 dark:text-white">
+
+          <!-- Right action panel -->
+          <div class="lg:w-56 shrink-0 rounded-2xl bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700 p-4">
+            <p class="text-right text-xl font-extrabold text-gray-900 dark:text-white">
               {{ formatPrice(contract.agreedPriceTotal, contract.currency) }}
             </p>
-            <!-- Actions for submitted contracts -->
-            <div v-if="contract.status === 'submitted'" class="flex flex-wrap gap-2">
+
+            <div v-if="contract.status === 'pending_payment'" class="mt-4 flex flex-col gap-2">
+              <BaseButton
+                class="w-full justify-center"
+                variant="primary"
+                size="sm"
+                :loading="contractsStore.paymentLoadingMap[contract.id]"
+                @click="contractsStore.mockPayContract(contract.id)"
+              >
+                Mock Ödeme Yap
+              </BaseButton>
+
+              <BaseButton
+                class="w-full justify-center"
+                variant="danger"
+                size="sm"
+                @click="contractsStore.cancelContract(contract.id)"
+              >
+                Vazgeç / İptal Et
+              </BaseButton>
+
+              <p class="text-[11px] text-gray-500 dark:text-gray-400 text-center leading-snug">
+                Ödeme tamamlanınca sözleşme aktif hale gelir.
+              </p>
+            </div>
+
+            <div v-if="contract.status === 'submitted'" class="mt-4 flex flex-col gap-2">
               <button
                 type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50 transition-colors"
+                class="w-full px-3 py-2 text-xs font-medium rounded-lg bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50 transition-colors"
                 :disabled="contractsStore.qcLoading"
                 @click="openQcPreview(contract.id)"
               >
-                <span v-if="contractsStore.qcLoading && contractsStore.qcPreviewContractId === contract.id" class="flex items-center gap-1">
+                <span v-if="contractsStore.qcLoading && contractsStore.qcPreviewContractId === contract.id" class="flex items-center justify-center gap-1">
                   <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -245,39 +324,42 @@ const currentConfirmMessage = computed(() => {
                 </span>
                 <span v-else>QC Önizleme</span>
               </button>
+
               <button
                 type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 transition-colors"
+                class="w-full px-3 py-2 text-xs font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 transition-colors"
                 @click="openConfirm('approve', contract.id)"
               >
                 Onayla
               </button>
+
               <button
                 type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors"
+                class="w-full px-3 py-2 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors"
                 @click="openConfirm('reject', contract.id)"
               >
                 Revizyon İste
               </button>
             </div>
-            <!-- Actions for approved contracts -->
-            <div v-if="contract.status === 'approved'" class="flex flex-wrap gap-2 items-center">
+
+            <div v-if="contract.status === 'approved'" class="mt-4 flex flex-col gap-2">
               <select
-                class="select select-sm select-bordered rounded-lg bg-white dark:bg-gray-800 text-sm"
+                class="select select-sm select-bordered rounded-lg bg-white dark:bg-gray-800 text-sm w-full"
                 :value="formatMap[contract.id] || 'COCO'"
-                @change="(e) => formatMap[contract.id] = (e.target as HTMLSelectElement).value as any"
+                @change="(e) => formatMap[contract.id] = (e.target as HTMLSelectElement).value as 'COCO' | 'YOLO' | 'VOC'"
               >
                 <option value="COCO">COCO JSON</option>
                 <option value="YOLO">YOLO ZIP</option>
                 <option value="VOC">VOC ZIP</option>
               </select>
+
               <button
                 type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition-colors"
+                class="w-full px-3 py-2 text-xs font-medium rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition-colors"
                 :disabled="contractsStore.exportLoadingMap[contract.id]"
                 @click="contractsStore.downloadContractExport(contract.id, formatMap[contract.id] || 'COCO')"
               >
-                <span v-if="contractsStore.exportLoadingMap[contract.id]" class="flex items-center gap-1">
+                <span v-if="contractsStore.exportLoadingMap[contract.id]" class="flex items-center justify-center gap-1">
                   <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -287,11 +369,14 @@ const currentConfirmMessage = computed(() => {
                 <span v-else>Çıktıyı İndir</span>
               </button>
             </div>
-            <!-- Actions for active contracts -->
-            <div v-if="contract.status === 'active'" class="flex gap-2">
+
+            <div
+              v-if="contract.status === 'active' || contract.status === 'overdue' || contract.status === 'revision_requested'"
+              class="mt-4"
+            >
               <button
                 type="button"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors"
+                class="w-full px-3 py-2 text-xs font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors"
                 @click="openConfirm('cancel', contract.id)"
               >
                 İptal Et
@@ -370,6 +455,42 @@ const currentConfirmMessage = computed(() => {
               @click="handleRejectWithReason"
             >
               Revizyon İste
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+    <!-- Cancel Reason Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showCancelReasonModal"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        @click.self="showCancelReasonModal = false"
+      >
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Sözleşmeyi İptal Et
+          </h3>
+          <p class="text-sm text-orange-600 dark:text-orange-400 font-medium mb-2">
+            Ödeme yapılmış aktif sözleşmelerde iptal işlemi doğrudan iade oluşturmaz. Talep admin incelemesine/itiraza taşınır.
+          </p>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Lütfen iptal nedenini detaylı bir şekilde açıklayın.
+          </p>
+          <textarea
+            v-model="cancelReason"
+            class="input resize-none w-full"
+            rows="3"
+            placeholder="İptal nedeni (zorunlu)"
+          />
+          <div class="flex justify-end gap-3 mt-4">
+            <BaseButton variant="secondary" @click="showCancelReasonModal = false">Vazgeç</BaseButton>
+            <BaseButton
+              variant="danger"
+              :loading="contractsStore.loading"
+              @click="handleCancelWithReason"
+            >
+              İptal Talebi Oluştur
             </BaseButton>
           </div>
         </div>

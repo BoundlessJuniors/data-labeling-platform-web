@@ -8,9 +8,9 @@ Görsel veri etiketleme işlerini yöneten bir pazar yeri platformu. Müşterile
 data-labeling-platform-web/
 ├── backend/              # Node.js + Express + Prisma API
 │   ├── src/
-│   │   ├── controllers/  # 11 API endpoint handler
+│   │   ├── controllers/  # 12 API endpoint handler
 │   │   ├── services/     # Business Logic Layer (Service Layer Pattern)
-│   │   ├── routes/       # 11 route modülü
+│   │   ├── routes/       # 12 route modülü
 │   │   ├── middlewares/  # 9 middleware (auth, cache, rate-limit, upload...)
 │   │   ├── lib/          # Prisma, Redis, Logger, MinIO/R2 Storage
 │   │   ├── validators/   # Joi validation schemas
@@ -19,13 +19,13 @@ data-labeling-platform-web/
 │
 ├── frontend/             # Vue 3 + Tailwind CSS web app
 │   ├── src/
-│   │   ├── api/          # 9 API service modülü
+│   │   ├── api/          # 10 API service modülü
 │   │   ├── components/   # 13+ UI bileşeni
 │   │   ├── composables/  # Vue composables
 │   │   ├── layouts/      # 3 layout (Admin, App, Public)
 │   │   ├── router/       # Role-based routing
 │   │   ├── stores/       # 10 Pinia store
-│   │   ├── types/        # 10 TypeScript type dosyası
+│   │   ├── types/        # 11 TypeScript type dosyası
 │   │   └── views/        # 18 sayfa bileşeni
 │   └── public/           # Static assets
 │
@@ -97,7 +97,7 @@ npm run dev
 | `labels` | LabelSet içindeki etiketler |
 | `listings` | Etiketleme ilanları (`annotationFormat` enum: COCO/YOLO/VOC/Custom) |
 | `proposals` | İlan başvuruları (Listing Proposals) |
-| `contracts` | Labeler-Client sözleşmeleri |
+| `contracts` | İş sözleşmeleri (payment-gated, iptal, iade yönetimi) |
 | `submissions` | Toplu etiket gönderimi (Dataset Import) |
 | `tasks` | En küçük iş birimi (1 task = 1 asset) |
 | `task_leases` | Task kilitleme mekanizması |
@@ -119,6 +119,7 @@ npm run dev
 | Listings | `/api/v1/listings/*` | İlanlar (`?search=` ile başlık araması) |
 | Proposals | `/api/v1/proposals/*` | İlan başvuruları (sadece labeler/admin) |
 | Contracts | `/api/v1/contracts/*` | Sözleşmeler (yalnızca proposal kabul ile oluşur) |
+| Payments | `/api/v1/payments/*` | Mock ödeme iş akışı |
 | Tasks | `/api/v1/tasks/*` | Görevler (lease, submit, QC) |
 | Annotations | `/api/v1/annotations/*` | Admin debug/reprocess (labeler akışı: `/tasks/:id/submit`) |
 | Reviews | `/api/v1/reviews/*` | QC reviews |
@@ -146,6 +147,7 @@ npm run dev
 |-------|---------------|
 | **Frontend** | [frontend/README.md](./frontend/README.md) - Kapsamlı geliştirme rehberi |
 | **Backend** | [backend/README.md](./backend/README.md) - API ve mimari özeti |
+| **Testing** | [docs/lifecycle-regression-checklist.md](./docs/lifecycle-regression-checklist.md) - Regresyon test senaryoları |
 
 ## 📜 Kullanışlı Komutlar
 

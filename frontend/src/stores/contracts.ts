@@ -3,9 +3,12 @@
  */
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import axios from 'axios';
 import { contractsApi, type ContractListParams } from '@/api/contracts';
+import { paymentsApi } from '@/api/payments';
 import { tasksApi } from '@/api/tasks';
 import type { Contract, ContractWithDetails, ContractStatus } from '@/types/contract';
+import type { Payment } from '@/types/payment';
 import type { QcSampleResponse, QcTaskView } from '@/types/qc';
 import { getErrorMessage } from '@/types/api';
 import { useToastStore } from './toast';
@@ -38,6 +41,9 @@ export const useContractsStore = defineStore('contracts', () => {
 
   // ── Export State ──────────────────────────────────────────────────
   const exportLoadingMap = ref<Record<string, boolean>>({});
+
+  // ── Payment State ─────────────────────────────────────────────────
+  const paymentLoadingMap = ref<Record<string, boolean>>({});
 
   /**
    * Fetch paginated contracts list
@@ -124,12 +130,16 @@ export const useContractsStore = defineStore('contracts', () => {
   /**
    * Cancel a contract
    */
-  async function cancelContract(id: string) {
+  async function cancelContract(id: string, reason?: string) {
     loading.value = true;
     try {
-      const response = await contractsApi.cancel(id);
+      const response = await contractsApi.cancel(id, reason);
       updateContractInList(id, response.data.data);
-      toastStore.success('Sözleşme iptal edildi');
+      if (response.data.data.status === 'disputed') {
+        toastStore.success('İptal talebi itiraza taşındı. Admin incelemesi bekleniyor.');
+      } else {
+        toastStore.success('Sözleşme iptal edildi');
+      }
       return true;
     } catch (_err) {
       toastStore.error(getErrorMessage(_err, 'Sözleşme iptal edilemedi'));
@@ -156,6 +166,45 @@ export const useContractsStore = defineStore('contracts', () => {
       loading.value = false;
     }
   }
+
+  // ── Payment Actions ───────────────────────────────────────────────
+
+  async function mockPayContract(contractId: string) {
+  paymentLoadingMap.value[contractId] = true;
+
+  try {
+    let payment: Payment | null = null;
+
+    try {
+      const paymentRes = await paymentsApi.getByContract(contractId);
+      payment = paymentRes.data.data;
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        const initRes = await paymentsApi.initForContract(contractId);
+        payment = initRes.data.data;
+      } else {
+        throw err;
+      }
+    }
+
+    if (!payment) {
+      const initRes = await paymentsApi.initForContract(contractId);
+      payment = initRes.data.data;
+    }
+
+    await paymentsApi.mockSuccess(payment.id);
+
+    toastStore.success('Ödeme tamamlandı. Sözleşme aktif hale getirildi.');
+    await fetchContracts();
+
+    return true;
+  } catch (_err) {
+    toastStore.error(getErrorMessage(_err, 'Ödeme tamamlanamadı'));
+    return false;
+  } finally {
+    paymentLoadingMap.value[contractId] = false;
+  }
+}
 
   // ── Export Actions ────────────────────────────────────────────────
   
@@ -326,6 +375,7 @@ export const useContractsStore = defineStore('contracts', () => {
     qcLoading,
     qcError,
     exportLoadingMap,
+    paymentLoadingMap,
     // Actions
     fetchContracts,
     fetchContract,
@@ -337,6 +387,7 @@ export const useContractsStore = defineStore('contracts', () => {
     setStatusFilter,
     goToPage,
     reset,
+    mockPayContract,
     // QC Preview Actions
     fetchQcPreview,
     closeQcPreview,

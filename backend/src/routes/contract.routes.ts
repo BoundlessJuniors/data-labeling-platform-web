@@ -7,6 +7,7 @@ import {
   idParamSchema,
   rejectContractSchema,
   cancelContractSchema,
+  resolveDisputeSchema,
   qcSampleQuerySchema,
   exportContractQuerySchema
 } from '../validators/validation.schemas';
@@ -94,6 +95,15 @@ router.patch(
   contractController.cancelContract
 );
 
+// PATCH /api/contracts/:id/resolve-dispute - Resolve disputed contract (admin only)
+router.patch(
+  '/:id/resolve-dispute',
+  adminOnly,
+  validate(idParamSchema, 'params'),
+  validate(resolveDisputeSchema),
+  contractController.resolveDispute
+);
+
 // POST /api/contracts/:id/normalize-retry - Retry normalize job (admin only)
 router.post(
   '/:id/normalize-retry',
@@ -103,4 +113,3 @@ router.post(
 );
 
 export default router;
-

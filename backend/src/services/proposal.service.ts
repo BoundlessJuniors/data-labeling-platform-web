@@ -1,31 +1,62 @@
+// ============================================================================
+// Proposal Service — Phase 3
+// Payment-gated lifecycle:
+//   createProposal (with deliveryDays from labeler)
+//   acceptProposal → pending_payment contract + auto-init payment
+// ============================================================================
+
+import { ContractStatus, ListingStatus, UserRole } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
 import { cacheDelete } from '../lib/redis';
 import logger from '../lib/logger';
+import { paymentService } from './payment.service';
+
+// ── SLA env helpers ───────────────────────────────────────────────────────────
+
+function getSlaGracePeriodHours(): number {
+  return Number(process.env.CONTRACT_GRACE_PERIOD_HOURS ?? 24) || 24;
+}
+
+function getSlaReviewWindowHours(): number {
+  return Number(process.env.CONTRACT_REVIEW_WINDOW_HOURS ?? 72) || 72;
+}
+
+function getSlaRevisionWindowHours(): number {
+  return Number(process.env.CONTRACT_REVISION_WINDOW_HOURS ?? 72) || 72;
+}
+
+function getSlaMaxRevisionCount(): number {
+  return Number(process.env.CONTRACT_MAX_REVISION_COUNT ?? 2) || 2;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export class ProposalService {
   /**
    * Create a new proposal (labeler or admin only).
    *
-   * Business rule: only labelers (and admins) can create proposals.
-   * Clients must not be able to create proposals — they are the listing owners
-   * who receive and accept/reject proposals.
+   * Business rules:
+   * - Only labelers (and admins) can create proposals.
+   * - Listing must be open.
+   * - Labeler must provide deliveryDays (1–90).
+   * - Duplicate check prevents a labeler from applying twice.
    */
   async createProposal(
     listingId: string,
     labelerUserId: string,
     userRole: UserRole,
     priceQuote: number,
+    deliveryDays: number,
     coverLetter?: string
   ) {
-    // ── Role check (defense-in-depth; also enforced at route level) ──
+    // ── Role check ────────────────────────────────────────────────────────
     if (userRole !== 'labeler' && userRole !== 'admin') {
       throw new ForbiddenError('Only labelers can create proposals');
     }
 
-    // Verify listing exists and is open
+    // ── Verify listing exists and is open ─────────────────────────────────
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
     });
@@ -38,12 +69,12 @@ export class ProposalService {
       throw new BadRequestError('Cannot apply to a listing that is not open');
     }
 
-    // Users cannot apply to their own listings
+    // ── Users cannot apply to their own listings ──────────────────────────
     if (listing.ownerUserId === labelerUserId) {
       throw new BadRequestError('Cannot apply to your own listing');
     }
 
-    // Check if user already applied
+    // ── Duplicate check ───────────────────────────────────────────────────
     const existingProposal = await prisma.proposal.findUnique({
       where: {
         listingId_labelerUserId: {
@@ -54,7 +85,37 @@ export class ProposalService {
     });
 
     if (existingProposal) {
-      throw new ConflictError('You have already applied to this listing');
+      // Active or accepted proposals block re-application
+      if (existingProposal.status === 'pending' || existingProposal.status === 'accepted') {
+        throw new ConflictError('You have already applied to this listing');
+      }
+
+      // rejected or withdrawn: update the existing row instead of creating a new one
+      // This avoids the @@unique([listingId, labelerUserId]) constraint violation
+      const updatedProposal = await prisma.proposal.update({
+        where: { id: existingProposal.id },
+        data: {
+          status: 'pending',
+          priceQuote,
+          deliveryDays,
+          coverLetter: coverLetter ?? null,
+        },
+        include: {
+          listing: {
+            select: { id: true, title: true, priceTotal: true, currency: true },
+          },
+          labeler: {
+            select: { id: true, email: true, displayName: true, ratingAvg: true },
+          },
+        },
+      });
+
+      logger.info(
+        `Proposal ${updatedProposal.id} re-applied (was ${existingProposal.status}) by labeler ${labelerUserId} ` +
+        `for listing ${listingId} (deliveryDays: ${deliveryDays})`
+      );
+
+      return updatedProposal;
     }
 
     const proposal = await prisma.proposal.create({
@@ -62,6 +123,7 @@ export class ProposalService {
         listingId,
         labelerUserId,
         priceQuote,
+        deliveryDays,
         coverLetter,
         status: 'pending',
       },
@@ -75,13 +137,17 @@ export class ProposalService {
       },
     });
 
-    logger.info(`Proposal created: ${proposal.id} by user ${labelerUserId} for listing ${listingId}`);
+    logger.info(
+      `Proposal ${proposal.id} created by labeler ${labelerUserId} ` +
+      `for listing ${listingId} (deliveryDays: ${deliveryDays})`
+    );
 
     return proposal;
   }
 
+
   /**
-   * Get all proposals with filtering and pagination
+   * Get all proposals with filtering and pagination.
    */
   async getProposals(
     page: number,
@@ -93,7 +159,6 @@ export class ProposalService {
   ) {
     const skip = (page - 1) * limit;
 
-    // Build where clause
     const where: Prisma.ProposalWhereInput = {};
 
     if (status) {
@@ -113,7 +178,6 @@ export class ProposalService {
     } else if (userRole === 'client') {
       where.listing = { ownerUserId: userId };
     }
-    // admin sees all
 
     const [proposals, total] = await Promise.all([
       prisma.proposal.findMany({
@@ -145,7 +209,7 @@ export class ProposalService {
   }
 
   /**
-   * Get a single proposal by ID with access control
+   * Get a single proposal by ID with access control.
    */
   async getProposalById(proposalId: string, userId: string, userRole: UserRole) {
     const proposal = await prisma.proposal.findUnique({
@@ -172,7 +236,6 @@ export class ProposalService {
       throw new NotFoundError('Proposal');
     }
 
-    // Check access: labeler who applied, listing owner, or admin
     const isLabeler = proposal.labelerUserId === userId;
     const isListingOwner = proposal.listing.ownerUserId === userId;
     const isAdmin = userRole === 'admin';
@@ -185,12 +248,28 @@ export class ProposalService {
   }
 
   /**
-   * Accept a proposal (client only) — Creates a Contract + Tasks inside a transaction
+   * Accept a proposal (client only).
+   *
+   * Phase 3 lifecycle:
+   * A. Transaction:
+   *    1. Validate proposal + listing
+   *    2. Mark proposal accepted
+   *    3. Create contract as pending_payment (with SLA defaults from env)
+   *    4. Create tasks (one per dataset asset)
+   *    5. Move listing to payment_pending
+   *    6. Do NOT reject other proposals here — that happens when payment succeeds
+   *
+   * B. After transaction:
+   *    - Auto-initialize a pending payment via PaymentService
+   *    - Return { proposal, contract, payment }
+   *
+   * If payment init fails the contract + tasks already exist, and the client
+   * can retry via POST /api/v1/payments/contracts/:contractId/init.
    */
   async acceptProposal(proposalId: string, clientUserId: string) {
-    // Use transaction for atomic operations
+    // ── A. Atomic transaction ─────────────────────────────────────────────
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Get proposal with listing
+      // 1. Load proposal with listing + labeler
       const proposal = await tx.proposal.findUnique({
         where: { id: proposalId },
         include: {
@@ -205,36 +284,43 @@ export class ProposalService {
         throw new NotFoundError('Proposal');
       }
 
-      // 2. Validate ownership
+      // 2. Ownership check
       if (proposal.listing.ownerUserId !== clientUserId) {
         throw new ForbiddenError('Only the listing owner can accept proposals');
       }
 
-      // 3. Check proposal status
+      // 3. Proposal state check
       if (proposal.status !== 'pending') {
         throw new BadRequestError(`Cannot accept a proposal that is ${proposal.status}`);
       }
 
-      // 4. Check listing status
+      // 4. Listing state check
       if (proposal.listing.status !== 'open') {
         throw new BadRequestError('Cannot accept proposals for a listing that is not open');
       }
 
-      // 5. Update proposal to accepted
+      // 5. Mark proposal accepted
       await tx.proposal.update({
         where: { id: proposalId },
         data: { status: 'accepted' },
       });
 
-      // 6. Create the contract
+      // 6. Create contract as pending_payment (SLA defaults from env)
       const contract = await tx.contract.create({
         data: {
           listingId: proposal.listingId,
+          proposalId: proposal.id,
           clientUserId,
           labelerUserId: proposal.labelerUserId,
           agreedPriceTotal: proposal.priceQuote,
           currency: proposal.listing.currency,
-          status: 'active',
+          deliveryDays: proposal.deliveryDays,
+          status: ContractStatus.pending_payment,
+          // SLA defaults — actual deadlines set when payment succeeds
+          gracePeriodHours: getSlaGracePeriodHours(),
+          reviewWindowHours: getSlaReviewWindowHours(),
+          revisionWindowHours: getSlaRevisionWindowHours(),
+          maxRevisionCount: getSlaMaxRevisionCount(),
         },
         include: {
           listing: {
@@ -246,7 +332,7 @@ export class ProposalService {
         },
       });
 
-      // 6.1. Find all assets in the dataset
+      // 7. Find all assets in the dataset
       const assets = await tx.asset.findMany({
         where: { datasetId: contract.listing.datasetId },
         select: { id: true },
@@ -256,12 +342,12 @@ export class ProposalService {
         throw new BadRequestError('Dataset is empty, cannot create tasks.');
       }
 
-      // 6.2. Create a task for each asset (Bulk Insert)
+      // 8. Create one task per asset
       await tx.task.createMany({
         data: assets.map((asset) => ({
           contractId: contract.id,
           assetId: asset.id,
-          status: 'ready',
+          status: 'ready' as const,
           attemptCount: 0,
           annotationCount: 0,
         })),
@@ -269,36 +355,55 @@ export class ProposalService {
 
       logger.info(`${assets.length} tasks created for contract ${contract.id}`);
 
-      // 7. Reject all other pending proposals for this listing
-      await tx.proposal.updateMany({
-        where: {
-          listingId: proposal.listingId,
-          id: { not: proposalId },
-          status: 'pending',
-        },
-        data: { status: 'rejected' },
-      });
-
-      // 8. Update listing status to in_progress
+      // 9. Lock listing in payment_pending
+      //    Other proposals are NOT rejected here — rejection happens
+      //    inside PaymentService.mockSuccess after payment succeeds.
       await tx.listing.update({
         where: { id: proposal.listingId },
-        data: { status: 'in_progress' },
+        data: { status: ListingStatus.payment_pending },
       });
 
       return { proposal, contract };
     });
 
-    // Invalidate cache
+    // ── Cache invalidation ────────────────────────────────────────────────
     await cacheDelete(`cache:/api/v1/listings/${result.proposal.listingId}`);
     await cacheDelete(`cache:/api/v1/listings`);
 
-    logger.info(`Proposal ${proposalId} accepted, Contract ${result.contract.id} created`);
+    logger.info(
+      `Proposal ${proposalId} accepted — Contract ${result.contract.id} created as pending_payment`
+    );
 
-    return result;
+    // ── B. Auto-initialize payment (outside transaction) ──────────────────
+    // The contract is now committed to the database, so PaymentService can
+    // load it. If this call fails the contract exists and can be retried via
+    // POST /api/v1/payments/contracts/:contractId/init.
+    let payment;
+    try {
+      payment = await paymentService.initPaymentForContract(
+        result.contract.id,
+        clientUserId,
+        UserRole.client
+      );
+      logger.info(`Payment ${payment.id} auto-initialized for contract ${result.contract.id}`);
+    } catch (paymentErr) {
+      logger.error(
+        `Payment initialization failed for contract ${result.contract.id} — ` +
+        `client can retry via POST /api/v1/payments/contracts/${result.contract.id}/init`,
+        paymentErr
+      );
+      throw paymentErr;
+    }
+
+    return {
+      proposal: result.proposal,
+      contract: result.contract,
+      payment,
+    };
   }
 
   /**
-   * Reject a proposal (client only)
+   * Reject a proposal (client / listing owner only).
    */
   async rejectProposal(proposalId: string, userId: string) {
     const proposal = await prisma.proposal.findUnique({
@@ -314,7 +419,6 @@ export class ProposalService {
       throw new NotFoundError('Proposal');
     }
 
-    // Only listing owner can reject
     if (proposal.listing.ownerUserId !== userId) {
       throw new ForbiddenError('Only the listing owner can reject proposals');
     }
@@ -339,7 +443,7 @@ export class ProposalService {
   }
 
   /**
-   * Withdraw a proposal (labeler only)
+   * Withdraw a proposal (labeler only).
    */
   async withdrawProposal(proposalId: string, userId: string) {
     const proposal = await prisma.proposal.findUnique({
@@ -350,7 +454,6 @@ export class ProposalService {
       throw new NotFoundError('Proposal');
     }
 
-    // Only the labeler who created the proposal can withdraw
     if (proposal.labelerUserId !== userId) {
       throw new ForbiddenError('Only the proposer can withdraw their proposal');
     }
@@ -370,10 +473,10 @@ export class ProposalService {
   }
 
   /**
-   * Get proposals for a specific listing (for listing detail page)
+   * Get proposals for a specific listing (listing owner or admin only).
+   * deliveryDays is included via default Prisma select (all scalar fields returned).
    */
   async getListingProposals(listingId: string, userId: string, userRole: UserRole) {
-    // Verify listing exists and user has access
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
     });
@@ -382,7 +485,6 @@ export class ProposalService {
       throw new NotFoundError('Listing');
     }
 
-    // Only listing owner or admin can see all proposals for a listing
     if (listing.ownerUserId !== userId && userRole !== 'admin') {
       throw new ForbiddenError('You do not have permission to view these proposals');
     }

@@ -11,6 +11,7 @@ export interface Proposal {
   listingId: string;
   labelerUserId: string;
   priceQuote: number;
+  deliveryDays: number;
   coverLetter: string | null;
   status: ProposalStatus;
   createdAt: string;
@@ -30,8 +31,10 @@ export interface Proposal {
 }
 
 /** Accept proposal response */
+import type { Payment } from './payment';
+
 export interface AcceptProposalResponse {
-  proposal: { id: string; status: 'accepted' };
+  proposal: Proposal;
   contract: {
     id: string;
     listingId: string;
@@ -41,4 +44,5 @@ export interface AcceptProposalResponse {
     currency: string;
     status: string;
   };
+  payment: Payment;
 }

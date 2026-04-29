@@ -16,7 +16,7 @@ export const proposalsApi = {
   /**
    * Create a new proposal (labeler applies to listing)
    */
-  create(data: { listingId: string; priceQuote: number; coverLetter?: string }) {
+  create(data: { listingId: string; priceQuote: number; deliveryDays: number; coverLetter?: string }) {
     return apiClient.post<ApiResponse<Proposal>>('/proposals', data);
   },
 

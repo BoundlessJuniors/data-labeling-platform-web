@@ -24,6 +24,7 @@ interface MyProposal {
   id: string;
   listingTitle: string;
   priceQuote: number;
+  deliveryDays: number;
   currency: string;
   status: string;
   createdAt: string;
@@ -58,6 +59,7 @@ async function fetchProposals() {
       id: item.id,
       listingTitle: item.listing?.title ?? 'İlan',
       priceQuote: item.priceQuote,
+      deliveryDays: item.deliveryDays ?? 7,
       currency: item.listing?.currency ?? 'TRY',
       status: item.status,
       createdAt: item.createdAt,
@@ -184,6 +186,7 @@ function formatDate(dateString: string) {
             </div>
             <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
               <span>Teklif: {{ formatPrice(proposal.priceQuote, proposal.currency) }}</span>
+              <span>Teslim süresi: {{ proposal.deliveryDays }} gün</span>
               <span>{{ formatDate(proposal.createdAt) }}</span>
             </div>
           </div>
@@ -200,7 +203,7 @@ function formatDate(dateString: string) {
               v-if="proposal.status === 'accepted'"
               class="text-sm text-green-600 dark:text-green-400 font-medium"
             >
-              ✓ Sözleşme oluşturuldu
+              ✓ Kabul edildi, ödeme bekleniyor olabilir
             </span>
           </div>
         </div>

@@ -57,6 +57,7 @@ frontend/
 │   │   ├── labelsets.ts       # LabelSet API
 │   │   ├── proposals.ts       # Proposal API
 │   │   ├── contracts.ts       # Contract API
+│   │   ├── payments.ts        # Payment API (YENİ)
 │   │   └── tasks.ts           # Task API
 │   │
 │   ├── stores/                # Pinia state management (10 store)
@@ -148,6 +149,7 @@ frontend/
 │   │   ├── listing.ts         # Listing types (`AnnotationFormat` enum, `CreateListingRequest`, `UpdateListingRequest`)
 │   │   ├── proposal.ts        # Proposal types
 │   │   ├── contract.ts        # Contract types (agreedPriceTotal, startedAt, tasks[])
+│   │   ├── payment.ts         # Payment types (YENİ)
 │   │   ├── task.ts            # Task types
 │   │   └── qc.ts              # QC Preview types ve yardımcı fonksiyonlar (extractAnnotationShapes vb.)
 │   │
@@ -288,6 +290,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/
 | Proposals | `api/proposals.ts` | `/api/v1/proposals` |
 | Listings | `api/listings.ts` | `/api/v1/listings` |
 | Contracts | `api/contracts.ts` | `/api/v1/contracts` |
+| Payments | `api/payments.ts` | `/api/v1/payments` |
 | Tasks | `api/tasks.ts` | `/api/v1/tasks` |
 
 ## 🧪 Test
@@ -404,6 +407,10 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Admin Faz 3**: `BaseModal` API standardizasyonu — tüm admin sayfalarında `v-model` kullanımı `open` + `@close` event API'sine dönüştürüldü.
 - [x] **Admin Faz 3**: `AdminUserDetail` ve ilişkili summary tipleri (`AdminUserAuditLogSummary`, `AdminUserProposalSummary` vb.) `types/admin.ts`'e eklendi; `AdminUserListItem` bozulmadan korundu.
 - [x] **Admin Faz 3**: `AdminAuditLogsPage`'de `AuditLogRow` view-model ile recursive `JsonValue` tipi template'ten izole edilerek "Type instantiation is excessively deep" hatası kalıcı olarak çözüldü.
+- [x] **Faz 4 (Lifecycle Hardening)**: Payment-gated sözleşme akışı entegre edildi. Sözleşmeler ilk olarak `pending_payment` durumunda başlar; mock ödeme sonrası `active` olur.
+- [x] **Faz 4 (Lifecycle Hardening)**: İptal (Cancel) ve iade (Refund) suistimalini önlemek için `ContractsPage` UI üzerinde zorunlu neden belirterek iptal akışı (dispute mekanizması) eklendi.
+- [x] **Faz 4 (Lifecycle Hardening)**: Labeler UI güncellemeleri — `MyContractsPage` ve `TasksPage` üzerinde `pending_payment` durumu için bilgilendirme eklendi, ödemesi tamamlanmayan işlerde task işlemleri engellendi.
+- [x] **Faz 4 (Lifecycle Hardening)**: Regresyon testleri için manuel kontrol listesi (`docs/lifecycle-regression-checklist.md`) standartlaştırıldı.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
@@ -424,6 +431,7 @@ Frontend, backend API'ye şu endpoint'ler üzerinden bağlanır:
 | Proposals | `/api/v1/proposals` | Client başvuru yönetimi, Labeler başvuru takibi |
 | Listings | `/api/v1/listings` | Client & Labeler |
 | Contracts | `/api/v1/contracts` | Client & Labeler |
+| Payments | `/api/v1/payments` | Client mock ödeme akışı |
 | Tasks | `/api/v1/tasks` | Labeler görevleri |
 | Admin | `/api/v1/admin` | Admin sayfaları |
 | Admin (Audit) | `/api/v1/admin/audit-logs` | Audit Logs sayfası |

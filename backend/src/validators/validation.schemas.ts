@@ -15,6 +15,10 @@ export const idParamSchema = Joi.object({
   id: uuidSchema,
 });
 
+export const contractIdParamSchema = Joi.object({
+  contractId: uuidSchema,
+});
+
 export const uuidArraySchema = Joi.object({
   ids: Joi.array().items(uuidSchema).min(1).required().messages({
     'array.min': 'At least one ID must be provided',
@@ -205,7 +209,7 @@ export const updateListingSchema = Joi.object({
   qcMode: Joi.string().valid('none', 'client_approval', 'internal_reviewer').optional(),
   priceTotal: Joi.number().positive().precision(2).optional(),
   deadlineAt: Joi.date().iso().greater('now').optional().allow(null),
-  status: Joi.string().valid('open', 'in_progress', 'completed', 'cancelled').optional(),
+  status: Joi.string().valid('open','payment_pending', 'in_progress', 'completed', 'cancelled').optional(),
   annotationFormat: Joi.string().valid('COCO', 'YOLO', 'VOC', 'Custom').optional(),
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
@@ -225,6 +229,21 @@ export const rejectContractSchema = Joi.object({
 
 export const cancelContractSchema = Joi.object({
   reason: Joi.string().max(1000).optional().allow(''),
+});
+
+export const resolveDisputeSchema = Joi.object({
+  decision: Joi.string()
+    .valid('refund_client', 'release_to_labeler')
+    .required()
+    .messages({
+      'any.only': 'Decision must be refund_client or release_to_labeler',
+      'any.required': 'Decision is required',
+    }),
+  reason: Joi.string().trim().min(1).max(2000).required().messages({
+    'string.empty': 'Reason is required',
+    'string.min': 'Reason is required',
+    'any.required': 'Reason is required',
+  }),
 });
 
 export const exportContractQuerySchema = Joi.object({
@@ -374,6 +393,18 @@ export const createProposalSchema = Joi.object({
     'any.required': 'Price quote is required',
     'number.positive': 'Price quote must be positive',
   }),
+  deliveryDays: Joi.number()
+    .integer()
+    .min(1)
+    .max(90)
+    .required()
+    .messages({
+      'any.required': 'Delivery time is required',
+      'number.base': 'Delivery time must be a number',
+      'number.integer': 'Delivery time must be an integer number of days',
+      'number.min': 'Delivery time must be at least 1 day',
+      'number.max': 'Delivery time cannot exceed 90 days',
+    }),
   coverLetter: Joi.string().max(2000).optional().allow(''),
 });
 

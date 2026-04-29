@@ -11,7 +11,7 @@ export const createProposal = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { listingId, priceQuote, coverLetter } = req.body;
+    const { listingId, priceQuote, coverLetter, deliveryDays } = req.body;
     const userId = req.user!.id;
     const userRole = req.user!.role;
 
@@ -20,6 +20,7 @@ export const createProposal = async (
       userId,
       userRole,
       priceQuote,
+      deliveryDays,
       coverLetter
     );
 
@@ -87,7 +88,7 @@ export const getProposalById = async (
   }
 };
 
-// Accept a proposal (client only) - Creates a Contract
+// Accept a proposal (client only) - Creates a Contract + auto-initializes Payment
 export const acceptProposal = async (
   req: AuthRequest,
   res: Response,
@@ -101,10 +102,11 @@ export const acceptProposal = async (
 
     res.json({
       success: true,
-      message: 'Proposal accepted and contract created',
+      message: 'Proposal accepted. Payment is required to activate the contract.',
       data: {
-        proposal: { id, status: 'accepted' },
+        proposal: result.proposal,
         contract: result.contract,
+        payment: result.payment,
       },
     });
   } catch (error) {

@@ -238,9 +238,13 @@ function formatPrice(price: number, currency?: string) {
             <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
-            <p class="text-sm text-yellow-800 dark:text-yellow-300">
-              Bu teklifi kabul ettiğinizde sözleşme otomatik olarak başlayacak ve diğer bekleyen teklifler reddedilecektir. Bu işlem geri alınamaz.
-            </p>
+            <div class="text-sm text-yellow-800 dark:text-yellow-300">
+              <ul class="list-disc pl-4 space-y-1">
+                <li>Teklif kabul edilince sözleşme ödeme bekleyen durumda oluşturulur.</li>
+                <li>Müşteri ödeme yapmadan labeler işe başlayamaz.</li>
+                <li>Diğer bekleyen teklifler ödeme başarıyla tamamlanana kadar beklemede kalır.</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -254,7 +258,7 @@ function formatPrice(price: number, currency?: string) {
           class="!bg-green-600 hover:!bg-green-700"
           @click="handleAccept"
         >
-          Kabul Et ve Sözleşme Oluştur
+          Kabul Et ve Ödeme Oluştur
         </BaseButton>
       </template>
     </BaseModal>

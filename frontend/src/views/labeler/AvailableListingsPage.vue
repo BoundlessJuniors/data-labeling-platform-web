@@ -50,6 +50,7 @@ let searchTimeout: ReturnType<typeof setTimeout>;
 const showApplyModal = ref(false);
 const applyingListing = ref<PublicListing | null>(null);
 const applyLoading = ref(false);
+const deliveryDays = ref<number>(7);
 
 async function fetchListings() {
   loading.value = true;
@@ -100,17 +101,24 @@ watch(searchInput, () => {
 
 function openApplyModal(listing: PublicListing) {
   applyingListing.value = listing;
+  deliveryDays.value = 7;
   showApplyModal.value = true;
 }
 
 async function handleApply() {
   if (!applyingListing.value) return;
 
+  if (deliveryDays.value < 1 || deliveryDays.value > 90) {
+    toastStore.error('Teslim süresi 1 ile 90 gün arasında olmalıdır.');
+    return;
+  }
+
   applyLoading.value = true;
   try {
     await apiClient.post('/proposals', {
       listingId: applyingListing.value.id,
       priceQuote: applyingListing.value.priceTotal,
+      deliveryDays: deliveryDays.value,
     });
     toastStore.success('Başvurunuz alındı! Müşteri onayını bekleyiniz.');
     showApplyModal.value = false;
@@ -221,7 +229,21 @@ function formatPrice(price: number, currency: string) {
             {{ applyingListing.totalAssets }} asset için toplam {{ formatPrice(applyingListing.priceTotal, applyingListing.currency) }}
           </p>
         </div>
-        <p class="text-gray-600 dark:text-gray-400">
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Teslim Süresi (gün)
+          </label>
+          <input
+            v-model.number="deliveryDays"
+            type="number"
+            min="1"
+            max="90"
+            class="input w-full"
+          />
+        </div>
+
+        <p class="text-gray-600 dark:text-gray-400 text-sm">
           Bu ilana başvurmak istediğinizden emin misiniz? Müşteri başvurunuzu onayladığında size bildirim gönderilecektir.
         </p>
       </div>

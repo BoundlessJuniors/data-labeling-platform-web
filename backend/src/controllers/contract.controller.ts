@@ -246,3 +246,32 @@ export const retryNormalize = async (
   }
 };
 
+// Resolve dispute (Admin only)
+export const resolveDispute = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { decision, reason } = req.body;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const updatedContract = await contractService.resolveDispute(
+      id,
+      userId,
+      userRole,
+      decision,
+      reason
+    );
+
+    res.json({
+      success: true,
+      data: updatedContract,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
