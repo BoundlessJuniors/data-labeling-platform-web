@@ -6,7 +6,7 @@ import logger from '../lib/logger';
 import { addNormalizeJob } from '../lib/queue';
 import { getSignedUrl } from '../lib/storage';
 import { ExportFormat, ExportableTaskRecord } from '../utils/export/export.types';
-import { extractBboxes } from '../utils/export/export.helpers';
+import { extractExportShapes } from '../utils/export/export.helpers';
 import { exportCoco } from '../utils/export/coco.export';
 import { exportYolo } from '../utils/export/yolo.export';
 import { exportVoc } from '../utils/export/voc.export';
@@ -1065,15 +1065,19 @@ export class ContractService {
         throw new BadRequestError(`Task ${task.id} has an invalid normalized payload format.`);
       }
 
-      const bboxes = extractBboxes(payload.data, labels);
+      if (!task.asset.width || !task.asset.height || task.asset.width <= 0 || task.asset.height <= 0) {
+        throw new BadRequestError(`Task ${task.id} has missing width/height required for export.`);
+      }
+
+      const shapes = extractExportShapes(payload.data, labels, task.asset.width, task.asset.height);
 
       exportableTasks.push({
         taskId: task.id,
         objectKey: task.asset.objectKey,
         basename: task.asset.objectKey.split('/').pop() || `task-${task.id}.jpg`,
-        width: task.asset.width || 0,
-        height: task.asset.height || 0,
-        bboxes,
+        width: task.asset.width,
+        height: task.asset.height,
+        shapes,
       });
     }
 
@@ -1081,11 +1085,6 @@ export class ContractService {
       case 'COCO':
         return exportCoco(contractId, exportableTasks, labels);
       case 'YOLO':
-        // YOLO and VOC normally require width and height to be > 0.
-        const missingDimensions = exportableTasks.find(t => t.width === 0 || t.height === 0);
-        if (missingDimensions) {
-          throw new BadRequestError(`Task ${missingDimensions.taskId} has an asset (key: ${missingDimensions.objectKey}) with missing width or height. This is required for YOLO logic.`);
-        }
         return exportYolo(contractId, exportableTasks, labels);
       case 'VOC':
         return exportVoc(contractId, exportableTasks, labels);

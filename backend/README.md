@@ -43,6 +43,7 @@ npm run dev
 - **Payment-Gated Lifecycle (Faz 4):** Sözleşmeler için ödeme bariyeri (`pending_payment` durumu) eklendi. Ödeme yapılmadan görevlere başlanması engellendi.
 - **Deadline Automation (Faz 4):** Süresi dolan ödemelerin iptali, geciken sözleşmelerin (`overdue`) yönetimi ve otomatik iade süreçleri için `deadline.worker.ts` ve BullMQ entegrasyonu sağlandı.
 - **Refund Abuse Hardening (Faz 4):** Müşterilerin devam eden işlerde haksız iade taleplerini engellemek için doğrudan iptal işlemi kısıtlandı, zorunlu iptal nedeni ve `disputed` (ihtilaflı) durumu zorunlu kılındı.
+- **Multi-Shape Export Desteği:** Sadece Bounding Box (BBOX) yerine `polygon`, `polyline`, `keypoint` ve `circle` şekillerinin COCO, YOLO ve VOC formatlarında dışa aktarımı sağlandı. Sıkı geometri doğrulama, dinamik alan (area) hesaplamaları ve görüntü sınırlarına sıkı kenetlenme (`clampBboxToImage`) ile export hattı (pipeline) güvenli hale getirildi.
 
 ## 📁 Proje Yapısı
 

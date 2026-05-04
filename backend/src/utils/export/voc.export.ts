@@ -38,18 +38,36 @@ export async function exportVoc(
     xml += `    <depth>3</depth>\n`;
     xml += `  </size>\n`;
 
-    task.bboxes.forEach(bbox => {
+    task.shapes.forEach(shape => {
+      const bbox = shape.derivedBbox;
       xml += `  <object>\n`;
-      xml += `    <name>${escapeXml(bbox.label)}</name>\n`;
+      xml += `    <name>${escapeXml(shape.label)}</name>\n`;
       xml += `    <pose>Unspecified</pose>\n`;
       xml += `    <truncated>0</truncated>\n`;
       xml += `    <difficult>0</difficult>\n`;
       xml += `    <bndbox>\n`;
-      xml += `      <xmin>${Math.round(bbox.x)}</xmin>\n`;
-      xml += `      <ymin>${Math.round(bbox.y)}</ymin>\n`;
-      xml += `      <xmax>${Math.round(bbox.x + bbox.width)}</xmax>\n`;
-      xml += `      <ymax>${Math.round(bbox.y + bbox.height)}</ymax>\n`;
+      xml += `      <xmin>${Math.max(Math.round(bbox.x), 0)}</xmin>\n`;
+      xml += `      <ymin>${Math.max(Math.round(bbox.y), 0)}</ymin>\n`;
+      xml += `      <xmax>${Math.min(Math.round(bbox.x + bbox.width), task.width)}</xmax>\n`;
+      xml += `      <ymax>${Math.min(Math.round(bbox.y + bbox.height), task.height)}</ymax>\n`;
       xml += `    </bndbox>\n`;
+
+      xml += `    <shape_type>${shape.type}</shape_type>\n`;
+      if (shape.type === 'polygon' || shape.type === 'polyline') {
+        const points = shape.points;
+        if (points) {
+          xml += `    <points>\n`;
+          points.forEach(p => {
+            xml += `      <point><x>${p.x}</x><y>${p.y}</y></point>\n`;
+          });
+          xml += `    </points>\n`;
+        }
+      } else if (shape.type === 'keypoint') {
+        xml += `    <point><x>${shape.x}</x><y>${shape.y}</y></point>\n`;
+      } else if (shape.type === 'circle') {
+        xml += `    <circle><cx>${shape.cx}</cx><cy>${shape.cy}</cy><r>${shape.r}</r></circle>\n`;
+      }
+
       xml += `  </object>\n`;
     });
     xml += `</annotation>\n`;

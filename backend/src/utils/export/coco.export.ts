@@ -24,6 +24,16 @@ export async function exportCoco(
 
   let annotationId = 1;
 
+  function calculatePolygonArea(points: {x: number, y: number}[]): number {
+    let area = 0;
+    for (let i = 0; i < points.length; i++) {
+      const j = (i + 1) % points.length;
+      area += points[i].x * points[j].y;
+      area -= points[j].x * points[i].y;
+    }
+    return Math.abs(area / 2);
+  }
+
   tasks.forEach((task, index) => {
     const imageId = index + 1;
     images.push({
@@ -33,16 +43,37 @@ export async function exportCoco(
       height: task.height,
     });
 
-    task.bboxes.forEach(bbox => {
-      const categoryId = labelToIdMap.get(bbox.label);
+    task.shapes.forEach(shape => {
+      const categoryId = labelToIdMap.get(shape.label);
       if (categoryId) {
+        const bbox = shape.derivedBbox;
+        let area = bbox.width * bbox.height;
+        let segmentation: any[] = [];
+        const attributes: any = { shape_type: shape.type };
+
+        if (shape.type === 'polygon') {
+          segmentation = [[...shape.points.flatMap(p => [p.x, p.y])]];
+          area = calculatePolygonArea(shape.points);
+        } else if (shape.type === 'polyline') {
+          attributes.points = shape.points;
+        } else if (shape.type === 'keypoint') {
+          attributes.x = shape.x;
+          attributes.y = shape.y;
+        } else if (shape.type === 'circle') {
+          attributes.cx = shape.cx;
+          attributes.cy = shape.cy;
+          attributes.r = shape.r;
+        }
+
         annotations.push({
           id: annotationId++,
           image_id: imageId,
           category_id: categoryId,
           bbox: [bbox.x, bbox.y, bbox.width, bbox.height],
-          area: bbox.width * bbox.height,
+          area,
+          segmentation,
           iscrowd: 0,
+          attributes,
         });
       }
     });

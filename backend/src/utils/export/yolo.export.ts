@@ -1,5 +1,6 @@
 import archiver from 'archiver';
 import { ExportableTaskRecord, ExportArtifact } from './export.types';
+import { BadRequestError } from '../errors';
 import { downloadFromR2 } from '../../lib/storage';
 import logger from '../../lib/logger';
 
@@ -27,6 +28,8 @@ export async function exportYolo(
   const dataYaml = `names:\n${labels.map(l => `  - ${l.name}`).join('\n')}\nnc: ${labels.length}\n`;
   archive.append(dataYaml, { name: 'data.yaml' });
 
+  const shapeMetadata: Record<string, any> = {};
+
   for (const task of tasks) {
     if (task.objectKey) {
       try {
@@ -37,19 +40,40 @@ export async function exportYolo(
       }
     }
 
-    const txtLines = task.bboxes.map(bbox => {
-      const idx = labelToIndex.get(bbox.label)!;
-      const xCenter = (bbox.x + bbox.width / 2) / task.width;
-      const yCenter = (bbox.y + bbox.height / 2) / task.height;
-      const wNorm = bbox.width / task.width;
-      const hNorm = bbox.height / task.height;
+    const txtLines = task.shapes.map(shape => {
+      const idx = labelToIndex.get(shape.label)!;
+      const bbox = shape.derivedBbox;
+      
+      const xCenterRaw = (bbox.x + bbox.width / 2) / task.width;
+      const yCenterRaw = (bbox.y + bbox.height / 2) / task.height;
+      const wNormRaw = bbox.width / task.width;
+      const hNormRaw = bbox.height / task.height;
+
+      if (!Number.isFinite(xCenterRaw) || !Number.isFinite(yCenterRaw) || !Number.isFinite(wNormRaw) || !Number.isFinite(hNormRaw)) {
+        throw new BadRequestError(`Invalid YOLO normalized geometry for annotation ${shape.id} on task ${task.taskId}`);
+      }
+
+      if (wNormRaw <= 0 || hNormRaw <= 0) {
+        throw new BadRequestError(`Invalid YOLO normalized dimensions for annotation ${shape.id} on task ${task.taskId}`);
+      }
+      
+      // Clamp tiny floating-point boundary noise
+      const xCenter = Math.min(Math.max(xCenterRaw, 0), 1);
+      const yCenter = Math.min(Math.max(yCenterRaw, 0), 1);
+      const wNorm = Math.min(Math.max(wNormRaw, 0), 1);
+      const hNorm = Math.min(Math.max(hNormRaw, 0), 1);
+
       return `${idx} ${xCenter.toFixed(6)} ${yCenter.toFixed(6)} ${wNorm.toFixed(6)} ${hNorm.toFixed(6)}`;
     });
 
     const extIndex = task.basename.lastIndexOf('.');
     const basenameWithoutExt = extIndex > -1 ? task.basename.substring(0, extIndex) : task.basename;
     archive.append(txtLines.join('\n'), { name: `labels/${basenameWithoutExt}.txt` });
+
+    shapeMetadata[task.basename] = task.shapes;
   }
+
+  archive.append(JSON.stringify(shapeMetadata, null, 2), { name: 'shape-metadata.json' });
 
   archive.finalize();
   const buffer = await zipBufferPromise;
