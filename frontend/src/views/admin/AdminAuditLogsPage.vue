@@ -94,6 +94,11 @@ const actionOptions = [
   { label: 'review.resolve', value: 'review.resolve' },
   { label: 'annotation.raw_debug_create', value: 'annotation.raw_debug_create' },
   { label: 'annotation.normalized_upsert', value: 'annotation.normalized_upsert' },
+  // Storage lifecycle (system events — actor is null)
+  { label: 'storage.purge_scheduled', value: 'storage.purge_scheduled' },
+  { label: 'storage.purge_started', value: 'storage.purge_started' },
+  { label: 'storage.purge_completed', value: 'storage.purge_completed' },
+  { label: 'storage.purge_failed', value: 'storage.purge_failed' },
 ];
 
 const entityTypeOptions = [
@@ -104,6 +109,7 @@ const entityTypeOptions = [
   { label: 'review', value: 'review' },
   { label: 'annotation_raw', value: 'annotation_raw' },
   { label: 'annotation_normalized', value: 'annotation_normalized' },
+  { label: 'dataset', value: 'dataset' },
   { label: 'system', value: 'system' },
 ];
 
@@ -269,9 +275,17 @@ watch(() => route.query, (newQ, oldQ) => {
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ log.actor?.displayName || 'Unknown' }}</div>
-                <div class="text-sm text-slate-500 dark:text-slate-400">{{ log.actor?.email }}</div>
-                <div class="text-xs text-slate-400 dark:text-slate-500 capitalize">{{ log.actor?.role }}</div>
+                <!-- Human actor -->
+                <template v-if="log.actor">
+                  <div class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ log.actor.displayName || log.actor.email }}</div>
+                  <div class="text-sm text-slate-500 dark:text-slate-400">{{ log.actor.email }}</div>
+                  <div class="text-xs text-slate-400 dark:text-slate-500 capitalize">{{ log.actor.role }}</div>
+                </template>
+                <!-- System/worker event (actor is null) -->
+                <template v-else>
+                  <div class="text-sm font-medium text-slate-400 dark:text-slate-500 italic">System</div>
+                  <div class="text-xs text-slate-400 dark:text-slate-500 italic">Background Worker</div>
+                </template>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm text-slate-900 dark:text-slate-100">{{ log.entityType }}</div>

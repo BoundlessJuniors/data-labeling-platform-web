@@ -123,6 +123,20 @@ enum AnnotationFormat {
   Custom
 }
 
+// Storage lifecycle state for datasets and their assets.
+// active:           Objects exist in storage (default).
+// purge_scheduled:  Cleanup is scheduled; objects not yet deleted.
+// purging:          Deletion in progress.
+// purged:           All objects deleted; DB metadata retained.
+// purge_failed:     One or more objects could not be deleted; retry pending.
+enum StorageState {
+  active
+  purge_scheduled
+  purging
+  purged
+  purge_failed
+}
+
 // ============================================================================
 // 1. USERS
 // Hem müşteri hem etiketleyici tek tabloda. Rol alanıyla ayrılır.
@@ -150,6 +164,7 @@ model User {
   // Explicit named relations because Payment now has two User FKs.
   payments              Payment[]              @relation("PaymentPayer")
   labelerPayments       Payment[]              @relation("PaymentLabeler")
+  // AuditLog.actorUserId is now nullable; back-relation kept for human-initiated events.
   auditLogs             AuditLog[]
   reviews               Review[]
   proposals             Proposal[]
@@ -172,6 +187,14 @@ model Dataset {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Storage lifecycle — tracks object purge state (DB metadata always retained)
+  storageState            StorageState @default(active) @map("storage_state")
+  storagePurgeEligibleAt  DateTime?    @map("storage_purge_eligible_at") @db.Timestamptz
+  storagePurgeScheduledAt DateTime?    @map("storage_purge_scheduled_at") @db.Timestamptz
+  storagePurgedAt         DateTime?    @map("storage_purged_at") @db.Timestamptz
+  storagePurgeReason      String?      @map("storage_purge_reason")
+  storagePurgeError       String?      @map("storage_purge_error")
+
   // Relations
   owner    User      @relation(fields: [ownerUserId], references: [id])
   assets   Asset[]
@@ -179,6 +202,8 @@ model Dataset {
 
   @@index([ownerUserId])
   @@index([status])
+  @@index([storageState])
+  @@index([storagePurgeEligibleAt])
   @@map("datasets")
 }
 
@@ -208,12 +233,18 @@ model Asset {
   processingError String?     @map("processing_error")
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
 
+  // Storage lifecycle — mirrors Dataset.storageState at per-asset granularity
+  storageState      StorageState @default(active) @map("storage_state")
+  objectDeletedAt   DateTime?    @map("object_deleted_at") @db.Timestamptz
+  objectDeleteError String?      @map("object_delete_error")
+
   // Relations
   dataset Dataset @relation(fields: [datasetId], references: [id])
   tasks   Task[]
 
   @@unique([datasetId, objectKey])
   @@index([datasetId])
+  @@index([storageState])
   @@map("assets")
 }
 
@@ -570,7 +601,9 @@ model EscrowLedger {
 
 model AuditLog {
   id          String   @id @default(uuid()) @db.Uuid
-  actorUserId String   @map("actor_user_id") @db.Uuid
+  // Nullable: system/worker events (e.g. storage cleanup) are logged with actorUserId = null.
+  // Human-initiated events always set this to the authenticated user's id.
+  actorUserId String?  @map("actor_user_id") @db.Uuid
   action      String
   entityType  String   @map("entity_type")
   entityId    String   @map("entity_id") @db.Uuid
@@ -578,7 +611,7 @@ model AuditLog {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  actor User @relation(fields: [actorUserId], references: [id])
+  actor User? @relation(fields: [actorUserId], references: [id])
 
   @@index([actorUserId])
   @@index([entityType, entityId])

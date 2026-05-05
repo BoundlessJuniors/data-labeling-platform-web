@@ -254,3 +254,25 @@ export async function deleteFromR2(key: string): Promise<void> {
   await s3Client.send(command);
   logger.info(`Deleted from storage: ${key}`);
 }
+
+/**
+ * Idempotent variant of deleteFromR2.
+ * Returns true if the object was deleted or was already absent.
+ * Throws only on genuine storage errors (auth failures, network errors, etc.).
+ */
+export async function deleteFromR2Safe(key: string): Promise<boolean> {
+  try {
+    await deleteFromR2(key);
+    return true;
+  } catch (err: any) {
+    // S3/R2/MinIO return NoSuchKey or a 404 when the object does not exist.
+    // Treat both as a successful delete (idempotent).
+    const code: string | undefined = err?.Code ?? err?.code ?? err?.name;
+    const status: number | undefined = err?.$metadata?.httpStatusCode;
+    if (code === 'NoSuchKey' || status === 404) {
+      logger.info(`Object already absent in storage (idempotent delete): ${key}`);
+      return true;
+    }
+    throw err;
+  }
+}

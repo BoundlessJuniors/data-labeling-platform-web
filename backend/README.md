@@ -37,7 +37,9 @@ npm run dev
 
 ## 📝 Son Güncellemeler (Patch Notes)
 
+- **Storage Lifecycle:** Onaylanan sözleşmeler, ilgili dataset'in kaynak görsel objelerini R2/MinIO'dan `STORAGE_RETENTION_DAYS` (varsayılan: 7 gün) sonra otomatik olarak siler. DB metadata her zaman korunur. Yeni `StorageState` enum, `Dataset` ve `Asset` tablolarında depolama yaşam döngüsünü izler. Silinen assetler için `signedUrl: null` döner. Kaçırılan işler, `storage-cleanup` worker'ının tekrarlayan tarama (scan) jobı ile geri kazanılır.
 - **Auth Session Uyumlaştırılması:** JWT token `expiresIn` süresi ile çerez `maxAge` süresi tek bir kaynaktan (`JWT_EXPIRES_IN`) yönetilerek senkronize edildi.
+
 - **QC Canonical Raw Düzeltmesi:** Read ve QC endpoint'lerinde (`getTaskQcView` ve `getTaskById`) dönen en güncel ham verinin admin debug kayıtları değil, kanonik kayıt (`leaseToken != null`) olması sağlandı.
 - **Lease Response Tutarlılığı:** `POST /tasks/lease-batch` ve `POST /tasks/:id/lease` endpoint'lerinin yanıt yapısı düzleştirilerek, istemciler için `leaseToken` ve `leasedUntil` alanları `task` objesinin root seviyesine çıkarıldı.
 - **Payment-Gated Lifecycle (Faz 4):** Sözleşmeler için ödeme bariyeri (`pending_payment` durumu) eklendi. Ödeme yapılmadan görevlere başlanması engellendi.

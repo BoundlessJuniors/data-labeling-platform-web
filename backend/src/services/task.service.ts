@@ -673,9 +673,11 @@ export class TaskService {
     logger.info(`Released ${expiredLeases.length} expired leases`);
 
     if (adminUserId && expiredLeases.length > 0) {
-      // Create a single system-level log for the batch using the admin's id
-      await auditService.logAction(adminUserId, 'task.release_expired_leases', 'system', 'leases', {
+      // Use adminUserId as entityId — AuditLog.entityId is @db.Uuid and 'leases' is not a UUID.
+      // The actual scope is captured in metaJson.
+      await auditService.logAction(adminUserId, 'task.release_expired_leases', 'system', adminUserId, {
         releasedCount: expiredLeases.length,
+        target: 'expired_task_leases',
       });
     }
 
@@ -815,6 +817,7 @@ export class TaskService {
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
+        // storageState must be included to guard signed URL generation
         asset: true,
         contract: {
           include: {
@@ -849,13 +852,18 @@ export class TaskService {
       throw new ForbiddenError('You do not have access to this task');
     }
 
-    // Generate signed URL for direct image access
+    // Generate signed URL for direct image access.
+    // Skip for purged assets — the source image is no longer in storage.
     let imageUrl: string | null = null;
     if (task.asset?.objectKey) {
-      try {
-        imageUrl = await getSignedUrl(task.asset.objectKey, 3600);
-      } catch (err) {
-        logger.warn(`Failed to generate signed URL for asset ${task.asset.id}:`, err);
+      if (task.asset.storageState === 'purged') {
+        imageUrl = null;
+      } else {
+        try {
+          imageUrl = await getSignedUrl(task.asset.objectKey, 3600);
+        } catch (err) {
+          logger.warn(`Failed to generate signed URL for asset ${task.asset.id}:`, err);
+        }
       }
     }
 

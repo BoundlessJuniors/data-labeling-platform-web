@@ -11,6 +11,7 @@ import { exportCoco } from '../utils/export/coco.export';
 import { exportYolo } from '../utils/export/yolo.export';
 import { exportVoc } from '../utils/export/voc.export';
 import { auditService } from './audit.service';
+import { storageLifecycleService } from './storage-lifecycle.service';
 
 // ── Local helpers ─────────────────────────────────────────────────────────────
 
@@ -501,6 +502,13 @@ export class ContractService {
       logger.warn('Audit log failed for contract.approve', auditErr);
     }
 
+    // Schedule storage lifecycle cleanup — must not fail the approval
+    try {
+      await storageLifecycleService.scheduleDatasetPurgeForContract(contractId, 'contract_approve');
+    } catch (lifecycleErr) {
+      logger.warn(`[StorageLifecycle] Failed to schedule purge for contract ${contractId}:`, lifecycleErr);
+    }
+
     logger.info(`Contract approved: ${contractId}`);
 
     return updatedContract;
@@ -906,7 +914,8 @@ export class ContractService {
         id: true,
         status: true,
         asset: {
-          select: { id: true, objectKey: true, mimeType: true, width: true, height: true },
+          // storageState must be selected so we can skip signed URL for purged assets
+          select: { id: true, objectKey: true, mimeType: true, width: true, height: true, storageState: true },
         },
       },
     });
@@ -927,10 +936,15 @@ export class ContractService {
       sample.map(async (task) => {
         let imageUrl: string | null = null;
         if (task.asset?.objectKey) {
-          try {
-            imageUrl = await getSignedUrl(task.asset.objectKey, 3600);
-          } catch (err) {
-            logger.warn(`Failed to generate signed URL for asset ${task.asset?.id}:`, err);
+          // Skip URL generation for purged assets
+          if (task.asset.storageState === 'purged') {
+            imageUrl = null;
+          } else {
+            try {
+              imageUrl = await getSignedUrl(task.asset.objectKey, 3600);
+            } catch (err) {
+              logger.warn(`Failed to generate signed URL for asset ${task.asset?.id}:`, err);
+            }
           }
         }
         return { ...task, imageUrl };
@@ -1301,6 +1315,13 @@ export class ContractService {
         platformAmount,
       });
     } catch (auditErr) { logger.warn('Audit log failed for contract.dispute_released', auditErr); }
+
+    // Schedule storage lifecycle cleanup after dispute release — must not fail the resolution
+    try {
+      await storageLifecycleService.scheduleDatasetPurgeForContract(contractId, 'admin_dispute_release');
+    } catch (lifecycleErr) {
+      logger.warn(`[StorageLifecycle] Failed to schedule purge after dispute release for contract ${contractId}:`, lifecycleErr);
+    }
 
     return updatedContract;
   }

@@ -1,4 +1,4 @@
-import { Prisma, UserRole } from "@prisma/client";
+import { Prisma, StorageState, UserRole } from "@prisma/client";
 import path from "path";
 import { randomUUID } from "crypto";
 import prisma from "../lib/db";
@@ -11,7 +11,7 @@ import { cacheDelete, cacheDeletePattern } from "../lib/redis";
 import {
   uploadToR2,
   getSignedUrl,
-  deleteFromR2,
+  deleteFromR2Safe,
   getPresignedPutUrl,
 } from "../lib/storage";
 import { addAssetJob } from "../lib/queue";
@@ -27,21 +27,27 @@ interface UploadedFile {
 
 export class AssetService {
   /**
-   * Helper: Attach a signed URL to a single asset record
+   * Helper: Attach a signed URL to a single asset record.
+   * Returns signedUrl: null if the asset's object has been purged from storage.
+   * The asset's storageState field must be included in the query that fetches the asset.
    */
-  private async attachSignedUrl<T extends { objectKey: string }>(
+  private async attachSignedUrl<T extends { objectKey: string; storageState: StorageState }>(
     asset: T,
-  ): Promise<T & { signedUrl: string }> {
+  ): Promise<T & { signedUrl: string | null }> {
+    if (asset.storageState === StorageState.purged) {
+      return { ...asset, signedUrl: null };
+    }
     const signedUrl = await getSignedUrl(asset.objectKey);
     return { ...asset, signedUrl };
   }
 
   /**
-   * Helper: Attach signed URLs to a list of asset records
+   * Helper: Attach signed URLs to a list of asset records.
+   * Purged assets receive signedUrl: null.
    */
-  private async attachSignedUrls<T extends { objectKey: string }>(
+  private async attachSignedUrls<T extends { objectKey: string; storageState: StorageState }>(
     assets: T[],
-  ): Promise<(T & { signedUrl: string })[]> {
+  ): Promise<(T & { signedUrl: string | null })[]> {
     return Promise.all(assets.map((a) => this.attachSignedUrl(a)));
   }
 
@@ -191,7 +197,7 @@ export class AssetService {
       prisma.asset.count({ where }),
     ]);
 
-    // Attach signed URLs
+    // Attach signed URLs (purged assets get signedUrl: null)
     const assets = await this.attachSignedUrls(rawAssets);
 
     return {
@@ -206,7 +212,9 @@ export class AssetService {
   }
 
   /**
-   * Get a single asset by ID
+   * Get a single asset by ID.
+   * Purged assets are still returned (metadata is always preserved);
+   * signedUrl will be null for purged assets.
    */
   async getAssetById(
     assetId: string,
@@ -253,6 +261,7 @@ export class AssetService {
       throw new ForbiddenError("Bu asete erişim yetkiniz yok.");
     }
 
+    // Return metadata for purged assets with signedUrl: null
     return this.attachSignedUrl(rawAsset);
   }
 
@@ -316,7 +325,9 @@ export class AssetService {
   }
 
   /**
-   * Delete an asset
+   * Delete an asset (only for datasets not linked to any listing).
+   * - If the asset's object has already been purged from storage, skips R2 deletion.
+   * - If the object is missing in storage (404/NoSuchKey), tolerates it.
    */
   async deleteAsset(assetId: string, userId: string, userRole: UserRole) {
     // Check if asset exists and user has access
@@ -343,13 +354,15 @@ export class AssetService {
       );
     }
 
-    // Delete from R2 first
-    try {
-      await deleteFromR2(existingAsset.objectKey);
-    } catch (r2Err) {
-      logger.warn(
-        `Failed to delete object from R2 (key: ${existingAsset.objectKey}): ${r2Err}`,
-      );
+    // Delete physical object from R2 (skipped if already purged; tolerates missing objects)
+    if (existingAsset.storageState !== StorageState.purged) {
+      try {
+        await deleteFromR2Safe(existingAsset.objectKey);
+      } catch (r2Err) {
+        logger.warn(
+          `Failed to delete object from R2 (key: ${existingAsset.objectKey}): ${r2Err}`,
+        );
+      }
     }
 
     await prisma.asset.delete({

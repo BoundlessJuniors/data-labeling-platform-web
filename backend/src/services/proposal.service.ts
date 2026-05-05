@@ -5,7 +5,7 @@
 //   acceptProposal → pending_payment contract + auto-init payment
 // ============================================================================
 
-import { ContractStatus, ListingStatus, UserRole } from '@prisma/client';
+import { ContractStatus, ListingStatus, StorageState, UserRole } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
@@ -273,7 +273,16 @@ export class ProposalService {
       const proposal = await tx.proposal.findUnique({
         where: { id: proposalId },
         include: {
-          listing: true,
+          listing: {
+            include: {
+              dataset: {
+                select: {
+                  id: true,
+                  storageState: true,
+                },
+              },
+            },
+          },
           labeler: {
             select: { id: true, email: true, displayName: true },
           },
@@ -297,6 +306,13 @@ export class ProposalService {
       // 4. Listing state check
       if (proposal.listing.status !== 'open') {
         throw new BadRequestError('Cannot accept proposals for a listing that is not open');
+      }
+
+      // 4b. Dataset storage state check — the dataset must still be active in storage
+      if (proposal.listing.dataset.storageState !== StorageState.active) {
+        throw new BadRequestError(
+          'Cannot accept proposal because the dataset source files are not active in storage.'
+        );
       }
 
       // 5. Mark proposal accepted
@@ -332,11 +348,24 @@ export class ProposalService {
         },
       });
 
-      // 7. Find all assets in the dataset
+      // 7. Find all assets in the dataset that are still active in storage
       const assets = await tx.asset.findMany({
-        where: { datasetId: contract.listing.datasetId },
+        where: {
+          datasetId: contract.listing.datasetId,
+          storageState: StorageState.active,
+        },
         select: { id: true },
       });
+
+      // Pre-flight: ensure there are no non-active assets (purge in flight, etc.)
+      const totalAssets = await tx.asset.count({
+        where: { datasetId: contract.listing.datasetId },
+      });
+      if (totalAssets > 0 && assets.length < totalAssets) {
+        throw new BadRequestError(
+          'Cannot create tasks because one or more dataset assets are not active in storage.'
+        );
+      }
 
       if (assets.length === 0) {
         throw new BadRequestError('Dataset is empty, cannot create tasks.');

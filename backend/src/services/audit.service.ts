@@ -3,10 +3,17 @@ import { Prisma } from '@prisma/client';
 
 export class AuditService {
   /**
-   * Logs an administrative action to the database.
+   * Logs an administrative or system action to the database.
+   *
+   * actorUserId: pass the authenticated user's id for human-initiated events,
+   *              or null for system/worker events (e.g. storage lifecycle purge).
+   *
+   * metaJson source handling:
+   *   - The default source is 'admin_panel'.
+   *   - If the caller passes { source: 'my_worker', ... } it is preserved as-is.
    */
   async logAction(
-    actorUserId: string,
+    actorUserId: string | null,
     action: string,
     entityType: string,
     entityId: string,
@@ -15,14 +22,15 @@ export class AuditService {
   ) {
     const db = transaction || prisma;
 
-    // Build the meta object, enforcing standard props when provided
-    const payload = metaJson && typeof metaJson === 'object' 
-      ? { ...metaJson, source: 'admin_panel' } 
+    // Build the meta object.
+    // Caller-provided source wins; fallback is 'admin_panel'.
+    const payload = metaJson && typeof metaJson === 'object'
+      ? { source: 'admin_panel', ...metaJson }
       : { source: 'admin_panel', meta: metaJson };
 
     return db.auditLog.create({
       data: {
-        actorUserId,
+        actorUserId: actorUserId ?? null,
         action,
         entityType,
         entityId,
@@ -84,6 +92,7 @@ export class AuditService {
         skip,
         take: limit,
         include: {
+          // actor is now optional (null for system events)
           actor: {
             select: { id: true, email: true, displayName: true, role: true },
           },

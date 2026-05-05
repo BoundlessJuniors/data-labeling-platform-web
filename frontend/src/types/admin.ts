@@ -345,18 +345,20 @@ export interface AdminTaskAnnotationsResponse {
 
 export interface AdminAuditLogItem {
   id: string;
-  actorUserId: string;
+  /** null for system/worker events (e.g. storage lifecycle purge) */
+  actorUserId: string | null;
   action: string;
   entityType: string;
   entityId: string;
   metaJson: JsonValue | null;
   createdAt: string;
+  /** null for system/worker events */
   actor: {
     id: string;
     email: string;
     displayName: string | null;
     role: string;
-  };
+  } | null;
 }
 
 // ============================================================================

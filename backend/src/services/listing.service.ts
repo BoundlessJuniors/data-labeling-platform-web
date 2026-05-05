@@ -1,4 +1,4 @@
-import { AnnotationFormat, ListingStatus, Prisma, QcMode } from '@prisma/client';
+import { AnnotationFormat, ListingStatus, Prisma, QcMode, StorageState } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
@@ -37,6 +37,14 @@ export class ListingService {
 
     if (userRole !== 'admin' && dataset.ownerUserId !== userId) {
       throw new ForbiddenError('You do not have permission to create a listing for this dataset');
+    }
+
+    // Prevent listing creation on datasets whose source files are not active in storage.
+    // This covers purge_scheduled, purging, purged, and purge_failed states.
+    if (dataset.storageState !== StorageState.active) {
+      throw new BadRequestError(
+        'Cannot create a listing for this dataset because its source files are not active in storage.'
+      );
     }
 
     // Verify labelset exists

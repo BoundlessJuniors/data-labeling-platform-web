@@ -1,8 +1,8 @@
-import { DatasetStatus, Prisma, UserRole } from '@prisma/client';
+import { DatasetStatus, Prisma, StorageState, UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import { cacheDeletePattern } from '../lib/redis';
-import { deleteFromR2 } from '../lib/storage';
+import { deleteFromR2Safe } from '../lib/storage';
 import logger from '../lib/logger';
 
 export class DatasetService {
@@ -222,13 +222,16 @@ export class DatasetService {
     // 1. Fetch all assets so we can clean up MinIO objects
     const assets = await prisma.asset.findMany({
       where: { datasetId },
-      select: { id: true, objectKey: true },
+      select: { id: true, objectKey: true, storageState: true },
     });
 
     // 2. Delete physical files from MinIO / R2
-    // We use allSettled to ensure we try to delete all files even if some fail
+    // Skip assets whose objects have already been purged by the lifecycle service.
+    // deleteFromR2Safe tolerates missing objects (NoSuchKey / 404) — safe to retry.
     await Promise.allSettled(
-      assets.map((a) => deleteFromR2(a.objectKey))
+      assets
+        .filter((a) => a.storageState !== StorageState.purged)
+        .map((a) => deleteFromR2Safe(a.objectKey))
     );
 
     // 3. Delete DB records inside a transaction (assets first, then dataset)

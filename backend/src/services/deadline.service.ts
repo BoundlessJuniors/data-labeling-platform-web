@@ -1,6 +1,7 @@
 import { ContractStatus, ListingStatus, PaymentStatus, EscrowType, SubmissionStatus, Prisma } from '@prisma/client';
 import prisma from '../lib/db';
 import logger from '../lib/logger';
+import { storageLifecycleService } from './storage-lifecycle.service';
 
 export interface DeadlineProcessSummary {
   expiredPendingPayments: number;
@@ -399,6 +400,13 @@ export class DeadlineService {
 
         logger.info(`[DeadlineService] Auto-approved contract ${contract.id} and released payment ${payment.id}`);
         processed++;
+
+        // Schedule storage lifecycle cleanup — must not fail the deadline scan loop
+        try {
+          await storageLifecycleService.scheduleDatasetPurgeForContract(contract.id, 'deadline_auto_approve');
+        } catch (lifecycleErr) {
+          logger.warn(`[DeadlineService] Failed to schedule storage purge for contract ${contract.id}:`, lifecycleErr);
+        }
       } catch (err) {
         logger.error(`[DeadlineService] Error auto-approving contract ${contract.id}:`, err);
       }

@@ -23,7 +23,8 @@ import { ensureBucket } from './lib/storage';
 import { startAssetWorker } from './workers/asset.worker';
 import { startNormalizeWorker } from './workers/normalize.worker';
 import { startDeadlineWorker } from './workers/deadline.worker';
-import { addDeadlineScanJob } from './lib/queue';
+import { startStorageCleanupWorker } from './workers/storage-cleanup.worker';
+import { addDeadlineScanJob, addStorageCleanupScanJob } from './lib/queue';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -80,7 +81,9 @@ const startServer = async () => {
     startAssetWorker();
     startNormalizeWorker();
     startDeadlineWorker();
+    startStorageCleanupWorker();
     await addDeadlineScanJob().catch(err => logger.warn('Failed to add deadline scan job:', err));
+    await addStorageCleanupScanJob().catch(err => logger.warn('Failed to add storage cleanup scan job:', err));
 
     // Ensure the storage bucket exists (creates it on MinIO if missing)
     await ensureBucket();

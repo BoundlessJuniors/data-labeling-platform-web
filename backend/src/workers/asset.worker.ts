@@ -28,6 +28,21 @@ export function startAssetWorker() {
       logger.info(`[AssetWorker] Processing job ${job.id} for asset ${assetId}`);
 
       try {
+        // Reload asset to check current storageState.
+        // If the dataset has been purged since this job was enqueued, skip processing.
+        const freshAsset = await prisma.asset.findUnique({
+          where: { id: assetId },
+          select: { id: true, storageState: true },
+        });
+        if (!freshAsset) {
+          logger.warn(`[AssetWorker] Asset ${assetId} not found; skipping job ${job.id}`);
+          return;
+        }
+        if (freshAsset.storageState === 'purged') {
+          logger.info(`[AssetWorker] Asset ${assetId} is purged; skipping processing job ${job.id}`);
+          return;
+        }
+
         // 1. Update status to processing
         await prisma.asset.update({
           where: { id: assetId },
