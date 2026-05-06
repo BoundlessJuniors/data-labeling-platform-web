@@ -130,6 +130,10 @@ export const adminApi = {
     return apiClient.get<PaginatedResponse<AdminInviteRequestItem>>('/admin/invite-requests', { params });
   },
 
+  rejectInviteRequest(id: string) {
+    return apiClient.patch<ApiResponse<AdminInviteRequestItem>>(`/admin/invite-requests/${id}/reject`);
+  },
+
   createInviteCode(payload: AdminCreateInviteCodePayload) {
     return apiClient.post<ApiResponse<AdminInviteCodeItem>>('/admin/invite-codes', payload);
   },

@@ -298,3 +298,25 @@ export const getInviteRequests = async (
   }
 };
 
+// Reject a pending invite request (admin only)
+export const rejectInviteRequest = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+    const { id } = req.params;
+    const adminUserId = req.user!.id;
+
+    const updatedRequest = await adminService.rejectInviteRequest(adminUserId, id);
+
+    res.json({
+      success: true,
+      data: updatedRequest,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

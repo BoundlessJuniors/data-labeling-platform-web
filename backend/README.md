@@ -48,6 +48,17 @@ npm run dev
 - **Refund Abuse Hardening (Faz 4):** Müşterilerin devam eden işlerde haksız iade taleplerini engellemek için doğrudan iptal işlemi kısıtlandı, zorunlu iptal nedeni ve `disputed` (ihtilaflı) durumu zorunlu kılındı.
 - **Multi-Shape Export Desteği:** Sadece Bounding Box (BBOX) yerine `polygon`, `polyline`, `keypoint` ve `circle` şekillerinin COCO, YOLO ve VOC formatlarında dışa aktarımı sağlandı. Sıkı geometri doğrulama, dinamik alan (area) hesaplamaları ve görüntü sınırlarına sıkı kenetlenme (`clampBboxToImage`) ile export hattı (pipeline) güvenli hale getirildi.
 
+### P0 Beta Upload/Storage Hardening
+
+- **Storage CORS (Env Tabanlı):** `backend/src/lib/storage.ts` içinde CORS origin listesi hardcoded olmaktan çıkarıldı. `STORAGE_ALLOWED_ORIGINS` (yoksa `ALLOWED_ORIGINS`) ortam değişkeninden okunuyor; prod ortamında liste boşsa konfigürasyon güvenli şekilde atlanıp loglanıyor.
+- **initiateUpload Race-Safe Quota:** `AssetService.initiateUpload` içindeki tüm kota kontrolleri `prisma.$transaction` bloğuna alındı. Non-admin kullanıcılar için `dataset` ve `user` satırları `SELECT … FOR UPDATE` ile kilitlenerek aynı anda gelen paralel isteklerin dataset asset veya depolama kotasını aşması engellendi. Dataset asset sayımına `storageState != purged` filtresi eklendi; böylece worker tarafından reddedilmiş/purged kayıtlar limit sayımına dahil edilmedi.
+- **completeUpload Concurrent-Safe (Atomic):** `prisma.asset.update` yerine `prisma.asset.updateMany(WHERE id=? AND status='pending')` kullanılarak `pending → uploaded` geçişi atomik hale getirildi. Yarışı kazanamayan eş zamanlı istek duplicate BullMQ job üretmeden idempotent yanıt alır.
+- **completeUpload Idempotency Guard'ları:** `storageState === purged` → `BadRequestError`; `status ∈ {uploaded, processing, ready}` → mevcut asset ile dön (no-op); `status === error` → yeniden yükleme talep eden `BadRequestError`. Bu guard'lar sayesinde frontend'in birden fazla confirm çağrısı güvenlidir.
+- **Asset Worker — Oversized Lifecycle Tutarlılığı:** Yüklenen nesne `BETA_MAX_FILE_SIZE_BYTES` sınırını aşarsa `rejectUploadedObject` helper'ı ile nesne storage'dan silinir; silme başarılıysa asset `storageState = purged`, `objectDeletedAt = now` olarak güncellenir. Silme başarısız olursa `storageState` değiştirilmez, `objectDeleteError` yazılır — fiziksel depolama ile DB metadatası her koşulda tutarlı kalır.
+- **Asset Worker — Toplam Storage Kota Kontrolü (Pre-Download):** HeadObject ile alınan gerçek `actualSizeBytes` kullanılarak download ve Sharp işlemine girmeden önce user toplam depolama kotası transaction içinde kontrol ediliyor. Kota aşılırsa `rejectUploadedObject` çağrılır, nesne silinir ve worker retry döngüsüne girmeden (`return`) sonlanır. Bu mekanizma, client'ın `/assets/initiate` isteğinde sahte küçük `fileSize` göndererek kotayı aşma saldırısını engeller.
+- **getAssets — Purged Filtre:** `AssetService.getAssets` liste sorgusu artık `storageState != purged` filtresiyle çalışıyor. `pagination.total` aktif (non-purged) asset sayısını yansıtır; bu sayede frontend `isAssetLimitReached` hesabı backend kota mantığıyla tutarlı olur.
+- **Admin Invite Request Reject:** `PATCH /api/v1/admin/invite-requests/:id/reject` endpoint'i eklendi. `pending` durumdaki davetiye istekleri `rejected` statüsüne çekilebiliyor; işlem audit log'a kaydediliyor.
+
 ## 📁 Proje Yapısı
 
 ```
@@ -174,7 +185,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
 | GET | `/dashboard` | İstatistik paneli verileri (20+ metrik) |
-| GET | `/users` | Tüm kullanıcıları listele (sayfahlı, filtrelenebilir) |
+| GET | `/users` | Tüm kullanıcıları listele (sayhalı, filtrelenebilir) |
 | GET | `/users/:id` | Kullanıcı detayı (ilişki sayıları + son auditLog/proposal listesi) |
 | PATCH | `/users/:id` | Kullanıcı rolünü vs. güncelle |
 | DELETE | `/users/:id` | Kullanıcı sil |
@@ -183,6 +194,8 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/audit-logs` | Denetim loglarını listele (`?action`, `?entityType`, `?entityId`, `?actorSearch`, sayfalama) |
 | GET | `/payments/dashboard` | Platform ödeme istatistikleri ve escrow özetleri (Faz 10) |
 | GET | `/payments` | Ödeme kayıtlarını filtreli ve sayfalı olarak listele (Faz 10) |
+| GET | `/invite-requests` | Beta davetiye taleplerini listele (sayfalı) |
+| PATCH | `/invite-requests/:id/reject` | Bekleyen davetiye talebini reddet — audit log kaydeder |
 
 > **Faz 2 Mimari Yönelim:** Sözleşme (Contract), Görev (Task) veya Review incelemeleri için admin paneli, gereksiz route kopyalaması yapmak yerine varolan root endpoint'leri (`/contracts`, `/tasks`, `/reviews`) kullanır. Sistemin rol kontrolü, admin yetkisine göre global erişim sağlar. Sadece admin iş akışı için hayati bir yapı olan **Annotation Debug** endpointleri izole olarak `/api/v1/annotations` içerisinde tasarlanmıştır.
 
@@ -222,10 +235,10 @@ Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenli
 
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
-| GET | `/` | Assetleri listele |
-| GET | `/:id` | Asset detayı (signed URL ile) |
-| POST | `/initiate` | Görsel yükleme başlat ( URL dön ) |
-| POST | `/:id/confirm` | Yüklemeyi onayla ve işlemeye al |
+| GET | `/` | Assetleri listele (purged kayıtlar hariç tutulur) |
+| GET | `/:id` | Asset detayı (purged asset için signedUrl: null) |
+| POST | `/initiate` | Görsel yükleme başlat (presigned PUT URL dön) — quota transaction + row lock |
+| POST | `/:id/confirm` | Yüklemeyi onayla ve işlemeye al — idempotent, concurrent-safe |
 | PUT | `/:id` | Asset güncelle |
 | DELETE | `/:id` | Asset sil (MinIO/R2 + DB) |
 
@@ -442,6 +455,13 @@ R2_ACCESS_KEY_ID="minioadmin"
 R2_SECRET_ACCESS_KEY="minioadmin"
 R2_BUCKET_NAME="datalabeling"
 MINIO_ENDPOINT="http://localhost:9000"
+
+# CORS
+ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
+
+# Storage CORS — Production'da frontend domain'i yaz:
+# STORAGE_ALLOWED_ORIGINS="https://your-frontend-domain.com"
+STORAGE_ALLOWED_ORIGINS="http://localhost:5173"
 ```
 
 ## 🔐 Authentication

@@ -28,13 +28,6 @@ export const contractsApi = {
   },
 
   /**
-   * Accept a contract (legacy alias — prefer approve)
-   */
-  accept(id: string) {
-    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/accept`);
-  },
-
-  /**
    * Approve a contract (client approves labeler's work)
    */
   approve(id: string) {
@@ -53,13 +46,6 @@ export const contractsApi = {
    */
   cancel(id: string, reason?: string) {
     return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/cancel`, { reason });
-  },
-
-  /**
-   * Complete a contract (mark as done after all tasks approved)
-   */
-  complete(id: string) {
-    return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/complete`);
   },
 
   /**

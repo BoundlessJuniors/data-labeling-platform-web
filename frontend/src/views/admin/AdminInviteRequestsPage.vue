@@ -34,6 +34,10 @@ const formEmail = ref('');
 const formExpiresAt = ref('');
 const generatedCode = ref<string | null>(null);
 
+const showRejectModal = ref(false);
+const rejectLoading = ref(false);
+const rejectTargetId = ref<string | null>(null);
+
 async function fetchRequests(p = page.value) {
   loading.value = true;
   error.value = null;
@@ -115,6 +119,32 @@ async function copyCode() {
     toastStore.success('Kod kopyalandı.');
   } catch (_err) {
     toastStore.error('Kopyalama başarısız oldu.');
+  }
+}
+
+function openRejectModal(id: string) {
+  rejectTargetId.value = id;
+  showRejectModal.value = true;
+}
+
+function closeRejectModal() {
+  showRejectModal.value = false;
+  rejectTargetId.value = null;
+}
+
+async function handleRejectRequest() {
+  if (!rejectTargetId.value) return;
+  rejectLoading.value = true;
+  try {
+    await adminApi.rejectInviteRequest(rejectTargetId.value);
+    toastStore.success('Davetiye isteği reddedildi.');
+    fetchRequests(page.value);
+    closeRejectModal();
+  } catch (_err) {
+    const err = _err as { response?: { data?: { error?: { message?: string } } } };
+    toastStore.error(err.response?.data?.error?.message || 'İstek reddedilirken hata oluştu.');
+  } finally {
+    rejectLoading.value = false;
   }
 }
 </script>
@@ -206,7 +236,7 @@ async function copyCode() {
               <td class="px-6 py-4 text-gray-500 dark:text-gray-400">
                 {{ formatDate(item.updatedAt) }}
               </td>
-              <td class="px-6 py-4 text-right">
+              <td class="px-6 py-4 text-right space-x-3">
                 <button
                   v-if="item.status === 'pending'"
                   type="button"
@@ -214,6 +244,14 @@ async function copyCode() {
                   @click="openCreateModal(item.email)"
                 >
                   Kod Oluştur
+                </button>
+                <button
+                  v-if="item.status === 'pending'"
+                  type="button"
+                  class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                  @click="openRejectModal(item.id)"
+                >
+                  Reddet
                 </button>
               </td>
             </tr>
@@ -275,6 +313,17 @@ async function copyCode() {
         <template v-else>
           <BaseButton variant="primary" @click="closeCreateModal">Kapat</BaseButton>
         </template>
+      </template>
+    </BaseModal>
+
+    <!-- Reject Confirmation Modal -->
+    <BaseModal :open="showRejectModal" title="İsteği Reddet" @close="closeRejectModal">
+      <div class="py-4 text-gray-700 dark:text-gray-300">
+        Bu davetiye isteğini reddetmek istediğinizden emin misiniz?
+      </div>
+      <template #footer>
+        <BaseButton variant="secondary" :disabled="rejectLoading" @click="closeRejectModal">İptal</BaseButton>
+        <BaseButton class="bg-red-600 hover:bg-red-700 text-white" :loading="rejectLoading" @click="handleRejectRequest">Reddet</BaseButton>
       </template>
     </BaseModal>
   </div>

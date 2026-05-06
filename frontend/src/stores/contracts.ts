@@ -149,23 +149,7 @@ export const useContractsStore = defineStore('contracts', () => {
     }
   }
 
-  /**
-   * Complete a contract (legacy — backend may not support)
-   */
-  async function completeContract(id: string) {
-    loading.value = true;
-    try {
-      const response = await contractsApi.complete(id);
-      updateContractInList(id, response.data.data);
-      toastStore.success('Sözleşme tamamlandı');
-      return true;
-    } catch (_err) {
-      toastStore.error(getErrorMessage(_err, 'Sözleşme tamamlanamadı'));
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
+
 
   // ── Payment Actions ───────────────────────────────────────────────
 
@@ -382,7 +366,6 @@ export const useContractsStore = defineStore('contracts', () => {
     approveContract,
     rejectContract,
     cancelContract,
-    completeContract,
     downloadContractExport,
     setStatusFilter,
     goToPage,

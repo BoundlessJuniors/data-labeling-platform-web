@@ -712,4 +712,34 @@ export class AdminService {
       },
     };
   }
+
+  /**
+   * Reject a pending invite request
+   */
+  async rejectInviteRequest(adminUserId: string, inviteRequestId: string) {
+    const inviteRequest = await prisma.inviteRequest.findUnique({
+      where: { id: inviteRequestId },
+    });
+
+    if (!inviteRequest) {
+      throw new NotFoundError('InviteRequest');
+    }
+
+    if (inviteRequest.status !== 'pending') {
+      throw new BadRequestError('Only pending invite requests can be rejected.');
+    }
+
+    const updatedRequest = await prisma.inviteRequest.update({
+      where: { id: inviteRequestId },
+      data: { status: 'rejected' },
+    });
+
+    await auditService.logAction(adminUserId, 'invite_request.reject', 'invite_request', inviteRequestId, {
+      email: inviteRequest.email,
+      previousStatus: inviteRequest.status,
+      newStatus: 'rejected',
+    });
+
+    return updatedRequest;
+  }
 }

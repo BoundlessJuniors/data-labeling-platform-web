@@ -96,5 +96,12 @@ router.get(
   adminController.getInviteRequests
 );
 
+// PATCH /api/admin/invite-requests/:id/reject - Reject a pending invite request
+router.patch(
+  '/invite-requests/:id/reject',
+  validate(idParamSchema, 'params'),
+  adminController.rejectInviteRequest
+);
+
 export default router;
 

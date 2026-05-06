@@ -207,7 +207,7 @@ frontend/
 | `/admin/annotations` | Admin | Annotation debug ve manuel raw/normalize akışı |
 | `/admin/audit-logs` | Admin | Yönetimsel işlem denetim kayıtları (filtreli, sayfalı) |
 | `/admin/payments` | Admin | Admin ödeme dashboard ve işlemleri (Faz 10) |
-| `/admin/invite-requests` | Admin | Beta davetiye taleplerini inceleme ve davet kodu oluşturma |
+| `/admin/invite-requests` | Admin | Beta davetiye taleplerini inceleme, davet kodu oluşturma ve **reddetme** |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
@@ -431,6 +431,8 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Public & Beta Security**: İlan, sözleşme ve ödeme ekranlarında "mock/test ödeme" sürecinin gerçek para veya kart bilgisi içermediğine dair bilgilendirmeler ve modal onayları eklendi.
 - [x] **Public & Beta Security**: Beta sınırlarını (`betaLimits.ts`) merkeze alan kota kontrolleri (dataset oluşturma limiti, dosya yükleme boyutu ve maksimum asset limitleri) devreye alındı. Aşım durumları için bilgilendirici Toast ve UI bildirimleri eklendi.
 - [x] **Admin (Invites)**: Admin paneline beta davetiye isteklerini (Invite Requests) listeleyebilen ve onaylanan e-postalara davetiye kodu oluşturabilen `AdminInviteRequestsPage` ekranı eklendi.
+- [x] **Admin (Invites)**: `AdminInviteRequestsPage` üzerine `pending` durumdaki davetiye istekleri için "Reddet" butonu ve onay modalı eklendi; `adminApi.rejectInviteRequest` API metodu oluşturuldu.
+- [x] **P0 Beta Upload Hardening**: Backend `getAssets` sorgusu artık `storageState != purged` filtresiyle çalışıyor. `pagination.total` aktif asset sayısını yansıtır; `DatasetDetailPage` upload butonu artık purged/reddedilmiş yüklemeler yüzünden yanlışlıkla disabled görünmez.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

@@ -68,85 +68,100 @@ export class AssetService {
       throw new BadRequestError("Dataset ID zorunludur.");
     }
 
-    // Verify dataset exists and user has access
-    const dataset = await prisma.dataset.findUnique({
-      where: { id: datasetId },
-      include: { _count: { select: { listings: true } } },
-    });
-
-    if (!dataset) {
-      throw new NotFoundError("Dataset");
-    }
-
-    if (userRole !== "admin" && dataset.ownerUserId !== userId) {
-      throw new ForbiddenError("Bu datasete asset ekleme yetkiniz yok.");
-    }
-
-    if (dataset._count.listings > 0) {
-      throw new BadRequestError(
-        "Bu dataset bir ilanda kullanıldığı için yeni görsel yüklenemez.",
-      );
-    }
-
     const { datasetMaxAssets, userMaxStorageBytes } = getBetaLimits();
 
-    if (userRole !== "admin") {
-      // 1. Enforce Dataset Asset Limit
-      const currentAssetCount = await prisma.asset.count({
-        where: { datasetId },
-      });
-
-      if (currentAssetCount >= datasetMaxAssets) {
-        throw new BadRequestError(`Beta: Bir dataset en fazla ${datasetMaxAssets} görsel içerebilir.`);
+    const asset = await prisma.$transaction(async (tx) => {
+      // 1. Dataset satırını PostgreSQL row lock ile kilitle (non-admin için)
+      // 2. User satırını kilitle
+      // This prevents concurrent initiateUpload requests from bypassing beta dataset asset count and user storage quota.
+      if (userRole !== "admin") {
+        await tx.$queryRaw`SELECT id FROM "datasets" WHERE id = ${datasetId}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "users" WHERE id = ${userId}::uuid FOR UPDATE`;
       }
 
-      // 2. Enforce User Storage Limit
-      // We sum sizeBytes over all assets that belong to any dataset owned by the user
-      // Treating null sizeBytes as 0 is automatically handled by Prisma aggregate (it just ignores them, which is equivalent to 0 in sum)
-      const storageAgg = await prisma.asset.aggregate({
-        _sum: { sizeBytes: true },
-        where: {
-          dataset: { ownerUserId: userId }
+      const dataset = await tx.dataset.findUnique({
+        where: { id: datasetId },
+        include: { _count: { select: { listings: true } } },
+      });
+
+      if (!dataset) {
+        throw new NotFoundError("Dataset");
+      }
+
+      if (userRole !== "admin" && dataset.ownerUserId !== userId) {
+        throw new ForbiddenError("Bu datasete asset ekleme yetkiniz yok.");
+      }
+
+      if (dataset._count.listings > 0) {
+        throw new BadRequestError(
+          "Bu dataset bir ilanda kullanıldığı için yeni görsel yüklenemez.",
+        );
+      }
+
+      if (userRole !== "admin") {
+        // 1. Enforce Dataset Asset Limit
+        // Purged assets are excluded so that rejected/oversized uploads do not permanently block the user.
+        const currentAssetCount = await tx.asset.count({
+          where: {
+            datasetId,
+            storageState: { not: StorageState.purged },
+          },
+        });
+
+        if (currentAssetCount >= datasetMaxAssets) {
+          throw new BadRequestError(`Beta: Bir dataset en fazla ${datasetMaxAssets} görsel içerebilir.`);
         }
-      });
 
-      const currentStorageUsed = Number(storageAgg._sum.sizeBytes || 0);
-      if (currentStorageUsed + fileSize > userMaxStorageBytes) {
-        const maxMb = (userMaxStorageBytes / (1024 * 1024)).toFixed(1);
-        throw new BadRequestError(`Beta: Toplam depolama alanınız ${maxMb} MB sınırını aşıyor.`);
+        // 2. Enforce User Storage Limit
+        const storageAgg = await tx.asset.aggregate({
+          _sum: { sizeBytes: true },
+          where: {
+            dataset: { ownerUserId: userId },
+            storageState: { not: StorageState.purged }
+          }
+        });
+
+        const currentStorageUsed = Number(storageAgg._sum.sizeBytes || 0);
+        if (currentStorageUsed + fileSize > userMaxStorageBytes) {
+          const maxMb = (userMaxStorageBytes / (1024 * 1024)).toFixed(1);
+          throw new BadRequestError(`Beta: Toplam depolama alanınız ${maxMb} MB sınırını aşıyor.`);
+        }
       }
-    }
 
-    // Build a unique object key
-    const ext = path.extname(filename) || "";
-    const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
+      // Build a unique object key
+      const ext = path.extname(filename) || "";
+      const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
 
-    // Create pending asset record
-    const asset = await prisma.asset.create({
-      data: {
-        datasetId,
-        objectKey,
-        mimeType: contentType,
-        status: "pending",
-        sizeBytes: fileSize,
-      },
+      // Create pending asset record
+      return await tx.asset.create({
+        data: {
+          datasetId,
+          objectKey,
+          mimeType: contentType,
+          status: "pending",
+          sizeBytes: fileSize,
+        },
+      });
     });
 
     // Generate Presigned PUT URL
-    const signedUrl = await getPresignedPutUrl(objectKey, contentType);
+    const signedUrl = await getPresignedPutUrl(asset.objectKey, contentType);
 
     return {
       signedUrl,
       assetId: asset.id,
-      objectKey,
+      objectKey: asset.objectKey,
     };
   }
 
   /**
    * Complete an upload
    * Verifies the asset exists and triggers the processing job.
+   * Concurrent-safe: uses updateMany WHERE status='pending' to atomically claim the transition.
+   * Only the request that successfully flips status to 'uploaded' enqueues the job.
    */
   async completeUpload(userId: string, userRole: UserRole, assetId: string) {
+    // Auth + existence check first (outside transaction — read-only, fast)
     const asset = await prisma.asset.findUnique({
       where: { id: assetId },
       include: {
@@ -162,20 +177,83 @@ export class AssetService {
       throw new ForbiddenError("Bu işlem için yetkiniz yok.");
     }
 
-    // Update status to 'uploaded' (processing will start)
-    const updatedAsset = await prisma.asset.update({
-      where: { id: assetId },
+    // Guard: purged asset cannot be re-confirmed.
+    if (asset.storageState === StorageState.purged) {
+      throw new BadRequestError("Bu asset storage'dan silindiği için tekrar işlenemez.");
+    }
+
+    // Fast-path idempotency for already in-flight or finished assets (before the atomic update).
+    // Concurrent requests will fall through to updateMany and handle the race there.
+    if (
+      asset.status === "uploaded" ||
+      asset.status === "processing" ||
+      asset.status === "ready"
+    ) {
+      return this.attachSignedUrl(asset);
+    }
+
+    if (asset.status === "error") {
+      throw new BadRequestError(
+        "Bu asset hata durumunda olduğu için tekrar onaylanamaz. Lütfen yeniden yükleyin."
+      );
+    }
+
+    // Atomic pending → uploaded transition.
+    // Only the request that wins the race (count === 1) enqueues the job.
+    const updateResult = await prisma.asset.updateMany({
+      where: {
+        id: assetId,
+        status: "pending",
+        storageState: { not: StorageState.purged },
+      },
       data: { status: "uploaded" },
     });
 
-    // Add to queue
-    await addAssetJob(asset.id, asset.objectKey);
+    if (updateResult.count === 0) {
+      // Race lost or status changed between the read above and the update.
+      // Re-read to figure out current state and respond idempotently.
+      const latestAsset = await prisma.asset.findUnique({
+        where: { id: assetId },
+        include: { dataset: { select: { ownerUserId: true, id: true } } },
+      });
+
+      if (!latestAsset) throw new NotFoundError("Asset");
+
+      if (latestAsset.storageState === StorageState.purged) {
+        throw new BadRequestError("Bu asset storage'dan silindiği için tekrar işlenemez.");
+      }
+
+      if (
+        latestAsset.status === "uploaded" ||
+        latestAsset.status === "processing" ||
+        latestAsset.status === "ready"
+      ) {
+        return this.attachSignedUrl(latestAsset);
+      }
+
+      if (latestAsset.status === "error") {
+        throw new BadRequestError(
+          "Bu asset hata durumunda olduğu için tekrar onaylanamaz. Lütfen yeniden yükleyin."
+        );
+      }
+
+      throw new BadRequestError("Bu asset mevcut durumunda onaylanamaz.");
+    }
+
+    // updateResult.count === 1: this request won the race — enqueue the job.
+    const updatedAsset = await prisma.asset.findUnique({
+      where: { id: assetId },
+      include: { dataset: { select: { ownerUserId: true, id: true } } },
+    });
+
+    if (!updatedAsset) throw new NotFoundError("Asset");
+
+    await addAssetJob(updatedAsset.id, updatedAsset.objectKey);
 
     // Update dataset status → ready (if not already)
-    // Note: In a real bulk scenario, this might be too frequent, but safe for now.
-    if (asset.dataset) {
+    if (updatedAsset.dataset) {
       await prisma.dataset.updateMany({
-        where: { id: asset.datasetId, status: { in: ["draft", "uploading"] } },
+        where: { id: updatedAsset.datasetId, status: { in: ["draft", "uploading"] } },
         data: { status: "ready" },
       });
     }
@@ -201,7 +279,11 @@ export class AssetService {
   ) {
     const skip = (page - 1) * limit;
 
-    const where: Prisma.AssetWhereInput = {};
+    const where: Prisma.AssetWhereInput = {
+      // Exclude purged assets so that list count matches backend quota slot count.
+      // Frontend limit checks (isAssetLimitReached) depend on pagination.total being accurate.
+      storageState: { not: StorageState.purged },
+    };
 
     if (datasetId) {
       where.datasetId = datasetId;

@@ -31,6 +31,11 @@ const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY ?? '';
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME ?? '';
 const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT ?? '';
 
+function getStorageAllowedOrigins(): string[] {
+  const raw = process.env.STORAGE_ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || '';
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+}
+
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
@@ -132,24 +137,28 @@ export async function ensureBucket(): Promise<void> {
 
   // Apply CORS policy to allow direct browser uploads
   try {
-    const corsCommand = new PutBucketCorsCommand({
-      Bucket: R2_BUCKET_NAME,
-      CORSConfiguration: {
-        CORSRules: [
-          {
-            AllowedHeaders: ['*'],
-            AllowedMethods: ['PUT', 'GET', 'HEAD', 'POST'],
-            AllowedOrigins: isDevelopment
-              ? ['*']
-              : ['http://localhost:5173', 'http://localhost:3000'], // Adjust for prod
-            ExposeHeaders: ['ETag'],
-            MaxAgeSeconds: 3000,
-          },
-        ],
-      },
-    });
-    await s3Client.send(corsCommand);
-    logger.info(`✅ CORS configuration applied to bucket "${R2_BUCKET_NAME}"`);
+    const allowedOrigins = isDevelopment ? ['*'] : getStorageAllowedOrigins();
+    
+    if (!isDevelopment && allowedOrigins.length === 0) {
+      logger.warn('STORAGE_ALLOWED_ORIGINS or ALLOWED_ORIGINS is empty in production; storage CORS configuration may fail or be skipped.');
+    } else {
+      const corsCommand = new PutBucketCorsCommand({
+        Bucket: R2_BUCKET_NAME,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedHeaders: ['*'],
+              AllowedMethods: ['PUT', 'GET', 'HEAD', 'POST'],
+              AllowedOrigins: allowedOrigins,
+              ExposeHeaders: ['ETag'],
+              MaxAgeSeconds: 3000,
+            },
+          ],
+        },
+      });
+      await s3Client.send(corsCommand);
+      logger.info(`✅ CORS configuration applied to bucket "${R2_BUCKET_NAME}"`);
+    }
   } catch (corsErr) {
     logger.warn(`⚠️ Failed to apply CORS configuration:`, corsErr);
   }
