@@ -7,6 +7,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDatasetsStore } from '@/stores/datasets';
 import { useAssetsStore } from '@/stores/assets';
 import { useSeo } from '@/composables/useSeo';
+import { betaLimits } from '@/config/betaLimits';
+import { useToastStore } from '@/stores/toast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -20,7 +22,7 @@ interface DisplayableAsset {
   fileName?: string;
   objectKey?: string;
   fileUrl?: string;
-  signedUrl?: string;
+  signedUrl?: string | null;
   mimeType?: string;
   metadata?: Record<string, unknown> | null;
   [key: string]: unknown;
@@ -30,12 +32,14 @@ const route = useRoute();
 const router = useRouter();
 const datasetsStore = useDatasetsStore();
 const assetsStore = useAssetsStore();
+const toastStore = useToastStore();
 
 const datasetId = computed(() => route.params.id as string);
 
 // Upload
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isDatasetInUse = computed(() => (datasetsStore.currentDataset?.listingCount ?? 0) > 0);
+const isAssetLimitReached = computed(() => assetsStore.total >= betaLimits.datasetMaxAssets);
 
 // Preview modal
 const showPreviewModal = ref(false);
@@ -63,8 +67,30 @@ async function onFilesSelected(event: Event) {
   const input = event.target as HTMLInputElement;
   if (!input.files || input.files.length === 0) return;
 
-  const files = Array.from(input.files);
-  await assetsStore.uploadAssets(datasetId.value, files);
+  const allFiles = Array.from(input.files);
+  const validFiles = allFiles.filter(file => file.size <= betaLimits.maxFileSizeBytes);
+  
+  if (validFiles.length < allFiles.length) {
+    toastStore.warning(
+      `${allFiles.length - validFiles.length} dosya ${betaLimits.maxFileSizeMbLabel} sınırını aştığı için yüklenmedi.`
+    );
+  }
+
+  const remainingSlots = betaLimits.datasetMaxAssets - assetsStore.total;
+  if (remainingSlots <= 0) {
+    toastStore.warning(`Beta sürümünde bir dataset'e en fazla ${betaLimits.datasetMaxAssets} görsel eklenebilir. Limit doldu.`);
+    input.value = '';
+    return;
+  }
+  
+  const filesToAdd = validFiles.slice(0, remainingSlots);
+  if (validFiles.length > remainingSlots) {
+    toastStore.warning(
+      `Beta sürümünde bir dataset'e en fazla ${betaLimits.datasetMaxAssets} görsel eklenebilir. Sadece ${remainingSlots} dosya eklenecek.`
+    );
+  }
+
+  await assetsStore.uploadAssets(datasetId.value, filesToAdd, { existingAssetCount: assetsStore.total });
 
   // Reset input so same files can be re-selected
   input.value = '';
@@ -233,7 +259,7 @@ async function executeDelete() {
             {{ datasetsStore.currentDataset.status }}
           </span>
           <span class="text-sm text-gray-500 dark:text-gray-400">
-            {{ assetsStore.total }} asset
+            {{ assetsStore.total }} / {{ betaLimits.datasetMaxAssets }} asset &bull; Maks. {{ betaLimits.maxFileSizeMbLabel }}/dosya
           </span>
           
           <!-- Select Mode Toggle Button -->
@@ -253,8 +279,8 @@ async function executeDelete() {
           <BaseButton
             variant="primary"
             :loading="assetsStore.uploading"
-            :disabled="assetsStore.uploading || isDatasetInUse"
-            :title="isDatasetInUse ? 'Bu dataset bir ilanda kullanıldığı için yeni görsel eklenemez.' : 'Görsel Yükle'"
+            :disabled="assetsStore.uploading || isDatasetInUse || isAssetLimitReached"
+            :title="isDatasetInUse ? 'Bu dataset bir ilanda kullanıldığı için yeni görsel eklenemez.' : (isAssetLimitReached ? 'Beta maksimum görsel limitine ulaşıldı.' : 'Görsel Yükle')"
             @click="triggerFileSelect"
           >
             <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -322,8 +348,8 @@ async function executeDelete() {
       <template #action>
         <BaseButton 
           variant="primary" 
-          :disabled="isDatasetInUse"
-          :title="isDatasetInUse ? 'Bu dataset bir ilanda kullanıldığı için yeni görsel eklenemez.' : ''"
+          :disabled="isDatasetInUse || isAssetLimitReached"
+          :title="isDatasetInUse ? 'Bu dataset bir ilanda kullanıldığı için yeni görsel eklenemez.' : (isAssetLimitReached ? 'Beta maksimum görsel limitine ulaşıldı.' : '')"
           @click="triggerFileSelect"
         >
           <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

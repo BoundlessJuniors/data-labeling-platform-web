@@ -6,7 +6,7 @@
 
 export interface InputProps {
   modelValue?: string | number;
-  type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search';
+  type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search' | 'datetime-local';
   id: string;
   label?: string;
   placeholder?: string;

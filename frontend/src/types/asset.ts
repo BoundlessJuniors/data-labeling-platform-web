@@ -3,23 +3,27 @@
  */
 
 /** Asset status */
-export type AssetStatus = 'pending' | 'ready' | 'processing' | 'error';
+export type AssetStatus = 'pending' | 'ready' | 'processing' | 'error' | 'uploaded';
 
 /** Asset entity */
 export interface Asset {
   id: string;
   datasetId: string;
-  fileName: string;
-  fileUrl: string;
+  fileName?: string;
+  fileUrl?: string;
   thumbnailUrl?: string | null;
   mimeType: string;
-  fileSize: number;
+  fileSize?: number;
   width?: number | null;
   height?: number | null;
   status: AssetStatus;
   metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+  objectKey?: string;
+  signedUrl?: string | null;
+  sizeBytes?: number | string | null;
+  storageState?: string;
 }
 
 /** Asset upload metadata */

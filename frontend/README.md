@@ -60,6 +60,9 @@ frontend/
 │   │   ├── payments.ts        # Payment API (YENİ)
 │   │   └── tasks.ts           # Task API
 │   │
+│   ├── config/                # Uygulama konfigürasyonları (YENİ)
+│   │   └── betaLimits.ts      # Beta limitleri ve çevre değişkenleri
+│   │
 │   ├── stores/                # Pinia state management (10 store)
 │   │   ├── auth.ts            # Authentication store
 │   │   ├── datasets.ts        # Dataset store
@@ -126,7 +129,8 @@ frontend/
 │   │   │   ├── AdminReviewsPage.vue
 │   │   │   ├── AdminAnnotationsPage.vue
 │   │   │   ├── AdminAuditLogsPage.vue    # Faz 3 — Denetim log izleme
-│   │   │   └── AdminPaymentsPage.vue     # Admin Ödeme Dashboard (Faz 10)
+│   │   │   ├── AdminPaymentsPage.vue     # Admin Ödeme Dashboard (Faz 10)
+│   │   │   └── AdminInviteRequestsPage.vue # Beta Davetiye İstekleri Yönetimi (YENİ)
 │   │   │
 │   │   ├── client/            # Client sayfaları
 │   │   │   ├── DatasetsPage.vue
@@ -203,6 +207,7 @@ frontend/
 | `/admin/annotations` | Admin | Annotation debug ve manuel raw/normalize akışı |
 | `/admin/audit-logs` | Admin | Yönetimsel işlem denetim kayıtları (filtreli, sayfalı) |
 | `/admin/payments` | Admin | Admin ödeme dashboard ve işlemleri (Faz 10) |
+| `/admin/invite-requests` | Admin | Beta davetiye taleplerini inceleme ve davet kodu oluşturma |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
 | `/client/labelsets` | Client | Etiket seti yönetimi (oluştur, düzenle, sil) |
@@ -424,6 +429,8 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Faz 10 (Payment Dashboard)**: Admin paneline mock payment lifecycle'ı değiştirmeyen read-only listeleme, analiz ve escrow raporlama dashboard'u eklendi. Backend tarafında yeni `getPayments` API'leri Prisma aggregation desteğiyle yazıldı.
 - [x] **Public & Beta Security**: Kayıt sayfasına davetiye kodu (`inviteCode`) gereksinimi ve e-posta ile davetiye talep etme bileşeni (`InviteRequestModal`) eklendi. Landing ve layout seviyesinde platformun teknik demo olduğunu belirten uyarılar (`BetaNotice`) yerleştirildi.
 - [x] **Public & Beta Security**: İlan, sözleşme ve ödeme ekranlarında "mock/test ödeme" sürecinin gerçek para veya kart bilgisi içermediğine dair bilgilendirmeler ve modal onayları eklendi.
+- [x] **Public & Beta Security**: Beta sınırlarını (`betaLimits.ts`) merkeze alan kota kontrolleri (dataset oluşturma limiti, dosya yükleme boyutu ve maksimum asset limitleri) devreye alındı. Aşım durumları için bilgilendirici Toast ve UI bildirimleri eklendi.
+- [x] **Admin (Invites)**: Admin paneline beta davetiye isteklerini (Invite Requests) listeleyebilen ve onaylanan e-postalara davetiye kodu oluşturabilen `AdminInviteRequestsPage` ekranı eklendi.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

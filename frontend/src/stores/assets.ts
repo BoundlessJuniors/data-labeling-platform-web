@@ -7,6 +7,7 @@ import { assetsApi } from '@/api/assets';
 import type { Asset } from '@/types/asset';
 import { getErrorMessage } from '@/types/api';
 import { useToastStore } from './toast';
+import { betaLimits } from '@/config/betaLimits';
 
 export const useAssetsStore = defineStore('assets', () => {
   const toastStore = useToastStore();
@@ -83,10 +84,10 @@ export const useAssetsStore = defineStore('assets', () => {
       error.value = null;
     }
 
-    // 1. Client-side Validation: File Size (10MB)
-    const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+    // 1. Client-side Validation: File Size Limit (Beta)
+    const MAX_FILE_SIZE_BYTES = betaLimits.maxFileSizeBytes;
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      const msg = `"${file.name}" 10MB'dan büyük olamaz.`;
+      const msg = `"${file.name}" ${betaLimits.maxFileSizeMbLabel}'dan büyük olamaz.`;
       toastStore.error(msg);
       
       // Hata durumunda loading state'i kapatmalıyız
@@ -133,8 +134,16 @@ export const useAssetsStore = defineStore('assets', () => {
   /**
    * Upload multiple asset files to a dataset (Parallel)
    */
-  async function uploadAssets(datasetId: string, files: File[]) {
+  async function uploadAssets(datasetId: string, files: File[], options?: { existingAssetCount?: number }) {
     if (files.length === 0) return;
+
+    // Validate dataset max assets limit
+    const existingCount = options?.existingAssetCount ?? total.value;
+    if (existingCount + files.length > betaLimits.datasetMaxAssets) {
+      const msg = `Beta sürümünde bir dataset'e en fazla ${betaLimits.datasetMaxAssets} görsel yükleyebilirsiniz. Şu an ${existingCount} görsel var ve ${files.length} tane daha eklemeye çalışıyorsunuz.`;
+      toastStore.warning(msg);
+      return;
+    }
 
     uploading.value = true;
     uploadProgress.value = 0;

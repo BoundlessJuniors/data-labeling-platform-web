@@ -133,7 +133,7 @@ export const useDatasetsStore = defineStore('datasets', () => {
     
     // Dataset oluşturuldu, şimdi dosya yükleme işlemini Assets Store'a devrediyoruz.
     // Assets Store kendi progress ve hata yönetimini yapar.
-    await assetsStore.uploadAssets(dataset.id, files);
+    await assetsStore.uploadAssets(dataset.id, files, { existingAssetCount: 0 });
 
     // İşlem bittiğinde listeyi yenile
     await fetchDatasets();

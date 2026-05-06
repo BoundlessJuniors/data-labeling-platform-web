@@ -26,6 +26,9 @@ import type {
   AdminPaymentDashboardStats,
   AdminPaymentListItem,
   AdminPaymentListParams,
+  AdminInviteRequestItem,
+  AdminInviteCodeItem,
+  AdminCreateInviteCodePayload,
 } from '@/types/admin';
 
 export interface AdminUserListParams {
@@ -72,6 +75,11 @@ export interface AdminAuditLogListParams {
   sortOrder?: 'asc' | 'desc';
 }
 
+export interface AdminInviteRequestListParams {
+  page?: number;
+  limit?: number;
+}
+
 export const adminApi = {
   /**
    * Get dashboard statistics
@@ -113,6 +121,17 @@ export const adminApi = {
    */
   getQueueMonitoring(params: AdminQueueMonitoringParams = {}) {
     return apiClient.get<ApiResponse<AdminQueueMonitoringResponse>>('/admin/monitoring/queues', { params });
+  },
+
+  // ============================================================================
+  // Invites Phase Beta
+  // ============================================================================
+  getInviteRequests(params: AdminInviteRequestListParams = {}) {
+    return apiClient.get<PaginatedResponse<AdminInviteRequestItem>>('/admin/invite-requests', { params });
+  },
+
+  createInviteCode(payload: AdminCreateInviteCodePayload) {
+    return apiClient.post<ApiResponse<AdminInviteCodeItem>>('/admin/invite-codes', payload);
   },
 
   // ============================================================================

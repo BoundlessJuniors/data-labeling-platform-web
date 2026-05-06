@@ -5,8 +5,11 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDatasetsStore } from '@/stores/datasets';
+import { datasetsApi } from '@/api/datasets';
+import { useToastStore } from '@/stores/toast';
 import { assetsApi } from '@/api/assets';
 import { useSeo } from '@/composables/useSeo';
+import { betaLimits } from '@/config/betaLimits';
 import AppLayout from '@/layouts/AppLayout.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -22,6 +25,19 @@ useSeo({
 
 const router = useRouter();
 const datasetsStore = useDatasetsStore();
+const toastStore = useToastStore();
+
+const userDatasetCount = ref(0);
+const isDatasetLimitReached = computed(() => userDatasetCount.value >= betaLimits.userMaxDatasets);
+
+async function fetchUserDatasetCount() {
+  try {
+    const response = await datasetsApi.list({ page: 1, limit: 1 });
+    userDatasetCount.value = response.data.pagination?.total ?? response.data.data.length;
+  } catch {
+    // Backend remains the source of truth. Do not block the page if this fails.
+  }
+}
 
 // Modal state
 const showCreateModal = ref(false);
@@ -52,7 +68,7 @@ const editGalleryLoading = ref(false);
 
 // Computed: create button disabled unless name + at least one file
 const isCreateDisabled = computed(() => {
-  return !formName.value.trim() || selectedFiles.value.length === 0;
+  return !formName.value.trim() || selectedFiles.value.length === 0 || isDatasetLimitReached.value;
 });
 
 // Search
@@ -62,6 +78,7 @@ let searchTimeout: ReturnType<typeof setTimeout>;
 // Fetch on mount
 onMounted(() => {
   datasetsStore.fetchDatasets();
+  fetchUserDatasetCount();
 });
 
 // Debounced search
@@ -121,8 +138,26 @@ function triggerFileSelect() {
 function onFilesSelected(event: Event) {
   const input = event.target as HTMLInputElement;
   if (!input.files || input.files.length === 0) return;
-  const newFiles = Array.from(input.files);
-  selectedFiles.value = [...selectedFiles.value, ...newFiles];
+  
+  const allFiles = Array.from(input.files);
+  const validFiles = allFiles.filter(file => file.size <= betaLimits.maxFileSizeBytes);
+  
+  if (validFiles.length < allFiles.length) {
+    toastStore.warning(
+      `${allFiles.length - validFiles.length} dosya ${betaLimits.maxFileSizeMbLabel} sınırını aştığı için eklenmedi.`
+    );
+  }
+
+  const remainingSlots = betaLimits.datasetMaxAssets - selectedFiles.value.length;
+  const filesToAdd = validFiles.slice(0, remainingSlots);
+  
+  if (validFiles.length > remainingSlots) {
+    toastStore.warning(
+      `Beta sürümünde bir dataset'e en fazla ${betaLimits.datasetMaxAssets} görsel eklenebilir.`
+    );
+  }
+
+  selectedFiles.value = [...selectedFiles.value, ...filesToAdd];
   input.value = ''; // reset so same files can be re-selected
 }
 
@@ -148,6 +183,7 @@ async function handleCreate() {
   );
   if (result) {
     closeCreateModal();
+    await fetchUserDatasetCount();
   }
 }
 
@@ -169,6 +205,7 @@ async function handleDelete() {
   if (result) {
     showDeleteModal.value = false;
     deletingId.value = null;
+    await fetchUserDatasetCount();
   }
 }
 
@@ -218,12 +255,34 @@ function formatDate(dateString: string) {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
-      <BaseButton variant="primary" @click="openCreateModal">
-        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      <div class="flex items-center gap-3">
+        <div class="text-sm text-gray-600 dark:text-gray-400">
+          <span class="font-medium text-gray-900 dark:text-white">{{ userDatasetCount }}</span> / {{ betaLimits.userMaxDatasets }} Dataset
+        </div>
+        <BaseButton 
+          variant="primary" 
+          :disabled="isDatasetLimitReached"
+          :title="isDatasetLimitReached ? `Beta limitine ulaştınız (Maks. ${betaLimits.userMaxDatasets} dataset)` : ''"
+          @click="openCreateModal"
+        >
+          <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Yeni Dataset
+        </BaseButton>
+      </div>
+    </div>
+
+    <!-- Beta Info Box -->
+    <div class="mb-6 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-start gap-3 text-sm text-blue-800 dark:text-blue-300">
+        <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        Yeni Dataset
-      </BaseButton>
+        <div>
+          <strong class="font-medium">Beta Limitleri:</strong> Maksimum {{ betaLimits.userMaxDatasets }} dataset oluşturabilirsiniz. Her bir dataset en fazla {{ betaLimits.datasetMaxAssets }} görsel içerebilir. Dosya başı maksimum boyut {{ betaLimits.maxFileSizeMbLabel }} ve toplam depolama limitiniz {{ betaLimits.userMaxStorageMbLabel }}'dir.
+        </div>
+      </div>
     </div>
 
     <!-- Loading state -->
@@ -251,7 +310,11 @@ function formatDate(dateString: string) {
       :description="searchInput ? 'Arama kriterlerinizi değiştirin.' : 'İlk datasetinizi oluşturarak başlayın.'"
     >
       <template v-if="!searchInput" #action>
-        <BaseButton variant="primary" @click="openCreateModal">
+        <BaseButton 
+          variant="primary" 
+          :disabled="isDatasetLimitReached"
+          @click="openCreateModal"
+        >
           Yeni Dataset Oluştur
         </BaseButton>
       </template>
@@ -364,7 +427,7 @@ function formatDate(dateString: string) {
               Görsel seçmek için tıklayın
             </p>
             <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              JPEG, PNG, WEBP • Maks. 10 MB/dosya • Maks. 100 dosya
+              JPEG, PNG, WEBP • Maks. {{ betaLimits.maxFileSizeMbLabel }}/dosya • Maks. {{ betaLimits.datasetMaxAssets }} görsel
             </p>
           </div>
           <input

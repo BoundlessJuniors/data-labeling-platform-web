@@ -117,6 +117,12 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminAuditLogsPage.vue'),
           meta: { title: 'Audit Logs' },
         },
+        {
+          path: 'invite-requests',
+          name: 'admin-invite-requests',
+          component: () => import('@/views/admin/AdminInviteRequestsPage.vue'),
+          meta: { title: 'Invite Requests' },
+        },
       ],
     },
     // Client routes

@@ -39,6 +39,37 @@ export interface AdminDashboardStats {
 }
 
 // ============================================================================
+// Invites (Beta Phase)
+// ============================================================================
+
+export type AdminInviteRequestStatus = 'pending' | 'code_sent' | 'rejected';
+
+export interface AdminInviteRequestItem {
+  id: string;
+  email: string;
+  status: AdminInviteRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminInviteCodeItem {
+  id: string;
+  code: string;
+  email: string | null;
+  createdByUserId: string | null;
+  usedByUserId: string | null;
+  usedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminCreateInviteCodePayload {
+  email?: string;
+  expiresAt?: string;
+}
+
+// ============================================================================
 // Users
 // ============================================================================
 
