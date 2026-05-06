@@ -20,13 +20,14 @@ export const register = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { email, password, role, displayName } = req.body;
+    const { email, password, role, displayName, inviteCode } = req.body;
 
     const result = await authService.register({
       email,
       password,
       role: role as UserRole,
       displayName,
+      inviteCode,
     });
 
     // Set token as httpOnly cookie instead of returning in body
@@ -35,6 +36,24 @@ export const register = async (
     res.status(201).json({
       success: true,
       data: { user: result.user },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const inviteRequest = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { email } = req.body;
+    await authService.requestInvite(email);
+    // Always return safe success
+    res.json({
+      success: true,
+      message: 'Invite request received if the email is eligible.',
     });
   } catch (error) {
     next(error);

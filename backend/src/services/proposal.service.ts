@@ -12,6 +12,7 @@ import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '.
 import { cacheDelete } from '../lib/redis';
 import logger from '../lib/logger';
 import { paymentService } from './payment.service';
+import { getBetaLimits } from '../config/beta-limits';
 
 // ── SLA env helpers ───────────────────────────────────────────────────────────
 
@@ -313,6 +314,33 @@ export class ProposalService {
         throw new BadRequestError(
           'Cannot accept proposal because the dataset source files are not active in storage.'
         );
+      }
+
+      const { userMaxActiveContracts } = getBetaLimits();
+      const activeStatuses: ContractStatus[] = [
+        'pending_payment', 'active', 'overdue', 'submitted', 'revision_requested', 'disputed'
+      ];
+
+      // 4c. Check client active contracts limit
+      const clientActiveContracts = await tx.contract.count({
+        where: {
+          clientUserId,
+          status: { in: activeStatuses }
+        }
+      });
+      if (clientActiveContracts >= userMaxActiveContracts) {
+        throw new BadRequestError(`Beta: Client cannot have more than ${userMaxActiveContracts} active contracts.`);
+      }
+
+      // 4d. Check labeler active contracts limit
+      const labelerActiveContracts = await tx.contract.count({
+        where: {
+          labelerUserId: proposal.labelerUserId,
+          status: { in: activeStatuses }
+        }
+      });
+      if (labelerActiveContracts >= userMaxActiveContracts) {
+        throw new BadRequestError(`Beta: Labeler cannot have more than ${userMaxActiveContracts} active contracts.`);
       }
 
       // 5. Mark proposal accepted

@@ -37,6 +37,7 @@ npm run dev
 
 ## 📝 Son Güncellemeler (Patch Notes)
 
+- **Beta Limits & Invite System:** Sistem güvenliği ve kaynak yönetimi için `.env` üzerinden yapılandırılabilen (dosya boyutu, max dataset, max kullanıcı, sözleşme kotaları) sıkı beta güvenlik limitleri (`beta-limits.ts`) eklendi. Ayrıca kontrollü halka açık beta süreci için davetiye kodu (Invite Code) talep etme ve kullanma sistemi entegre edildi.
 - **Storage Lifecycle:** Onaylanan sözleşmeler, ilgili dataset'in kaynak görsel objelerini R2/MinIO'dan `STORAGE_RETENTION_DAYS` (varsayılan: 7 gün) sonra otomatik olarak siler. DB metadata her zaman korunur. Yeni `StorageState` enum, `Dataset` ve `Asset` tablolarında depolama yaşam döngüsünü izler. Silinen assetler için `signedUrl: null` döner. Kaçırılan işler, `storage-cleanup` worker'ının tekrarlayan tarama (scan) jobı ile geri kazanılır.
 - **Auth Session Uyumlaştırılması:** JWT token `expiresIn` süresi ile çerez `maxAge` süresi tek bir kaynaktan (`JWT_EXPIRES_IN`) yönetilerek senkronize edildi.
 
@@ -57,6 +58,8 @@ backend/
 │   └── seed.ts            # Seed data script
 │
 ├── src/
+│   ├── config/            # YENİ
+│   │   └── beta-limits.ts # Beta güvenlik limitleri helper
 │   ├── controllers/       # 11 API endpoint handler
 │   │   ├── auth.controller.ts
 │   │   ├── admin.controller.ts

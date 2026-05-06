@@ -16,6 +16,7 @@ import {
 } from "../lib/storage";
 import { addAssetJob } from "../lib/queue";
 import logger from "../lib/logger";
+import { getBetaLimits } from '../config/beta-limits';
 
 // Interface for Multer file (since we don't import 'express' here)
 interface UploadedFile {
@@ -61,6 +62,7 @@ export class AssetService {
     datasetId: string,
     filename: string,
     contentType: string,
+    fileSize: number
   ) {
     if (!datasetId) {
       throw new BadRequestError("Dataset ID zorunludur.");
@@ -86,6 +88,35 @@ export class AssetService {
       );
     }
 
+    const { datasetMaxAssets, userMaxStorageBytes } = getBetaLimits();
+
+    if (userRole !== "admin") {
+      // 1. Enforce Dataset Asset Limit
+      const currentAssetCount = await prisma.asset.count({
+        where: { datasetId },
+      });
+
+      if (currentAssetCount >= datasetMaxAssets) {
+        throw new BadRequestError(`Beta: Bir dataset en fazla ${datasetMaxAssets} görsel içerebilir.`);
+      }
+
+      // 2. Enforce User Storage Limit
+      // We sum sizeBytes over all assets that belong to any dataset owned by the user
+      // Treating null sizeBytes as 0 is automatically handled by Prisma aggregate (it just ignores them, which is equivalent to 0 in sum)
+      const storageAgg = await prisma.asset.aggregate({
+        _sum: { sizeBytes: true },
+        where: {
+          dataset: { ownerUserId: userId }
+        }
+      });
+
+      const currentStorageUsed = Number(storageAgg._sum.sizeBytes || 0);
+      if (currentStorageUsed + fileSize > userMaxStorageBytes) {
+        const maxMb = (userMaxStorageBytes / (1024 * 1024)).toFixed(1);
+        throw new BadRequestError(`Beta: Toplam depolama alanınız ${maxMb} MB sınırını aşıyor.`);
+      }
+    }
+
     // Build a unique object key
     const ext = path.extname(filename) || "";
     const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
@@ -97,6 +128,7 @@ export class AssetService {
         objectKey,
         mimeType: contentType,
         status: "pending",
+        sizeBytes: fileSize,
       },
     });
 

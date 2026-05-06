@@ -6,7 +6,9 @@ import { validate } from '../middlewares/validate.middleware';
 import { 
   idParamSchema,
   updateUserSchema,
-  adminPaymentQuerySchema
+  adminPaymentQuerySchema,
+  createInviteCodeSchema,
+  paginationSchema
 } from '../validators/validation.schemas';
 
 const router = Router();
@@ -78,6 +80,20 @@ router.get(
   '/payments',
   validate(adminPaymentQuerySchema, 'query'),
   adminController.getPayments
+);
+
+// POST /api/admin/invite-codes - Create a new invite code
+router.post(
+  '/invite-codes',
+  validate(createInviteCodeSchema),
+  adminController.createInviteCode
+);
+
+// GET /api/admin/invite-requests - Get paginated invite requests
+router.get(
+  '/invite-requests',
+  validate(paginationSchema, 'query'),
+  adminController.getInviteRequests
 );
 
 export default router;

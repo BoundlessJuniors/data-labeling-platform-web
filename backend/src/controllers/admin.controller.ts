@@ -253,3 +253,48 @@ export const getPayments = async (
   }
 };
 
+// Create a new invite code (admin only)
+export const createInviteCode = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+    const { email, expiresAt } = req.body;
+    const adminUserId = req.user!.id;
+
+    const inviteCode = await adminService.createInviteCode(adminUserId, email, expiresAt);
+
+    res.status(201).json({
+      success: true,
+      data: inviteCode,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get paginated invite requests (admin only)
+export const getInviteRequests = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    ensureAdmin(req);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+
+    const result = await adminService.getInviteRequests(page, limit);
+
+    res.json({
+      success: true,
+      data: result.requests,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

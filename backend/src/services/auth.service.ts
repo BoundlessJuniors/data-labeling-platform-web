@@ -1,9 +1,10 @@
 import bcrypt from 'bcrypt';
 import prisma from '../lib/db';
 import { generateToken } from '../middlewares/auth.middleware';
-import { ConflictError, UnauthorizedError, NotFoundError } from '../utils/errors';
+import { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } from '../utils/errors';
 import logger from '../lib/logger';
-import { UserRole } from '@prisma/client';
+import { UserRole, InviteRequestStatus } from '@prisma/client';
+import { getBetaLimits } from '../config/beta-limits';
 
 const SALT_ROUNDS = 10;
 
@@ -16,55 +17,147 @@ export class AuthService {
     password: string;
     role: UserRole;
     displayName: string;
+    inviteCode?: string;
   }) {
     // Check if user already exists
+    const normalizedEmail = data.email.trim().toLowerCase();
+    
     const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
       throw new ConflictError('User with this email already exists');
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+    const { maxRegisteredUsers, publicRegisterLimit } = getBetaLimits();
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        passwordHash,
-        role: data.role,
-        displayName: data.displayName,
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        displayName: true,
-        createdAt: true,
-      },
+    return await prisma.$transaction(async (tx) => {
+      // Check total users limit
+      const totalUsers = await tx.user.count();
+
+      if (totalUsers >= maxRegisteredUsers) {
+        throw new BadRequestError('Beta is currently full. No new registrations are allowed.');
+      }
+
+      // Check invite code requirement
+      if (totalUsers >= publicRegisterLimit) {
+        if (!data.inviteCode) {
+          throw new BadRequestError('An invite code is required to register at this time.');
+        }
+
+        const invite = await tx.inviteCode.findUnique({
+          where: { code: data.inviteCode },
+        });
+
+        if (!invite || invite.usedAt || (invite.expiresAt && invite.expiresAt < new Date())) {
+          throw new BadRequestError('Invalid or expired invite code.');
+        }
+
+        if (invite.email && invite.email !== normalizedEmail) {
+          throw new BadRequestError('This invite code is not valid for this email address.');
+        }
+
+        // Mark code as used conditionally to avoid race condition
+        const updatedCount = await tx.inviteCode.updateMany({
+          where: { 
+            id: invite.id,
+            usedAt: null,
+          },
+          data: { usedAt: new Date() },
+        });
+
+        if (updatedCount.count === 0) {
+          throw new BadRequestError('Invalid or expired invite code.');
+        }
+      }
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+
+      // Create user
+      const user = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          passwordHash,
+          role: data.role,
+          displayName: data.displayName,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          displayName: true,
+          createdAt: true,
+        },
+      });
+
+      // If invite code was used, link it to the new user
+      if (data.inviteCode && totalUsers >= publicRegisterLimit) {
+        await tx.inviteCode.update({
+          where: { code: data.inviteCode },
+          data: { usedByUserId: user.id },
+        });
+      }
+
+      // Generate JWT token
+      const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      logger.info(`User registered: ${user.email}`);
+
+      return { user, token };
     });
-
-    // Generate JWT token
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    });
-
-    logger.info(`User registered: ${user.email}`);
-
-    return { user, token };
   }
+
+  /**
+   * Request an invite code
+   */
+  async requestInvite(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingUser) {
+      // Safe generic response
+      return;
+    }
+
+    const existingRequest = await prisma.inviteRequest.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingRequest) {
+      // Safe generic response
+      return;
+    }
+
+    await prisma.inviteRequest.create({
+      data: {
+        email: normalizedEmail,
+        status: InviteRequestStatus.pending,
+      },
+    });
+
+    logger.info(`Invite requested: ${normalizedEmail}`);
+  }
+
 
   /**
    * Login user
    */
   async login(data: { email: string; password: string }) {
+    const normalizedEmail = data.email.trim().toLowerCase();
+
     // Find user
     const user = await prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: normalizedEmail },
     });
 
     if (!user) {

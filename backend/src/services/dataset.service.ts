@@ -4,12 +4,25 @@ import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors'
 import { cacheDeletePattern } from '../lib/redis';
 import { deleteFromR2Safe } from '../lib/storage';
 import logger from '../lib/logger';
+import { getBetaLimits } from '../config/beta-limits';
 
 export class DatasetService {
   /**
    * Create a new dataset
    */
-  async createDataset(userId: string, data: { name: string; description?: string; status?: DatasetStatus }) {
+  async createDataset(userId: string, data: { name: string; description?: string; status?: DatasetStatus }, userRole?: UserRole) {
+    const { userMaxDatasets } = getBetaLimits();
+
+    if (userRole !== 'admin') {
+      const existingCount = await prisma.dataset.count({
+        where: { ownerUserId: userId },
+      });
+
+      if (existingCount >= userMaxDatasets) {
+        throw new BadRequestError(`Beta: En fazla ${userMaxDatasets} dataset oluşturabilirsiniz.`);
+      }
+    }
+
     const dataset = await prisma.dataset.create({
       data: {
         name: data.name,

@@ -2,11 +2,11 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AssetService } from '../services/asset.service';
 import { BadRequestError } from '../utils/errors';
+import { getBetaLimits } from '../config/beta-limits';
 
 const assetService = new AssetService();
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 // Initiate upload (Get Presigned URL)
 export const initiateUpload = async (
@@ -30,9 +30,11 @@ export const initiateUpload = async (
       );
     }
 
-    // Security Check: File Size
-    if (fileSize > MAX_FILE_SIZE_BYTES) {
-      throw new BadRequestError('Dosya boyutu 10MB\'ı geçemez.');
+    // Security Check: File Size from Beta Limits
+    const { maxFileSizeBytes } = getBetaLimits();
+    if (fileSize > maxFileSizeBytes) {
+      const maxMb = (maxFileSizeBytes / (1024 * 1024)).toFixed(1);
+      throw new BadRequestError(`Dosya boyutu ${maxMb} MB'ı geçemez.`);
     }
 
     const result = await assetService.initiateUpload(
@@ -40,7 +42,8 @@ export const initiateUpload = async (
       userRole, 
       datasetId, 
       filename, 
-      contentType
+      contentType,
+      fileSize
     );
 
     res.status(201).json({

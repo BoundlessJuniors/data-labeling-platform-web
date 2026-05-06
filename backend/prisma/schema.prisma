@@ -137,6 +137,12 @@ enum StorageState {
   purge_failed
 }
 
+enum InviteRequestStatus {
+  pending
+  code_sent
+  rejected
+}
+
 // ============================================================================
 // 1. USERS
 // Hem müşteri hem etiketleyici tek tabloda. Rol alanıyla ayrılır.
@@ -169,6 +175,8 @@ model User {
   reviews               Review[]
   proposals             Proposal[]
   submissions           Submission[]
+  inviteCodesCreated    InviteCode[]           @relation("InviteCodeCreatedBy")
+  inviteCodesUsed       InviteCode?            @relation("InviteCodeUsedBy")
 
   @@map("users")
 }
@@ -695,4 +703,45 @@ model Submission {
   @@index([labelerUserId])
   @@index([status])
   @@map("submissions")
+}
+
+// ============================================================================
+// 18. INVITE CODES
+// Beta aşaması için davetiye kodları.
+// ============================================================================
+
+model InviteCode {
+  id              String    @id @default(uuid()) @db.Uuid
+  code            String    @unique
+  email           String?
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  usedByUserId    String?   @unique @map("used_by_user_id") @db.Uuid
+  usedAt          DateTime? @map("used_at") @db.Timestamptz
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  createdBy User? @relation("InviteCodeCreatedBy", fields: [createdByUserId], references: [id])
+  usedBy    User? @relation("InviteCodeUsedBy", fields: [usedByUserId], references: [id])
+
+  @@index([email])
+  @@index([usedAt])
+  @@index([expiresAt])
+  @@map("invite_codes")
+}
+
+// ============================================================================
+// 19. INVITE REQUESTS
+// Public kullanıcıların invite code talep etmesi.
+// ============================================================================
+
+model InviteRequest {
+  id        String              @id @default(uuid()) @db.Uuid
+  email     String              @unique
+  status    InviteRequestStatus @default(pending)
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@map("invite_requests")
 }

@@ -14,12 +14,13 @@ export const createDataset = async (
   try {
     const { name, description, status } = req.body;
     const userId = req.user!.id;
+    const userRole = req.user!.role;
 
     const dataset = await datasetService.createDataset(userId, {
       name,
       description,
       status: status as DatasetStatus,
-    });
+    }, userRole);
 
     res.status(201).json({
       success: true,

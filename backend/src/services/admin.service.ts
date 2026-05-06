@@ -637,4 +637,79 @@ export class AdminService {
       },
     };
   }
+
+  // ========================================================================
+  // Invite Codes
+  // ========================================================================
+
+  /**
+   * Create a new invite code
+   */
+  async createInviteCode(adminUserId: string, email?: string, expiresAt?: Date) {
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+
+    // Generate secure random code
+    const crypto = require('crypto');
+    const randomHex = crypto.randomBytes(8).toString('hex');
+    const code = `INV-${randomHex}`.toUpperCase();
+
+    return await prisma.$transaction(async (tx) => {
+      const inviteCode = await tx.inviteCode.create({
+        data: {
+          code,
+          email: normalizedEmail,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          createdByUserId: adminUserId,
+        },
+      });
+
+      // If email provided, check for a pending request and mark it sent
+      if (normalizedEmail) {
+        const existingRequest = await tx.inviteRequest.findUnique({
+          where: { email: normalizedEmail },
+        });
+
+        if (existingRequest && existingRequest.status === 'pending') {
+          await tx.inviteRequest.update({
+            where: { email: normalizedEmail },
+            data: { status: 'code_sent' },
+          });
+        }
+      }
+
+      await auditService.logAction(adminUserId, 'invite_code.create', 'invite_code', inviteCode.id, {
+        email: normalizedEmail,
+      });
+
+      return inviteCode;
+    });
+  }
+
+  /**
+   * Get paginated invite requests
+   */
+  async getInviteRequests(page: number, limit: number) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const skip = (safePage - 1) * safeLimit;
+
+    const [requests, total] = await Promise.all([
+      prisma.inviteRequest.findMany({
+        skip,
+        take: safeLimit,
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.inviteRequest.count(),
+    ]);
+
+    return {
+      requests,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      },
+    };
+  }
 }

@@ -44,6 +44,7 @@ export const registerSchema = Joi.object({
     'any.required': 'Role is required',
   }),
   displayName: Joi.string().max(100).optional(),
+  inviteCode: Joi.string().trim().max(100).optional().allow(''),
 });
 
 export const loginSchema = Joi.object({
@@ -54,6 +55,20 @@ export const loginSchema = Joi.object({
   password: Joi.string().required().messages({
     'any.required': 'Password is required',
   }),
+});
+
+export const inviteRequestSchema = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'Please provide a valid email address',
+    'any.required': 'Email is required',
+  }),
+});
+
+export const createInviteCodeSchema = Joi.object({
+  email: Joi.string().email().optional().allow('').messages({
+    'string.email': 'Please provide a valid email address',
+  }),
+  expiresAt: Joi.date().iso().greater('now').optional(),
 });
 
 // ============================================================================
