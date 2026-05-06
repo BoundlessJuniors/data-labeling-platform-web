@@ -8,10 +8,10 @@ Görsel veri etiketleme işlerini yöneten bir pazar yeri platformu. Müşterile
 data-labeling-platform-web/
 ├── backend/              # Node.js + Express + Prisma API
 │   ├── src/
-│   │   ├── controllers/  # 12 API endpoint handler
+│   │   ├── controllers/  # API endpoint handler
 │   │   ├── services/     # Business Logic Layer (Service Layer Pattern)
-│   │   ├── routes/       # 12 route modülü
-│   │   ├── middlewares/  # 9 middleware (auth, cache, rate-limit, upload...)
+│   │   ├── routes/       # route modülü
+│   │   ├── middlewares/  # middleware (auth, cache, rate-limit, upload...)
 │   │   ├── lib/          # Prisma, Redis, Logger, MinIO/R2 Storage
 │   │   ├── validators/   # Joi validation schemas
 │   │   └── utils/        # Error classes
@@ -19,14 +19,14 @@ data-labeling-platform-web/
 │
 ├── frontend/             # Vue 3 + Tailwind CSS web app
 │   ├── src/
-│   │   ├── api/          # 10 API service modülü
-│   │   ├── components/   # 13+ UI bileşeni
+│   │   ├── api/          # API service modülü
+│   │   ├── components/   # UI bileşeni
 │   │   ├── composables/  # Vue composables
-│   │   ├── layouts/      # 3 layout (Admin, App, Public)
+│   │   ├── layouts/      # layout (Admin, App, Public)
 │   │   ├── router/       # Role-based routing
-│   │   ├── stores/       # 10 Pinia store
-│   │   ├── types/        # 11 TypeScript type dosyası
-│   │   └── views/        # 18 sayfa bileşeni
+│   │   ├── stores/       # Pinia store
+│   │   ├── types/        # TypeScript type dosyası
+│   │   └── views/        # sayfa bileşeni
 │   └── public/           # Static assets
 │
 ├── docker-compose.yml    # PostgreSQL 16 + Redis 7 + MinIO
