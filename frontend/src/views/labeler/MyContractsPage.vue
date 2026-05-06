@@ -234,7 +234,7 @@ function formatDate(dateString?: string | null) {
             </p>
             
             <template v-if="contract.status === 'pending_payment'">
-              <p class="text-sm text-yellow-600 dark:text-yellow-400 max-w-xs">Müşteri ödemeyi tamamladıktan sonra işe başlayabilirsiniz.</p>
+              <p class="text-sm text-yellow-600 dark:text-yellow-400 max-w-xs">Müşteri test ödeme adımını tamamladıktan sonra işe başlayabilirsiniz. Bu beta ortamında gerçek ödeme alınmaz.</p>
             </template>
             
             <template v-else-if="contract.status === 'submitted'">

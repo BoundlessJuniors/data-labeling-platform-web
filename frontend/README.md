@@ -84,6 +84,9 @@ frontend/
 │   ├── components/            # Reusable bileşenler
 │   │   ├── admin/             # Admin'e özel bileşenler
 │   │   │   └── AdminTaskQcModal.vue
+│   │   ├── public/            # Public (Landing/Auth) özel bileşenler
+│   │   │   ├── BetaNotice.vue
+│   │   │   └── InviteRequestModal.vue
 │   │   ├── ui/                # 8 UI bileşeni
 │   │   │   ├── BaseButton.vue
 │   │   │   ├── BaseInput.vue
@@ -419,6 +422,8 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **UI İyileştirmeleri**: Koyu/Açık Tema (Dark/Light mode) geçişleri `useTheme.ts` composable ile sisteme kalıcı olarak entegre edildi. Tüm public, auth, client, labeler ve admin sayfaları masaüstü uygulaması renk paletine hizalandı.
 
 - [x] **Faz 10 (Payment Dashboard)**: Admin paneline mock payment lifecycle'ı değiştirmeyen read-only listeleme, analiz ve escrow raporlama dashboard'u eklendi. Backend tarafında yeni `getPayments` API'leri Prisma aggregation desteğiyle yazıldı.
+- [x] **Public & Beta Security**: Kayıt sayfasına davetiye kodu (`inviteCode`) gereksinimi ve e-posta ile davetiye talep etme bileşeni (`InviteRequestModal`) eklendi. Landing ve layout seviyesinde platformun teknik demo olduğunu belirten uyarılar (`BetaNotice`) yerleştirildi.
+- [x] **Public & Beta Security**: İlan, sözleşme ve ödeme ekranlarında "mock/test ödeme" sürecinin gerçek para veya kart bilgisi içermediğine dair bilgilendirmeler ve modal onayları eklendi.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

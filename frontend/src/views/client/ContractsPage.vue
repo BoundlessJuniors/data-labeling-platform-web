@@ -55,6 +55,23 @@ const showCancelReasonModal = ref(false);
 const cancelContractId = ref<string | null>(null);
 const cancelReason = ref('');
 
+// ── Mock Payment Modal ──────────────────────────────────────────
+const showMockPaymentModal = ref(false);
+const mockPaymentContractId = ref<string | null>(null);
+
+function openMockPayment(contractId: string) {
+  mockPaymentContractId.value = contractId;
+  showMockPaymentModal.value = true;
+}
+
+async function handleMockPayment() {
+  if (mockPaymentContractId.value) {
+    await contractsStore.mockPayContract(mockPaymentContractId.value);
+    showMockPaymentModal.value = false;
+    mockPaymentContractId.value = null;
+  }
+}
+
 // ── Export Format Map ───────────────────────────────────────────
 const formatMap = ref<Record<string, 'COCO' | 'YOLO' | 'VOC'>>({});
 
@@ -288,10 +305,9 @@ const currentConfirmMessage = computed(() => {
                 class="w-full justify-center"
                 variant="primary"
                 size="sm"
-                :loading="contractsStore.paymentLoadingMap[contract.id]"
-                @click="contractsStore.mockPayContract(contract.id)"
+                @click="openMockPayment(contract.id)"
               >
-                Mock Ödeme Yap
+                Test Ödemesini Tamamla
               </BaseButton>
 
               <BaseButton
@@ -304,7 +320,7 @@ const currentConfirmMessage = computed(() => {
               </BaseButton>
 
               <p class="text-[11px] text-gray-500 dark:text-gray-400 text-center leading-snug">
-                Ödeme tamamlanınca sözleşme aktif hale gelir.
+                Test ödeme adımı tamamlanınca sözleşme demo modunda aktif hale gelir.
               </p>
             </div>
 
@@ -491,6 +507,36 @@ const currentConfirmMessage = computed(() => {
               @click="handleCancelWithReason"
             >
               İptal Talebi Oluştur
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Mock Payment Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showMockPaymentModal"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        @click.self="showMockPaymentModal = false"
+      >
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Test Ödemesini Tamamla
+          </h3>
+          <div class="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p class="text-sm text-yellow-800 dark:text-yellow-200">
+              Bu gerçek bir ödeme değildir. Kart bilgisi alınmaz. Bu adım yalnızca sözleşme yaşam döngüsünü test etmek için kullanılır. Onayladığınızda sözleşme demo modunda aktif hale gelecektir.
+            </p>
+          </div>
+          <div class="flex justify-end gap-3">
+            <BaseButton variant="secondary" @click="showMockPaymentModal = false">İptal</BaseButton>
+            <BaseButton
+              variant="primary"
+              :loading="mockPaymentContractId ? contractsStore.paymentLoadingMap[mockPaymentContractId] : false"
+              @click="handleMockPayment"
+            >
+              Test Ödemesini Tamamla
             </BaseButton>
           </div>
         </div>

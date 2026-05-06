@@ -4,10 +4,12 @@
  * Used for login, register, landing pages
  */
 import { RouterLink } from 'vue-router';
+import BetaNotice from '@/components/public/BetaNotice.vue';
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-[#0f172a] flex flex-col">
+    <BetaNotice />
     <!-- Header -->
     <header class="bg-white dark:bg-[#111827] shadow-sm dark:border-b dark:border-[#334155]">
       <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="Main navigation">

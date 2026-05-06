@@ -7,6 +7,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter, RouterLink } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useSeo } from '@/composables/useSeo';
+import InviteRequestModal from '@/components/public/InviteRequestModal.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -16,6 +17,8 @@ const password = ref('');
 const confirmPassword = ref('');
 const displayName = ref('');
 const role = ref<'client' | 'labeler'>('client');
+const inviteCode = ref('');
+const isInviteModalOpen = ref(false);
 const showError = ref(false);
 const validationError = ref('');
 
@@ -48,6 +51,7 @@ async function handleSubmit() {
     password: password.value,
     role: role.value,
     displayName: displayName.value || undefined,
+    inviteCode: inviteCode.value.trim() || undefined,
   });
 
   if (success) {
@@ -85,6 +89,13 @@ async function handleSubmit() {
           aria-live="assertive"
         >
           <p class="text-sm text-red-600 dark:text-red-400">{{ validationError || authStore.error }}</p>
+        </div>
+
+        <!-- Beta Notice Box -->
+        <div class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <p class="text-sm text-yellow-800 dark:text-yellow-200">
+            Bu beta ortamında yalnızca test verileri kullanılmalıdır. Gerçek veya hassas veri yüklemeyiniz.
+          </p>
         </div>
 
         <!-- Form -->
@@ -147,6 +158,28 @@ async function handleSubmit() {
               class="input"
               placeholder="Şifreyi tekrar girin"
             />
+          </div>
+
+          <div>
+            <label for="register-invite" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              Davetiye Kodu (Opsiyonel)
+            </label>
+            <input
+              id="register-invite"
+              v-model="inviteCode"
+              type="text"
+              class="input"
+              placeholder="Varsa davetiye kodunuzu girin"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">
+              Beta kontenjanı dolduğunda kayıt için davetiye kodu gerekir.
+            </p>
+          </div>
+          
+          <div class="flex justify-end">
+            <button type="button" class="text-sm text-primary-600 dark:text-primary-400 hover:underline" @click="isInviteModalOpen = true">
+              Davetiye kodum yok / Davetiye talep et
+            </button>
           </div>
 
           <!-- Role Selection -->
@@ -224,5 +257,7 @@ async function handleSubmit() {
         </p>
       </div>
     </main>
+
+    <InviteRequestModal :open="isInviteModalOpen" @close="isInviteModalOpen = false" />
   </div>
 </template>

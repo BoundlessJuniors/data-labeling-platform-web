@@ -45,6 +45,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function requestInvite(email: string) {
+    loading.value = true
+    error.value = null
+    try {
+      await authApi.requestInvite({ email })
+      return true
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err, 'Davetiye talebi gönderilemedi')
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function fetchProfile() {
     try {
       const response = await authApi.getProfile()
@@ -79,6 +93,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLabeler,
     login,
     register,
+    requestInvite,
     fetchProfile,
     logout,
     clearError,

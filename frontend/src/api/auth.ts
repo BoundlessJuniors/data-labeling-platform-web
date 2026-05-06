@@ -10,6 +10,16 @@ export interface RegisterRequest {
   password: string
   role: 'client' | 'labeler'
   displayName?: string
+  inviteCode?: string
+}
+
+export interface InviteRequestRequest {
+  email: string
+}
+
+export interface InviteRequestResponse {
+  success: boolean
+  message: string
 }
 
 export interface User {
@@ -39,4 +49,7 @@ export const authApi = {
 
   logout: () =>
     apiClient.post<{ success: boolean; message: string }>('/auth/logout'),
+
+  requestInvite: (data: InviteRequestRequest) =>
+    apiClient.post<InviteRequestResponse>('/auth/invite-request', data),
 }

@@ -28,10 +28,10 @@ export interface RegisterRequest {
   password: string;
   role: 'client' | 'labeler';
   displayName?: string;
+  inviteCode?: string;
 }
 
-/** Auth response with token */
+/** Auth response */
 export interface AuthResponse {
   user: User;
-  token: string;
 }
