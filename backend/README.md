@@ -37,6 +37,7 @@ npm run dev
 
 ## 📝 Son Güncellemeler (Patch Notes)
 
+- **Labeler Rating System (Marketplace Trust):** Onaylanmış (`approved`) ve ödemesi serbest bırakılmış (`released`) sözleşmeler için, müşterilerin etiketleyicileri değerlendirebildiği (1-5 yıldız + yorum) güven odaklı puanlama sistemi eklendi. Yarış durumlarını (race conditions) önlemek için veritabanı kilitleri (`FOR UPDATE`) ve atomik hesaplamalar kullanıldı. Tüm puanlama aksiyonları `AuditLog` sistemine entegre edildi.
 - **Beta Limits & Invite System:** Sistem güvenliği ve kaynak yönetimi için `.env` üzerinden yapılandırılabilen (dosya boyutu, max dataset, max kullanıcı, sözleşme kotaları) sıkı beta güvenlik limitleri (`beta-limits.ts`) eklendi. Ayrıca kontrollü halka açık beta süreci için davetiye kodu (Invite Code) talep etme ve kullanma sistemi entegre edildi.
 - **Storage Lifecycle:** Onaylanan sözleşmeler, ilgili dataset'in kaynak görsel objelerini R2/MinIO'dan `STORAGE_RETENTION_DAYS` (varsayılan: 7 gün) sonra otomatik olarak siler. DB metadata her zaman korunur. Yeni `StorageState` enum, `Dataset` ve `Asset` tablolarında depolama yaşam döngüsünü izler. Silinen assetler için `signedUrl: null` döner. Kaçırılan işler, `storage-cleanup` worker'ının tekrarlayan tarama (scan) jobı ile geri kazanılır.
 - **Auth Session Uyumlaştırılması:** JWT token `expiresIn` süresi ile çerez `maxAge` süresi tek bir kaynaktan (`JWT_EXPIRES_IN`) yönetilerek senkronize edildi.
@@ -307,6 +308,7 @@ Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenli
 | PATCH | `/:id/approve` | Sözleşmeyi onayla (client) — normalize completed gerektirir |
 | PATCH | `/:id/reject` | Sözleşmeyi revision_requested'a çevir (client) — task statülerini sıfırlar |
 | PATCH | `/:id/cancel` | Sözleşmeyi iptal et (client/admin). İhtilaflı (disputed) durumuna çekebilir. |
+| POST | `/:id/rating` | Sözleşme için etiketleyiciyi (labeler) değerlendir (sadece müşteri) |
 | POST | `/:id/normalize-retry` | Normalize job'ı tekrar enqueue et (admin only) |
 
 > **Mimari Not:** Doğrudan `POST /contracts` endpoint'i yoktur. Contract oluşturma yalnızca `PATCH /proposals/:id/accept` ile gerçekleşir.
@@ -373,6 +375,7 @@ Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenli
 - **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom), `qcMode` (none, client_approval, internal_reviewer)
 - **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 
 - **Contract** - İş sözleşmeleri (pending_payment, active, submitted, approved, revision_requested, disputed, cancelled) — `revisionReason`, `revisionRequestedAt`, `revisionCount` alanları ile revizyon takibi. Ödeme sonrası aktif olma mekanizması.
+- **ContractRating** - Tamamlanan sözleşmelerin müşteri tarafından yapılan değerlendirme kayıtları (1-5 yıldız, `CHECK` kısıtlamalı, `AuditLog` destekli).
 - **Submission** - Normalize pipeline tracking (pending, processing, completed, failed) — contract submit'te oluşturulur, normalize worker tarafından güncellenir
 
 ### Task Models

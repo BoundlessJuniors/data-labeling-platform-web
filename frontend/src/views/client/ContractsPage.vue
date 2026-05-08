@@ -72,6 +72,32 @@ async function handleMockPayment() {
   }
 }
 
+// ── Rating Modal ───────────────────────────────────────────────
+const showRatingModal = ref(false);
+const ratingContractId = ref<string | null>(null);
+const ratingScore = ref<number>(5);
+const ratingComment = ref('');
+
+function openRatingModal(contractId: string) {
+  ratingContractId.value = contractId;
+  ratingScore.value = 5;
+  ratingComment.value = '';
+  showRatingModal.value = true;
+}
+
+async function submitRating() {
+  if (!ratingContractId.value) return;
+  const success = await contractsStore.rateContract(
+    ratingContractId.value,
+    ratingScore.value,
+    ratingComment.value.trim() || undefined
+  );
+  if (success) {
+    showRatingModal.value = false;
+    ratingContractId.value = null;
+  }
+}
+
 // ── Export Format Map ───────────────────────────────────────────
 const formatMap = ref<Record<string, 'COCO' | 'YOLO' | 'VOC'>>({});
 
@@ -384,6 +410,23 @@ const currentConfirmMessage = computed(() => {
                 </span>
                 <span v-else>Çıktıyı İndir</span>
               </button>
+
+              <button
+                v-if="!contract.rating"
+                type="button"
+                class="w-full px-3 py-2 text-xs font-medium rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-colors"
+                @click="openRatingModal(contract.id)"
+              >
+                Değerlendir
+              </button>
+              <div v-else class="w-full text-center mt-2">
+                <span class="text-xs font-medium text-gray-500 flex items-center justify-center gap-1">
+                  <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  Değerlendirme Yapıldı
+                </span>
+              </div>
             </div>
 
             <div
@@ -537,6 +580,68 @@ const currentConfirmMessage = computed(() => {
               @click="handleMockPayment"
             >
               Test Ödemesini Tamamla
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Rating Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showRatingModal"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        @click.self="showRatingModal = false"
+      >
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Labeler'ı Değerlendir
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            Lütfen çalışmayı ve iletişimi değerlendirin.
+          </p>
+
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Puan (1-5)</label>
+            <div class="flex items-center gap-2">
+              <button
+                v-for="star in 5"
+                :key="star"
+                type="button"
+                class="focus:outline-none transition-transform hover:scale-110"
+                @click="ratingScore = star"
+              >
+                <svg
+                  class="w-8 h-8"
+                  :class="star <= ratingScore ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Yorum (İsteğe bağlı)</label>
+            <textarea
+              v-model="ratingComment"
+              class="input resize-none w-full"
+              rows="3"
+              placeholder="Çalışma hakkında eklemek istedikleriniz..."
+              maxlength="2000"
+            />
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <BaseButton variant="secondary" @click="showRatingModal = false">İptal</BaseButton>
+            <BaseButton
+              variant="primary"
+              :loading="ratingContractId ? contractsStore.ratingLoadingMap[ratingContractId] : false"
+              @click="submitRating"
+            >
+              Gönder
             </BaseButton>
           </div>
         </div>

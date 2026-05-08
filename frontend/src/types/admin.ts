@@ -80,6 +80,7 @@ export interface AdminUserListItem {
   displayName: string | null;
   role: 'client' | 'labeler' | 'admin';
   ratingAvg: string | null; // Prisma Decimal comes as string
+  ratingCount: number;
   createdAt: string;
   _count: {
     datasets: number;
@@ -245,8 +246,8 @@ export interface AdminContractListItem {
   completedAt: string | null;
   revisionCount: number;
   listing?: { id: string; title: string };
-  client?: { id: string; email: string; displayName: string | null };
-  labeler?: { id: string; email: string; displayName: string | null };
+  client?: { id: string; email: string; displayName: string | null; ratingAvg?: string | number | null; ratingCount?: number };
+  labeler?: { id: string; email: string; displayName: string | null; ratingAvg?: string | number | null; ratingCount?: number };
   _count?: { tasks: number };
   tasks?: { status: string }[];
 }

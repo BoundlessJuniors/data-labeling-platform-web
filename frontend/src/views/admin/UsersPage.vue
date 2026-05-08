@@ -310,7 +310,7 @@ function formatDate(dateString: string) {
           <p class="font-medium text-sm">Email: {{ detailUser.email }}</p>
           <p class="font-medium text-sm">Rol: <span class="capitalize">{{ detailUser.role }}</span></p>
           <p class="font-medium text-sm">Kayıt: {{ formatDate(detailUser.createdAt) }}</p>
-          <p class="font-medium text-sm">Puan: {{ detailUser.ratingAvg || 'Yok' }}</p>
+          <p class="font-medium text-sm">Puan: {{ detailUser.ratingAvg ? `${detailUser.ratingAvg} (${detailUser.ratingCount || 0})` : 'Yok' }}</p>
         </div>
 
         <div class="bg-slate-50 p-3 rounded border border-slate-200">

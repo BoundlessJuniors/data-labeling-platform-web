@@ -45,6 +45,9 @@ export const useContractsStore = defineStore('contracts', () => {
   // ── Payment State ─────────────────────────────────────────────────
   const paymentLoadingMap = ref<Record<string, boolean>>({});
 
+  // ── Rating State ──────────────────────────────────────────────────
+  const ratingLoadingMap = ref<Record<string, boolean>>({});
+
   /**
    * Fetch paginated contracts list
    */
@@ -97,8 +100,8 @@ export const useContractsStore = defineStore('contracts', () => {
   async function approveContract(id: string) {
     loading.value = true;
     try {
-      const response = await contractsApi.approve(id);
-      updateContractInList(id, response.data.data);
+      await contractsApi.approve(id);
+      await fetchContracts();
       toastStore.success('Sözleşme onaylandı');
       return true;
     } catch (_err) {
@@ -115,8 +118,8 @@ export const useContractsStore = defineStore('contracts', () => {
   async function rejectContract(id: string, reason?: string) {
     loading.value = true;
     try {
-      const response = await contractsApi.reject(id, reason);
-      updateContractInList(id, response.data.data);
+      await contractsApi.reject(id, reason);
+      await fetchContracts();
       toastStore.success('Revizyon istendi');
       return true;
     } catch (_err) {
@@ -134,7 +137,7 @@ export const useContractsStore = defineStore('contracts', () => {
     loading.value = true;
     try {
       const response = await contractsApi.cancel(id, reason);
-      updateContractInList(id, response.data.data);
+      await fetchContracts();
       if (response.data.data.status === 'disputed') {
         toastStore.success('İptal talebi itiraza taşındı. Admin incelemesi bekleniyor.');
       } else {
@@ -146,6 +149,27 @@ export const useContractsStore = defineStore('contracts', () => {
       return false;
     } finally {
       loading.value = false;
+    }
+  }
+
+  /**
+   * Rate a labeler for a contract
+   */
+  async function rateContract(id: string, rating: number, comment?: string) {
+    ratingLoadingMap.value[id] = true;
+    try {
+      await contractsApi.rate(id, rating, comment);
+      toastStore.success('Değerlendirme gönderildi');
+      await fetchContracts();
+      if (currentContract.value?.id === id) {
+        await fetchContract(id);
+      }
+      return true;
+    } catch (_err) {
+      toastStore.error(getErrorMessage(_err, 'Değerlendirme gönderilemedi'));
+      return false;
+    } finally {
+      ratingLoadingMap.value[id] = false;
     }
   }
 
@@ -298,12 +322,7 @@ export const useContractsStore = defineStore('contracts', () => {
     qcError.value = null;
   }
 
-  function updateContractInList(id: string, updatedContract: Contract) {
-    const index = contracts.value.findIndex((c) => c.id === id);
-    if (index > -1) {
-      contracts.value[index] = updatedContract;
-    }
-  }
+
 
   /**
    * Set status filter and refetch
@@ -360,12 +379,14 @@ export const useContractsStore = defineStore('contracts', () => {
     qcError,
     exportLoadingMap,
     paymentLoadingMap,
+    ratingLoadingMap,
     // Actions
     fetchContracts,
     fetchContract,
     approveContract,
     rejectContract,
     cancelContract,
+    rateContract,
     downloadContractExport,
     setStatusFilter,
     goToPage,

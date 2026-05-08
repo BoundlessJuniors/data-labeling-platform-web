@@ -43,6 +43,7 @@ export class AdminService {
           displayName: true,
           role: true,
           ratingAvg: true,
+          ratingCount: true,
           createdAt: true,
           _count: {
             select: {
@@ -80,6 +81,7 @@ export class AdminService {
         displayName: true,
         role: true,
         ratingAvg: true,
+        ratingCount: true,
         createdAt: true,
         _count: {
           select: {
@@ -152,6 +154,7 @@ export class AdminService {
         displayName: true,
         role: true,
         ratingAvg: true,
+        ratingCount: true,
         createdAt: true,
       },
     });

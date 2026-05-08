@@ -28,9 +28,9 @@ function formatDate(dateString: string) {
   });
 }
 
-function formatRating(rating: number | null) {
-  if (rating === null || rating === undefined) return 'Değerlendirilmemiş';
-  return `⭐ ${Number(rating).toFixed(1)}`;
+function formatRating(rating: number | string | null, count?: number) {
+  if (rating === null || rating === undefined || count === 0 || count === undefined) return 'Değerlendirme yok';
+  return `⭐ ${Number(rating).toFixed(1)} / 5 · ${count} değerlendirme`;
 }
 
 function getStatusBadge(status: string) {
@@ -94,7 +94,7 @@ function truncateText(text: string, maxLength: number) {
             <p class="text-xs text-gray-500 dark:text-gray-400">{{ proposal.labeler.email }}</p>
           </div>
           <span class="text-sm text-gray-600 dark:text-gray-400 ml-auto lg:ml-2">
-            {{ formatRating(proposal.labeler.ratingAvg) }}
+            {{ formatRating(proposal.labeler.ratingAvg, proposal.labeler.ratingCount) }}
           </span>
         </div>
 

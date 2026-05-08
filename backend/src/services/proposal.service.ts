@@ -106,7 +106,7 @@ export class ProposalService {
             select: { id: true, title: true, priceTotal: true, currency: true },
           },
           labeler: {
-            select: { id: true, email: true, displayName: true, ratingAvg: true },
+            select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
           },
         },
       });
@@ -133,7 +133,7 @@ export class ProposalService {
           select: { id: true, title: true, priceTotal: true, currency: true },
         },
         labeler: {
-          select: { id: true, email: true, displayName: true, ratingAvg: true },
+          select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
         },
       },
     });
@@ -191,7 +191,7 @@ export class ProposalService {
             select: { id: true, title: true, priceTotal: true, currency: true, status: true },
           },
           labeler: {
-            select: { id: true, email: true, displayName: true, ratingAvg: true },
+            select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
           },
         },
       }),
@@ -228,7 +228,7 @@ export class ProposalService {
           },
         },
         labeler: {
-          select: { id: true, email: true, displayName: true, ratingAvg: true },
+          select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
         },
       },
     });
@@ -285,7 +285,7 @@ export class ProposalService {
             },
           },
           labeler: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
           },
         },
       });
@@ -371,7 +371,7 @@ export class ProposalService {
             select: { id: true, title: true, datasetId: true },
           },
           labeler: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
           },
         },
       });
@@ -489,7 +489,7 @@ export class ProposalService {
       data: { status: 'rejected' },
       include: {
         labeler: {
-          select: { id: true, email: true, displayName: true },
+          select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
         },
       },
     });
@@ -551,7 +551,7 @@ export class ProposalService {
       orderBy: { createdAt: 'desc' },
       include: {
         labeler: {
-          select: { id: true, email: true, displayName: true, ratingAvg: true },
+          select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
         },
       },
     });

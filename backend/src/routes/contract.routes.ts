@@ -9,7 +9,8 @@ import {
   cancelContractSchema,
   resolveDisputeSchema,
   qcSampleQuerySchema,
-  exportContractQuerySchema
+  exportContractQuerySchema,
+  createContractRatingSchema
 } from '../validators/validation.schemas';
 
 const router = Router();
@@ -110,6 +111,14 @@ router.post(
   adminOnly,
   validate(idParamSchema, 'params'),
   contractController.retryNormalize
+);
+
+// POST /api/contracts/:id/rating - Rate labeler (client)
+router.post(
+  '/:id/rating',
+  validate(idParamSchema, 'params'),
+  validate(createContractRatingSchema),
+  contractController.createContractRating
 );
 
 export default router;

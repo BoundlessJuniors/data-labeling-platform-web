@@ -2,7 +2,7 @@
  * Contracts API Module
  */
 import apiClient from './client';
-import type { Contract, ContractWithDetails, ContractStatus } from '@/types/contract';
+import type { Contract, ContractWithDetails, ContractStatus, ContractRating } from '@/types/contract';
 import type { ApiResponse, PaginatedResponse } from '@/types/api';
 import type { QcSampleResponse } from '@/types/qc';
 
@@ -75,6 +75,13 @@ export const contractsApi = {
     data: { decision: 'refund_client' | 'release_to_labeler'; reason: string }
   ) {
     return apiClient.patch<ApiResponse<Contract>>(`/contracts/${id}/resolve-dispute`, data);
+  },
+
+  /**
+   * Rate a labeler for an approved/paid contract
+   */
+  rate(id: string, rating: number, comment?: string) {
+    return apiClient.post<ApiResponse<ContractRating>>(`/contracts/${id}/rating`, { rating, comment });
   },
 };
 

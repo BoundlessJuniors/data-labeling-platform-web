@@ -26,7 +26,8 @@ export interface Proposal {
     id: string;
     email: string;
     displayName: string | null;
-    ratingAvg: number | null;
+    ratingAvg: string | number | null;
+    ratingCount: number;
   };
 }
 

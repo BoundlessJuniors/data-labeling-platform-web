@@ -275,3 +275,31 @@ export const resolveDispute = async (
   }
 };
 
+// Rate a labeler for a completed contract
+export const createContractRating = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const result = await contractService.createContractRating(
+      id,
+      userId,
+      userRole,
+      rating,
+      comment
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -433,6 +433,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Admin (Invites)**: Admin paneline beta davetiye isteklerini (Invite Requests) listeleyebilen ve onaylanan e-postalara davetiye kodu oluşturabilen `AdminInviteRequestsPage` ekranı eklendi.
 - [x] **Admin (Invites)**: `AdminInviteRequestsPage` üzerine `pending` durumdaki davetiye istekleri için "Reddet" butonu ve onay modalı eklendi; `adminApi.rejectInviteRequest` API metodu oluşturuldu.
 - [x] **P0 Beta Upload Hardening**: Backend `getAssets` sorgusu artık `storageState != purged` filtresiyle çalışıyor. `pagination.total` aktif asset sayısını yansıtır; `DatasetDetailPage` upload butonu artık purged/reddedilmiş yüklemeler yüzünden yanlışlıkla disabled görünmez.
+- [x] **P1 Labeler Rating System (Marketplace Trust)**: Onaylanmış sözleşmeler (`approved`) için "Değerlendir" butonu, rating modalı ve "Değerlendirme yok" badge'leri eklendi. Backend entegrasyonu sağlandı, ilan başvuru (proposal) kartlarına ve admin kullanıcı detay modalına etiketleyicilerin dinamik 5-yıldız puanı ve sayısı (`ratingAvg`, `ratingCount`) dahil edildi.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

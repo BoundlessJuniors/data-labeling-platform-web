@@ -90,10 +90,22 @@ export class ContractService {
             select: { id: true, title: true },
           },
           client: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
           },
           labeler: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
+          },
+          rating: {
+            select: {
+              id: true,
+              contractId: true,
+              clientUserId: true,
+              labelerUserId: true,
+              rating: true,
+              comment: true,
+              createdAt: true,
+              updatedAt: true,
+            },
           },
           tasks: {
             select: { status: true },
@@ -135,10 +147,22 @@ export class ContractService {
           },
         },
         client: {
-          select: { id: true, email: true, displayName: true, ratingAvg: true },
+          select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
         },
         labeler: {
-          select: { id: true, email: true, displayName: true, ratingAvg: true },
+          select: { id: true, email: true, displayName: true, ratingAvg: true, ratingCount: true },
+        },
+        rating: {
+          select: {
+            id: true,
+            contractId: true,
+            clientUserId: true,
+            labelerUserId: true,
+            rating: true,
+            comment: true,
+            createdAt: true,
+            updatedAt: true,
+          },
         },
         tasks: {
           select: { id: true, status: true },
@@ -1324,5 +1348,106 @@ export class ContractService {
     }
 
     return updatedContract;
+  }
+
+  /**
+   * Rate a completed and paid contract (client only).
+   */
+  async createContractRating(
+    contractId: string,
+    userId: string,
+    userRole: UserRole,
+    rating: number,
+    comment?: string
+  ) {
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+    });
+
+    if (!contract) {
+      throw new NotFoundError('Contract');
+    }
+
+    // Admin cannot rate on behalf of client, userId must strictly match clientUserId
+    if (contract.clientUserId !== userId) {
+      throw new ForbiddenError('Only the actual client can rate this contract. Admins cannot rate on behalf of clients.');
+    }
+
+    if (contract.status !== ContractStatus.approved) {
+      throw new BadRequestError('Contract must be approved to be rated.');
+    }
+
+    const releasedPayment = await prisma.payment.findFirst({
+      where: { contractId, status: PaymentStatus.released },
+    });
+
+    if (!releasedPayment) {
+      throw new BadRequestError('Contract must have a released payment to be rated.');
+    }
+
+    const existingRating = await prisma.contractRating.findUnique({
+      where: { contractId },
+    });
+
+    if (existingRating) {
+      throw new BadRequestError('This contract has already been rated.');
+    }
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        // Lock the labeler user row
+        await tx.$queryRaw<{ id: string }[]>`SELECT id FROM users WHERE id = ${contract.labelerUserId}::uuid FOR UPDATE`;
+
+        // Create rating
+        const contractRating = await tx.contractRating.create({
+          data: {
+            contractId,
+            clientUserId: contract.clientUserId,
+            labelerUserId: contract.labelerUserId,
+            rating,
+            comment: comment || null,
+          },
+        });
+
+        // Aggregate
+        const agg = await tx.contractRating.aggregate({
+          where: { labelerUserId: contract.labelerUserId },
+          _avg: { rating: true },
+          _count: { rating: true },
+        });
+
+        const newAvg = agg._avg.rating ? new Prisma.Decimal(agg._avg.rating.toFixed(2)) : null;
+        const newCount = agg._count.rating || 0;
+
+        // Update user
+        await tx.user.update({
+          where: { id: contract.labelerUserId },
+          data: {
+            ratingAvg: newAvg,
+            ratingCount: newCount,
+          },
+        });
+
+        return contractRating;
+      });
+
+      try {
+        await auditService.logAction(userId, 'contract.rating_create', 'contract', contractId, {
+          clientUserId: contract.clientUserId,
+          labelerUserId: contract.labelerUserId,
+          rating,
+          ratingId: result.id,
+        });
+      } catch (auditErr) {
+        logger.warn(`Audit logging failed for contract rating creation on contract ${contractId}`, auditErr);
+      }
+
+      return result;
+    } catch (error: any) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new BadRequestError('This contract has already been rated.');
+      }
+      throw error;
+    }
   }
 }

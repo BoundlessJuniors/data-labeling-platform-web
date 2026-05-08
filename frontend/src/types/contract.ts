@@ -2,6 +2,21 @@
  * Contract types
  */
 
+export interface ContractRating {
+  id: string;
+  contractId: string;
+  clientUserId: string;
+  labelerUserId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateContractRatingPayload {
+  rating: number;
+  comment?: string;
+}
 export type ContractStatus =
   | 'pending_payment'
   | 'active'
@@ -56,12 +71,17 @@ export interface Contract {
     id: string;
     email: string;
     displayName: string | null;
+    ratingAvg?: string | number | null;
+    ratingCount?: number;
   };
   labeler?: {
     id: string;
     email: string;
     displayName: string | null;
+    ratingAvg?: string | number | null;
+    ratingCount?: number;
   };
+  rating?: ContractRating | null;
   _count?: {
     tasks: number;
     payments?: number;
@@ -89,14 +109,17 @@ export interface ContractWithDetails extends Contract {
     id: string;
     displayName: string | null;
     email: string;
-    ratingAvg?: number | null;
+    ratingAvg?: string | number | null;
+    ratingCount?: number;
   };
   client: {
     id: string;
     displayName: string | null;
     email: string;
-    ratingAvg?: number | null;
+    ratingAvg?: string | number | null;
+    ratingCount?: number;
   };
+  rating?: ContractRating | null;
   tasks?: { id: string; status: string }[];
   _count: {
     tasks: number;

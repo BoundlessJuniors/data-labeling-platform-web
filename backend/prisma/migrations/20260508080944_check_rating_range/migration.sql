@@ -1,0 +1,1 @@
+ALTER TABLE "contract_ratings" ADD CONSTRAINT "contract_ratings_rating_check" CHECK (rating >= 1 AND rating <= 5);

@@ -268,6 +268,17 @@ export const exportContractQuerySchema = Joi.object({
   }),
 });
 
+export const createContractRatingSchema = Joi.object({
+  rating: Joi.number().integer().min(1).max(5).required().messages({
+    'number.base': 'Rating must be a number',
+    'number.integer': 'Rating must be an integer',
+    'number.min': 'Rating must be at least 1',
+    'number.max': 'Rating cannot exceed 5',
+    'any.required': 'Rating is required',
+  }),
+  comment: Joi.string().trim().max(2000).optional().allow(''),
+});
+
 // ============================================================================
 // Task Schemas
 // ============================================================================

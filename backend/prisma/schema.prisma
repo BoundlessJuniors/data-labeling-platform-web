@@ -155,6 +155,7 @@ model User {
   role         UserRole
   displayName  String?  @map("display_name")
   ratingAvg    Decimal? @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount  Int      @default(0) @map("rating_count")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -164,6 +165,8 @@ model User {
   listingsOwned         Listing[]              @relation("ListingOwner")
   contractsAsClient     Contract[]             @relation("ContractClient")
   contractsAsLabeler    Contract[]             @relation("ContractLabeler")
+  ratingsGiven          ContractRating[]       @relation("ContractRatingClient")
+  ratingsReceived       ContractRating[]       @relation("ContractRatingLabeler")
   taskLeases            TaskLease[]
   annotationsRaw        AnnotationRaw[]
   annotationsNormalized AnnotationNormalized[]
@@ -397,6 +400,7 @@ model Contract {
   listing       Listing        @relation(fields: [listingId], references: [id])
   client        User           @relation("ContractClient", fields: [clientUserId], references: [id])
   labeler       User           @relation("ContractLabeler", fields: [labelerUserId], references: [id])
+  rating        ContractRating?
   tasks         Task[]
   payments      Payment[]
   escrowLedgers EscrowLedger[]
@@ -744,4 +748,30 @@ model InviteRequest {
 
   @@index([status])
   @@map("invite_requests")
+}
+
+// ============================================================================
+// 20. CONTRACT RATINGS
+// Rating system for completed contracts.
+// ============================================================================
+
+model ContractRating {
+  id            String   @id @default(uuid()) @db.Uuid
+  contractId    String   @unique @map("contract_id") @db.Uuid
+  clientUserId  String   @map("client_user_id") @db.Uuid
+  labelerUserId String   @map("labeler_user_id") @db.Uuid
+  rating        Int
+  comment       String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  client   User     @relation("ContractRatingClient", fields: [clientUserId], references: [id])
+  labeler  User     @relation("ContractRatingLabeler", fields: [labelerUserId], references: [id])
+
+  @@index([clientUserId])
+  @@index([labelerUserId])
+  @@index([rating])
+  @@index([createdAt])
+  @@map("contract_ratings")
 }
