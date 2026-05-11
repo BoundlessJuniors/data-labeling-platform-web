@@ -46,6 +46,12 @@ const router = createRouter({
       meta: { guestOnly: true, title: 'Kayıt Ol' },
     },
     {
+      path: '/download',
+      name: 'download',
+      component: () => import('@/views/DownloadPage.vue'),
+      meta: { title: 'Desktop İndir' },
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('@/views/DashboardRedirect.vue'),

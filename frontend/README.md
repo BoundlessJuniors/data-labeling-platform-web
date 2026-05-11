@@ -1,6 +1,6 @@
-# Data Labeling Platform - Frontend
+# LabelGun - Frontend
 
-Vue 3 + Tailwind CSS ile oluşturulmuş görsel veri etiketleme platformu kullanıcı arayüzü.
+Vue 3 + Tailwind CSS ile oluşturulmuş LabelGun görsel veri etiketleme platformu kullanıcı arayüzü.
 
 ## 🛠️ Teknoloji Stack
 
@@ -61,7 +61,8 @@ frontend/
 │   │   └── tasks.ts           # Task API
 │   │
 │   ├── config/                # Uygulama konfigürasyonları (YENİ)
-│   │   └── betaLimits.ts      # Beta limitleri ve çevre değişkenleri
+│   │   ├── betaLimits.ts      # Beta limitleri ve çevre değişkenleri
+│   │   └── downloads.ts       # Desktop indirme seçenekleri ve konfigürasyonu
 │   │
 │   ├── stores/                # Pinia state management (10 store)
 │   │   ├── auth.ts            # Authentication store
@@ -112,10 +113,11 @@ frontend/
 │   │   ├── ToastContainer.vue
 │   │   └── HelloWorld.vue
 │   │
-│   ├── views/                 # Sayfa bileşenleri (18 sayfa)
+│   ├── views/                 # Sayfa bileşenleri (19 sayfa)
 │   │   ├── HomePage.vue       # Landing page
 │   │   ├── LoginPage.vue      # Giriş sayfası
 │   │   ├── RegisterPage.vue   # Kayıt sayfası
+│   │   ├── DownloadPage.vue   # Desktop indirme sayfası
 │   │   ├── DashboardRedirect.vue
 │   │   ├── NotFoundPage.vue   # 404 sayfası
 │   │   │
@@ -191,6 +193,7 @@ frontend/
 | `/` | HomePage | Landing page, platform tanıtımı |
 | `/login` | LoginPage | Kullanıcı girişi |
 | `/register` | RegisterPage | Yeni kullanıcı kaydı |
+| `/download` | DownloadPage | Desktop uygulama indirme sayfası |
 
 ### Protected Routes (Giriş Gerekli)
 
@@ -433,7 +436,8 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] **Admin (Invites)**: Admin paneline beta davetiye isteklerini (Invite Requests) listeleyebilen ve onaylanan e-postalara davetiye kodu oluşturabilen `AdminInviteRequestsPage` ekranı eklendi.
 - [x] **Admin (Invites)**: `AdminInviteRequestsPage` üzerine `pending` durumdaki davetiye istekleri için "Reddet" butonu ve onay modalı eklendi; `adminApi.rejectInviteRequest` API metodu oluşturuldu.
 - [x] **P0 Beta Upload Hardening**: Backend `getAssets` sorgusu artık `storageState != purged` filtresiyle çalışıyor. `pagination.total` aktif asset sayısını yansıtır; `DatasetDetailPage` upload butonu artık purged/reddedilmiş yüklemeler yüzünden yanlışlıkla disabled görünmez.
-- [x] **P1 Labeler Rating System (Marketplace Trust)**: Onaylanmış sözleşmeler (`approved`) için "Değerlendir" butonu, rating modalı ve "Değerlendirme yok" badge'leri eklendi. Backend entegrasyonu sağlandı, ilan başvuru (proposal) kartlarına ve admin kullanıcı detay modalına etiketleyicilerin dinamik 5-yıldız puanı ve sayısı (`ratingAvg`, `ratingCount`) dahil edildi.
+- [x] **P1 Labeler Rating System (Marketplace Trust)**: Onaylanmış sözleşmeler (`approved`) için "Değerlendir" butonu, rating modalı ve "Değerlendirme yok" badge'leri eklendi. Backend entevalüasyonu sağlandı, ilan başvuru (proposal) kartlarına ve admin kullanıcı detay modalına etiketleyicilerin dinamik 5-yıldız puanı ve sayısı (`ratingAvg`, `ratingCount`) dahil edildi.
+- [x] **Desktop Download Page**: Public desktop indirme sayfası yapısı eklendi; installer dosyaları daha sonra config üzerinden aktif edilebilir.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

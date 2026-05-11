@@ -69,9 +69,14 @@ function handleLogout() {
       <div class="h-16 flex items-center px-6 border-b border-gray-100 dark:border-[#334155]">
         <RouterLink
           to="/dashboard"
-          class="text-xl font-bold text-primary-600 dark:text-primary-400"
+          class="flex items-center gap-2 group"
         >
-          DataLabel
+          <div class="w-8 h-8 flex items-center justify-center transition-transform group-hover:scale-105" aria-hidden="true">
+            <img src="@/assets/LabelGun.png" alt="LabelGun Logo" class="w-full h-full object-contain rounded-md" />
+          </div>
+          <span class="text-xl font-bold text-gray-900 dark:text-white transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
+            LabelGun
+          </span>
         </RouterLink>
       </div>
 

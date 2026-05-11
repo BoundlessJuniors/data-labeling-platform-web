@@ -18,7 +18,7 @@ const showError = ref(false);
 
 useSeo({
   title: 'Giriş Yap',
-  description: 'DataLabel hesabınıza giriş yapın. Veri etiketleme projelerinizi yönetin.',
+  description: 'LabelGun hesabınıza giriş yapın. Veri etiketleme projelerinizi yönetin.',
 });
 
 onMounted(() => {
@@ -52,10 +52,10 @@ async function handleSubmit() {
       <!-- Logo -->
       <div class="text-center mb-8">
         <RouterLink to="/" class="inline-flex items-center space-x-2">
-          <div class="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center" aria-hidden="true">
-            <span class="text-white font-bold text-xl">D</span>
+          <div class="w-10 h-10 flex items-center justify-center" aria-hidden="true">
+            <img src="@/assets/LabelGun.png" alt="LabelGun Logo" class="w-full h-full object-contain rounded-md" />
           </div>
-          <span class="text-2xl font-bold text-gray-900 dark:text-white">DataLabel</span>
+          <span class="text-2xl font-bold text-gray-900 dark:text-white">LabelGun</span>
         </RouterLink>
       </div>
 

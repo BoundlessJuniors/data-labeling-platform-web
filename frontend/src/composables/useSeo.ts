@@ -9,7 +9,7 @@ interface SeoOptions {
   robots?: string;
 }
 
-const SITE_NAME = 'DataLabel';
+const SITE_NAME = 'LabelGun';
 const DEFAULT_DESCRIPTION =
   'Görsel veri etiketleme platformu. Dataset yönetimi, labeler ağı ve kalite kontrol sistemi.';
 
