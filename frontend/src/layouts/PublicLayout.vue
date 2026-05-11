@@ -105,7 +105,7 @@ const authStore = useAuthStore();
     <footer class="bg-white dark:bg-[#111827] border-t border-gray-200 dark:border-[#334155]">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <p class="text-center text-sm text-gray-500 dark:text-slate-400">
-          © {{ new Date().getFullYear() }} LabelGun Platform. BoundlessJuniors.
+          © {{ new Date().getFullYear() }} <a href="https://github.com/BoundlessJuniors" target="_blank" rel="noopener noreferrer" class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">LabelGun Platform. BoundlessJuniors.</a>
         </p>
       </div>
     </footer>
