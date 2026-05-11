@@ -2,16 +2,16 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: data-labeling-postgres
+    container_name: labelgun-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-data_labeling}
+      POSTGRES_DB: ${POSTGRES_DB:-labelgun}
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - labelgun_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -21,12 +21,12 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: data-labeling-redis
+    container_name: labelgun-redis
     restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - redis_data:/data
+      - labelgun_redis_data:/data
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -37,7 +37,7 @@ services:
   # MinIO Object Storage (S3-compatible, local R2 replacement)
   minio:
     image: minio/minio:latest
-    container_name: data-labeling-minio
+    container_name: labelgun-minio
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -46,7 +46,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio_data:/data
+      - labelgun_minio_data:/data
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -55,6 +55,6 @@ services:
       retries: 5
 
 volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
+  labelgun_postgres_data:
+  labelgun_redis_data:
+  labelgun_minio_data:

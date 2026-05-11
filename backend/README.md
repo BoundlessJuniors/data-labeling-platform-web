@@ -1,4 +1,4 @@
-# Data Labeling Platform - Backend API
+# LabelGun - Backend API
 
 Görsel veri etiketleme platformu için RESTful API.
 
@@ -429,9 +429,9 @@ docker-compose up -d
 
 | Servis | Port | Container |
 |--------|------|-----------|
-| PostgreSQL | 5433 | data-labeling-postgres |
-| Redis | 6379 | data-labeling-redis |
-| MinIO | 9000 (API) / 9001 (Console) | data-labeling-minio |
+| PostgreSQL | 5433 | labelgun-postgres |
+| Redis | 6379 | labelgun-redis |
+| MinIO | 9000 (API) / 9001 (Console) | labelgun-minio |
 
 ## 🔧 Environment Variables
 
@@ -443,7 +443,7 @@ PORT=3000
 NODE_ENV=development
 
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/data_labeling
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/labelgun
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -456,7 +456,7 @@ JWT_EXPIRES_IN=7d
 R2_ACCOUNT_ID="minio-local"
 R2_ACCESS_KEY_ID="minioadmin"
 R2_SECRET_ACCESS_KEY="minioadmin"
-R2_BUCKET_NAME="datalabeling"
+R2_BUCKET_NAME="labelgun-assets"
 MINIO_ENDPOINT="http://localhost:9000"
 
 # CORS

@@ -1,4 +1,4 @@
-# Data Labeling Platform
+# LabelGun Platform
 
 Görsel veri etiketleme işlerini yöneten bir pazar yeri platformu. Müşteriler datasetlerini yükleyip etiketleme ilanları açabilir, etiketleyiciler bu ilanları alıp görselleri etiketleyebilir.
 
@@ -129,9 +129,9 @@ npm run dev
 
 | Servis | Port | Container | Image |
 |--------|------|-----------|-------|
-| PostgreSQL | 5433 | data-labeling-postgres | postgres:16-alpine |
-| Redis | 6379 | data-labeling-redis | redis:7-alpine |
-| MinIO | 9000 (API) / 9001 (Console) | data-labeling-minio | minio/minio:latest |
+| PostgreSQL | 5433 | labelgun-postgres | postgres:16-alpine |
+| Redis | 6379 | labelgun-redis | redis:7-alpine |
+| MinIO | 9000 (API) / 9001 (Console) | labelgun-minio | minio/minio:latest |
 
 ## 👥 Kullanıcı Rolleri
 

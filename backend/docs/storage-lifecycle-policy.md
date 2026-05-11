@@ -1,6 +1,6 @@
 # Storage Lifecycle Policy
 
-> **Backend-only feature.** This document covers the server-side object storage lifecycle for the Data Labeling Platform.
+> **Backend-only feature.** This document covers the server-side object storage lifecycle for the LabelGun Platform.
 
 ---
 

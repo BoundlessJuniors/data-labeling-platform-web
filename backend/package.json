@@ -1,7 +1,7 @@
 {
-  "name": "data-labeling-backend",
+  "name": "labelgun-backend",
   "version": "1.0.0",
-  "description": "Backend API for Data Labeling Marketplace Platform",
+  "description": "Backend API for LabelGun Marketplace Platform",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
@@ -16,7 +16,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "keywords": [
-    "data-labeling",
+    "labelgun",
     "marketplace",
     "api"
   ],
