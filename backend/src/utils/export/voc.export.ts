@@ -1,6 +1,6 @@
 import archiver from 'archiver';
 import { ExportableTaskRecord, ExportArtifact } from './export.types';
-import { escapeXml } from './export.helpers';
+import { escapeXml, sanitizeArchiveEntryName } from './export.helpers';
 import { downloadFromR2 } from '../../lib/storage';
 import logger from '../../lib/logger';
 
@@ -20,10 +20,11 @@ export async function exportVoc(
   });
 
   for (const task of tasks) {
+    const safeBasename = sanitizeArchiveEntryName(task.basename, `task-${task.taskId}.jpg`);
     if (task.objectKey) {
       try {
         const imageBuffer = await downloadFromR2(task.objectKey);
-        archive.append(imageBuffer, { name: `images/${task.basename}` });
+        archive.append(imageBuffer, { name: `images/${safeBasename}` });
       } catch (err) {
         logger.warn(`Failed to download image from R2 for task ${task.taskId}:`, err);
       }
@@ -31,7 +32,7 @@ export async function exportVoc(
 
     let xml = `<annotation>\n`;
     xml += `  <folder>images</folder>\n`;
-    xml += `  <filename>${escapeXml(task.basename)}</filename>\n`;
+    xml += `  <filename>${escapeXml(safeBasename)}</filename>\n`;
     xml += `  <size>\n`;
     xml += `    <width>${task.width}</width>\n`;
     xml += `    <height>${task.height}</height>\n`;
@@ -72,8 +73,8 @@ export async function exportVoc(
     });
     xml += `</annotation>\n`;
 
-    const extIndex = task.basename.lastIndexOf('.');
-    const basenameWithoutExt = extIndex > -1 ? task.basename.substring(0, extIndex) : task.basename;
+    const extIndex = safeBasename.lastIndexOf('.');
+    const basenameWithoutExt = extIndex > -1 ? safeBasename.substring(0, extIndex) : safeBasename;
     archive.append(xml, { name: `annotations/${basenameWithoutExt}.xml` });
   }
 

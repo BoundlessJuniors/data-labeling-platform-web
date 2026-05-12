@@ -147,3 +147,38 @@ export function escapeXml(unsafe: string): string {
     }
   });
 }
+
+export function sanitizeExportFilenamePart(value: string, fallback: string): string {
+  if (!value) return fallback;
+  // Remove control characters, CR/LF
+  let sanitized = value.replace(/[\x00-\x1F\x7F-\x9F\r\n]/g, '');
+  // Remove path separators
+  sanitized = sanitized.replace(/[/\\]/g, '_');
+  // Remove remaining unsafe characters keeping: letters, numbers, dash, underscore, dot, space
+  sanitized = sanitized.replace(/[^a-zA-Z0-9.\-_ ]/g, '');
+  // Trim whitespace
+  sanitized = sanitized.trim();
+  // Prevent "." and ".."
+  if (sanitized === '.' || sanitized === '..') {
+    return fallback;
+  }
+  // Truncate if too long
+  if (sanitized.length > 200) {
+    sanitized = sanitized.substring(0, 200).trim();
+  }
+  return sanitized.length > 0 ? sanitized : fallback;
+}
+
+export function sanitizeArchiveEntryName(value: string, fallback: string): string {
+  // Re-use filename sanitization to ensure no directory traversal escapes
+  return sanitizeExportFilenamePart(value, fallback);
+}
+
+export function sanitizeYoloLabel(value: string): string {
+  if (!value) return 'unknown';
+  return value.replace(/[\x00-\x1F\x7F-\x9F\r\n]/g, '').trim() || 'unknown';
+}
+
+export function quoteYamlString(value: string): string {
+  return JSON.stringify(value);
+}

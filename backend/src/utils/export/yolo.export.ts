@@ -1,5 +1,6 @@
 import archiver from 'archiver';
 import { ExportableTaskRecord, ExportArtifact } from './export.types';
+import { sanitizeArchiveEntryName, sanitizeYoloLabel, quoteYamlString } from './export.helpers';
 import { BadRequestError } from '../errors';
 import { downloadFromR2 } from '../../lib/storage';
 import logger from '../../lib/logger';
@@ -22,19 +23,20 @@ export async function exportYolo(
   const labelToIndex = new Map<string, number>();
   labels.forEach((L, idx) => labelToIndex.set(L.name, idx));
 
-  const classesTxt = labels.map(l => l.name).join('\n');
+  const classesTxt = labels.map(l => sanitizeYoloLabel(l.name)).join('\n');
   archive.append(classesTxt, { name: 'classes.txt' });
 
-  const dataYaml = `names:\n${labels.map(l => `  - ${l.name}`).join('\n')}\nnc: ${labels.length}\n`;
+  const dataYaml = `names:\n${labels.map(l => `  - ${quoteYamlString(sanitizeYoloLabel(l.name))}`).join('\n')}\nnc: ${labels.length}\n`;
   archive.append(dataYaml, { name: 'data.yaml' });
 
   const shapeMetadata: Record<string, any> = {};
 
   for (const task of tasks) {
+    const safeBasename = sanitizeArchiveEntryName(task.basename, `task-${task.taskId}.jpg`);
     if (task.objectKey) {
       try {
         const imageBuffer = await downloadFromR2(task.objectKey);
-        archive.append(imageBuffer, { name: `images/${task.basename}` });
+        archive.append(imageBuffer, { name: `images/${safeBasename}` });
       } catch (err) {
         logger.warn(`Failed to download image from R2 for task ${task.taskId}:`, err);
       }
@@ -66,11 +68,11 @@ export async function exportYolo(
       return `${idx} ${xCenter.toFixed(6)} ${yCenter.toFixed(6)} ${wNorm.toFixed(6)} ${hNorm.toFixed(6)}`;
     });
 
-    const extIndex = task.basename.lastIndexOf('.');
-    const basenameWithoutExt = extIndex > -1 ? task.basename.substring(0, extIndex) : task.basename;
+    const extIndex = safeBasename.lastIndexOf('.');
+    const basenameWithoutExt = extIndex > -1 ? safeBasename.substring(0, extIndex) : safeBasename;
     archive.append(txtLines.join('\n'), { name: `labels/${basenameWithoutExt}.txt` });
 
-    shapeMetadata[task.basename] = task.shapes;
+    shapeMetadata[safeBasename] = task.shapes;
   }
 
   archive.append(JSON.stringify(shapeMetadata, null, 2), { name: 'shape-metadata.json' });

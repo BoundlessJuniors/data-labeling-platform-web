@@ -8,7 +8,7 @@ import { invalidateApiCache } from '../lib/redis';
 import { addNormalizeJob } from '../lib/queue';
 import { getSignedUrl } from '../lib/storage';
 import { ExportFormat, ExportableTaskRecord } from '../utils/export/export.types';
-import { extractExportShapes } from '../utils/export/export.helpers';
+import { extractExportShapes, sanitizeExportFilenamePart } from '../utils/export/export.helpers';
 import { exportCoco } from '../utils/export/coco.export';
 import { exportYolo } from '../utils/export/yolo.export';
 import { exportVoc } from '../utils/export/voc.export';
@@ -1130,10 +1130,13 @@ export class ContractService {
 
       const shapes = extractExportShapes(payload.data, labels, task.asset.width, task.asset.height);
 
+      const rawBasename = task.asset.objectKey.split('/').pop() || '';
+      const basename = sanitizeExportFilenamePart(rawBasename, `task-${task.id}.jpg`);
+
       exportableTasks.push({
         taskId: task.id,
         objectKey: task.asset.objectKey,
-        basename: task.asset.objectKey.split('/').pop() || `task-${task.id}.jpg`,
+        basename,
         width: task.asset.width,
         height: task.asset.height,
         shapes,

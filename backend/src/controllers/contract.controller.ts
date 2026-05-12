@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { ContractService } from '../services/contract.service';
 import { ExportFormat } from '../utils/export/export.types';
+import { sanitizeExportFilenamePart } from '../utils/export/export.helpers';
 
 const contractService = new ContractService();
 
@@ -216,8 +217,11 @@ export const exportContract = async (
 
     const exportArtifact = await contractService.exportContract(id, userId, userRole, format);
 
-    res.setHeader('Content-Type', exportArtifact.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${exportArtifact.filename}"`);
+    const safeFilename = sanitizeExportFilenamePart(exportArtifact.filename, `export-${id}.zip`);
+
+    res.setHeader('Content-Type', exportArtifact.mimeType === 'application/json' ? 'application/json' : 'application/zip');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
     res.send(exportArtifact.buffer);
   } catch (error) {
     next(error);
