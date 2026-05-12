@@ -3,7 +3,7 @@
  */
 
 /** Listing status */
-export type ListingStatus = 'open' | 'payment_pending' | 'in_progress' | 'draft' | 'published' | 'closed' | 'completed' | 'cancelled';
+export type ListingStatus = 'open' | 'payment_pending' | 'in_progress' | 'completed' | 'cancelled';
 
 /** Annotation format types */
 export type AnnotationFormat = 'COCO' | 'YOLO' | 'VOC' | 'Custom';

@@ -55,24 +55,4 @@ export const listingsApi = {
     return apiClient.delete<ApiResponse<void>>(`/listings/${id}`);
   },
 
-  /**
-   * Publish a listing (draft → published)
-   */
-  publish(id: string) {
-    return apiClient.patch<ApiResponse<Listing>>(`/listings/${id}/publish`);
-  },
-
-  /**
-   * Unpublish a listing (published → draft)
-   */
-  unpublish(id: string) {
-    return apiClient.patch<ApiResponse<Listing>>(`/listings/${id}/unpublish`);
-  },
-
-  /**
-   * Close a listing
-   */
-  close(id: string) {
-    return apiClient.patch<ApiResponse<Listing>>(`/listings/${id}/close`);
-  },
 };

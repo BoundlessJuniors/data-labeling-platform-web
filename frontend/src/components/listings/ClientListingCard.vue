@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import BaseButton from '@/components/ui/BaseButton.vue';
+import type { Listing } from '@/types/listing';
 
 defineProps<{
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  listing: any;
+  listing: Listing;
 }>();
 
 const emit = defineEmits<{
   (e: 'view-proposals', id: string): void;
-  (e: 'publish', id: string): void;
-  (e: 'unpublish', id: string): void;
-  (e: 'close', id: string): void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (e: 'edit', listing: any): void;
+  (e: 'edit', listing: Listing): void;
   (e: 'delete', id: string): void;
 }>();
 
@@ -20,14 +16,14 @@ function getStatusBadge(status: string) {
   switch (status) {
     case 'open':
       return 'badge-success';
-    case 'published':
-      return 'badge-success';
-    case 'draft':
-      return 'badge-neutral';
-    case 'closed':
+    case 'payment_pending':
       return 'badge-warning';
+    case 'in_progress':
+      return 'badge-info';
     case 'completed':
       return 'badge-info';
+    case 'cancelled':
+      return 'badge-neutral';
     default:
       return 'badge-neutral';
   }
@@ -37,14 +33,14 @@ function getStatusLabel(status: string) {
   switch (status) {
     case 'open':
       return 'Açık';
-    case 'published':
-      return 'Yayında';
-    case 'draft':
-      return 'Taslak';
-    case 'closed':
-      return 'Kapalı';
+    case 'payment_pending':
+      return 'Ödeme Bekliyor';
+    case 'in_progress':
+      return 'Devam Ediyor';
     case 'completed':
       return 'Tamamlandı';
+    case 'cancelled':
+      return 'İptal Edildi';
     default:
       return status;
   }
@@ -85,8 +81,8 @@ function formatDate(dateString: string) {
         </p>
         <!-- Actions -->
         <div class="flex gap-1">
+          <!-- View proposals — visible for all listings -->
           <BaseButton
-            v-if="['open', 'published', 'in_progress'].includes(listing.status)"
             variant="outline"
             size="sm"
             @click="emit('view-proposals', listing.id)"
@@ -96,31 +92,7 @@ function formatDate(dateString: string) {
             </svg>
             Başvuruları Gör
           </BaseButton>
-          <button
-            v-if="listing.status === 'draft'"
-            type="button"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 transition-colors"
-            @click="emit('publish', listing.id)"
-          >
-            Yayınla
-          </button>
-          <button
-            v-if="['open', 'published'].includes(listing.status)"
-            type="button"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 transition-colors"
-            @click="emit('unpublish', listing.id)"
-          >
-            Yayından Kaldır
-          </button>
-          <button
-            v-if="['open', 'published'].includes(listing.status)"
-            type="button"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 transition-colors"
-            @click="emit('close', listing.id)"
-          >
-            Kapat
-          </button>
-          <!-- Edit button for open listings -->
+          <!-- Edit — only for open listings -->
           <button
             v-if="listing.status === 'open'"
             type="button"
@@ -132,7 +104,7 @@ function formatDate(dateString: string) {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </button>
-          <!-- Delete button for open listings -->
+          <!-- Delete — only for open listings -->
           <button
             v-if="listing.status === 'open'"
             type="button"

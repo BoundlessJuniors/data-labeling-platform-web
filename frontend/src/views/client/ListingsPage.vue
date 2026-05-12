@@ -61,6 +61,7 @@ let searchTimeout: ReturnType<typeof setTimeout>;
 const statusOptions = [
   { value: '', label: 'Tüm Durumlar' },
   { value: 'open', label: 'Açık' },
+  { value: 'payment_pending', label: 'Ödeme Bekliyor' },
   { value: 'in_progress', label: 'Devam Ediyor' },
   { value: 'completed', label: 'Tamamlandı' },
   { value: 'cancelled', label: 'İptal Edildi' },
@@ -263,9 +264,6 @@ async function handleDelete() {
         :key="listing.id"
         :listing="listing"
         @view-proposals="router.push({ name: 'client-listing-proposals', params: { id: $event } })"
-        @publish="listingsStore.publishListing($event)"
-        @unpublish="listingsStore.unpublishListing($event)"
-        @close="listingsStore.closeListing($event)"
         @edit="openEditModal($event)"
         @delete="openDeleteModal($event)"
       />

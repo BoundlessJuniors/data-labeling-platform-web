@@ -143,69 +143,6 @@ export const useListingsStore = defineStore('listings', () => {
   }
 
   /**
-   * Publish a listing
-   */
-  async function publishListing(id: string) {
-    loading.value = true;
-    try {
-      const response = await listingsApi.publish(id);
-      const index = listings.value.findIndex((l) => l.id === id);
-      if (index > -1) {
-        listings.value[index] = response.data.data;
-      }
-      toastStore.success('İlan yayınlandı');
-      return true;
-    } catch (_err) {
-      toastStore.error(getErrorMessage(_err, 'İlan yayınlanamadı'));
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
-   * Unpublish a listing
-   */
-  async function unpublishListing(id: string) {
-    loading.value = true;
-    try {
-      const response = await listingsApi.unpublish(id);
-      const index = listings.value.findIndex((l) => l.id === id);
-      if (index > -1) {
-        listings.value[index] = response.data.data;
-      }
-      toastStore.success('İlan yayından kaldırıldı');
-      return true;
-    } catch (_err) {
-      toastStore.error(getErrorMessage(_err, 'İlan yayından kaldırılamadı'));
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
-   * Close a listing
-   */
-  async function closeListing(id: string) {
-    loading.value = true;
-    try {
-      const response = await listingsApi.close(id);
-      const index = listings.value.findIndex((l) => l.id === id);
-      if (index > -1) {
-        listings.value[index] = response.data.data;
-      }
-      toastStore.success('İlan kapatıldı');
-      return true;
-    } catch (_err) {
-      toastStore.error(getErrorMessage(_err, 'İlan kapatılamadı'));
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
    * Set search term and refetch
    */
   async function setSearch(term: string) {
@@ -267,9 +204,6 @@ export const useListingsStore = defineStore('listings', () => {
     createListing,
     updateListing,
     deleteListing,
-    publishListing,
-    unpublishListing,
-    closeListing,
     setSearch,
     setStatusFilter,
     goToPage,

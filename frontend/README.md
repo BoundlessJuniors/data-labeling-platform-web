@@ -138,7 +138,7 @@ frontend/
 │   │   │   ├── DatasetsPage.vue
 │   │   │   ├── DatasetDetailPage.vue   # Görsel yükleme (R2)
 │   │   │   ├── LabelSetsPage.vue       # Etiket seti yönetimi (CRUD + edit guard)
-│   │   │   ├── ListingsPage.vue        # İlan yönetimi (toplam fiyat, dataset gösterimi)
+│   │   │   ├── ListingsPage.vue        # İlan yönetimi (oluştur, düzenle, sil, başvuruları gör; statü: open/payment_pending/in_progress/completed/cancelled)
 │   │   │   ├── ListingProposalsPage.vue # Başvuru yönetimi
 │   │   │   └── ContractsPage.vue        # Sözleşme yönetimi + progress bar
 │   │   │
