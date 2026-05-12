@@ -1,6 +1,7 @@
 import { Prisma, UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
+import { invalidateApiCache } from '../lib/redis';
 import logger from '../lib/logger';
 
 export class LabelSetService {
@@ -39,6 +40,9 @@ export class LabelSetService {
     });
 
     logger.info(`LabelSet created: ${labelSet.id} by user ${userId}`);
+
+    // Invalidate labelset cache so the new entry appears immediately
+    await invalidateApiCache('/api/v1/labelsets');
 
     return labelSet;
   }
@@ -156,6 +160,9 @@ export class LabelSetService {
 
     logger.info(`Label created: ${label.id} in labelset ${labelSetId}`);
 
+    // Invalidate labelset cache so label additions are reflected immediately
+    await invalidateApiCache('/api/v1/labelsets');
+
     return label;
   }
 
@@ -239,6 +246,9 @@ export class LabelSetService {
 
     logger.info(`LabelSet updated: ${labelSetId} by user ${userId}`);
 
+    // Invalidate labelset cache so updates are reflected immediately
+    await invalidateApiCache('/api/v1/labelsets');
+
     return updated;
   }
 
@@ -272,5 +282,8 @@ export class LabelSetService {
     ]);
 
     logger.info(`LabelSet deleted: ${labelSetId}`);
+
+    // Invalidate labelset cache so the deleted entry no longer appears
+    await invalidateApiCache('/api/v1/labelsets');
   }
 }

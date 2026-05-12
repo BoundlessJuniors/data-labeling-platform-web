@@ -9,7 +9,7 @@ import { ContractStatus, ListingStatus, StorageState, UserRole } from '@prisma/c
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError, ConflictError } from '../utils/errors';
-import { cacheDelete } from '../lib/redis';
+import { invalidateApiCache } from '../lib/redis';
 import logger from '../lib/logger';
 import { paymentService } from './payment.service';
 import { getBetaLimits } from '../config/beta-limits';
@@ -142,6 +142,10 @@ export class ProposalService {
       `Proposal ${proposal.id} created by labeler ${labelerUserId} ` +
       `for listing ${listingId} (deliveryDays: ${deliveryDays})`
     );
+
+    // Invalidate listing cache — proposal count embedded in listing detail
+    // changes when a new proposal is added.
+    await invalidateApiCache('/api/v1/listings');
 
     return proposal;
   }
@@ -424,8 +428,9 @@ export class ProposalService {
     });
 
     // ── Cache invalidation ────────────────────────────────────────────────
-    await cacheDelete(`cache:/api/v1/listings/${result.proposal.listingId}`);
-    await cacheDelete(`cache:/api/v1/listings`);
+    // acceptProposal moves the listing to payment_pending, which changes listing
+    // status visible to all users. Wildcard pattern covers all users/roles/pages.
+    await invalidateApiCache('/api/v1/listings');
 
     logger.info(
       `Proposal ${proposalId} accepted — Contract ${result.contract.id} created as pending_payment`

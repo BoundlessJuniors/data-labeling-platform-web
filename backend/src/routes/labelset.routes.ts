@@ -4,7 +4,7 @@ import { authenticate } from '../middlewares/auth.middleware';
 import { adminOrClient } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { createLabelSetSchema, updateLabelSetSchema, idParamSchema, addLabelSchema } from '../validators/validation.schemas';
-import { cacheMiddleware, invalidateCache } from '../middlewares/cache.middleware';
+import { cacheMiddleware } from '../middlewares/cache.middleware';
 
 const router = Router();
 
@@ -22,7 +22,6 @@ router.post(
   authenticate,
   adminOrClient,
   validate(createLabelSetSchema),
-  invalidateCache(['cache:/api/v1/labelsets*']),
   labelsetController.createLabelSet
 );
 
@@ -41,7 +40,6 @@ router.post(
   authenticate,
   validate(idParamSchema, 'params'),
   validate(addLabelSchema),
-  invalidateCache(['cache:/api/v1/labelsets*']),
   labelsetController.addLabel
 );
 
@@ -51,7 +49,6 @@ router.put(
   authenticate,
   validate(idParamSchema, 'params'),
   validate(updateLabelSetSchema),
-  invalidateCache(['cache:/api/v1/labelsets*']),
   labelsetController.updateLabelSet
 );
 
@@ -60,7 +57,6 @@ router.delete(
   '/:id',
   authenticate,
   validate(idParamSchema, 'params'),
-  invalidateCache(['cache:/api/v1/labelsets*']),
   labelsetController.deleteLabelSet
 );
 

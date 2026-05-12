@@ -2,6 +2,7 @@ import { Prisma, UserRole, AssetStatus, ContractStatus, TaskStatus, SubmissionSt
 import prisma from '../lib/db';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/errors';
 import logger from '../lib/logger';
+import { invalidateApiCache } from '../lib/redis';
 import { assetQueue, normalizeQueue, deadlineQueue } from '../lib/queue';
 import { auditService } from './audit.service';
 
@@ -166,6 +167,14 @@ export class AdminService {
 
     logger.info(`User updated by admin: ${targetUserId}, new role: ${data.role || 'unchanged'}`);
 
+    // Invalidate all major resource caches.
+    // updateUser can change role (cross-role cache leak risk) or displayName
+    // (displayName appears in listing/dataset/labelset responses as owner info).
+    // Clearing broadly is safer than trying to be surgical here.
+    await invalidateApiCache('/api/v1/listings');
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/labelsets');
+
     return updatedUser;
   }
 
@@ -212,6 +221,14 @@ export class AdminService {
     });
 
     logger.info(`User deleted by admin: ${targetUserId}`);
+
+    // Invalidate all major resource caches.
+    // deleteUser removes a user whose data may be embedded in listing/dataset/labelset
+    // responses as owner info (email, displayName, ratingAvg).
+    await invalidateApiCache('/api/v1/listings');
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/labelsets');
+    await invalidateApiCache('/api/v1/assets');
   }
 
   // ========================================================================

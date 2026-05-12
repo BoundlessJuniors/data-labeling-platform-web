@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client, deleteFromR2Safe } from '../lib/storage';
 import prisma from '../lib/db';
-import { redisConfig } from '../lib/redis';
+import { redisConfig, invalidateApiCache } from '../lib/redis';
 import logger from '../lib/logger';
 import { Readable } from 'stream';
 import { getBetaLimits } from '../config/beta-limits';
@@ -59,6 +59,13 @@ async function rejectUploadedObject(params: {
   });
 
   logger.warn(`[AssetWorker] Validation rejection: ${processingError}`);
+
+  try {
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/assets');
+  } catch (cacheErr) {
+    logger.warn('[AssetWorker] Cache invalidation failed after rejected object:', cacheErr);
+  }
 }
 
 export function startAssetWorker() {
@@ -190,6 +197,13 @@ export function startAssetWorker() {
         });
 
         logger.info(`[AssetWorker] Validated asset ${assetId}: ${width}x${height}`);
+
+        // Invalidate asset and dataset caches so updated status and dimensions
+        // are reflected immediately. Asset routes do not use cacheMiddleware,
+        // but dataset detail may embed asset counts.
+        await invalidateApiCache('/api/v1/datasets').catch((e) =>
+          logger.warn('[AssetWorker] Cache invalidation failed after asset ready:', e)
+        );
       } catch (error: any) {
         logger.error(`[AssetWorker] Job failed for asset ${assetId}:`, error);
         
@@ -200,7 +214,12 @@ export function startAssetWorker() {
             processingError: error.message || 'Unknown processing error',
           },
         });
-        
+
+        // Invalidate dataset cache so error state is reflected
+        await invalidateApiCache('/api/v1/datasets').catch((e) =>
+          logger.warn('[AssetWorker] Cache invalidation failed after asset error:', e)
+        );
+
         throw error; // Let BullMQ handle retry mechanism
       }
     },

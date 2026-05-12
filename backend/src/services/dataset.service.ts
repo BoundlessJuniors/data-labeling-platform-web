@@ -1,7 +1,7 @@
 import { DatasetStatus, Prisma, StorageState, UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
-import { cacheDeletePattern } from '../lib/redis';
+import { invalidateApiCache } from '../lib/redis';
 import { deleteFromR2Safe } from '../lib/storage';
 import logger from '../lib/logger';
 import { getBetaLimits } from '../config/beta-limits';
@@ -40,7 +40,7 @@ export class DatasetService {
     logger.info(`Dataset created: ${dataset.id} by user ${userId}`);
 
     // Invalidate all dataset list caches so the new entry appears immediately
-    await cacheDeletePattern('cache:/api/v1/datasets*');
+    await invalidateApiCache('/api/v1/datasets');
 
     return dataset;
   }
@@ -198,7 +198,7 @@ export class DatasetService {
     });
 
     // Invalidate all dataset-related cache keys
-    await cacheDeletePattern('cache:/api/v1/datasets*');
+    await invalidateApiCache('/api/v1/datasets');
 
     logger.info(`Dataset updated: ${dataset.id}`);
 
@@ -253,8 +253,9 @@ export class DatasetService {
       prisma.dataset.delete({ where: { id: datasetId } }),
     ]);
 
-    // Invalidate all dataset-related cache keys
-    await cacheDeletePattern('cache:/api/v1/datasets*');
+    // Invalidate dataset and asset caches (cascade asset deletion happened above)
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/assets');
 
     logger.info(`Dataset deleted: ${datasetId} (${assets.length} assets cleaned up)`);
   }

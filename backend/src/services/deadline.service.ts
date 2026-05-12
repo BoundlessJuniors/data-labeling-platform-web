@@ -1,6 +1,7 @@
 import { ContractStatus, ListingStatus, PaymentStatus, EscrowType, SubmissionStatus, Prisma } from '@prisma/client';
 import prisma from '../lib/db';
 import logger from '../lib/logger';
+import { invalidateApiCache } from '../lib/redis';
 import { storageLifecycleService } from './storage-lifecycle.service';
 
 export interface DeadlineProcessSummary {
@@ -104,6 +105,10 @@ export class DeadlineService {
         });
         
         logger.info(`[DeadlineService] Expired pending payment ${payment.id} and cancelled contract ${payment.contractId}`);
+        // Invalidate listing cache — payment expiry reopens the listing
+        await invalidateApiCache('/api/v1/listings').catch((e) =>
+          logger.warn('[DeadlineService] Cache invalidation failed after payment expiry:', e)
+        );
         processed++;
       } catch (err) {
         logger.error(`[DeadlineService] Error expiring pending payment ${payment.id}:`, err);
@@ -142,6 +147,9 @@ export class DeadlineService {
         });
 
         logger.info(`[DeadlineService] Marked contract ${contract.id} as overdue`);
+        await invalidateApiCache('/api/v1/listings').catch((e) =>
+          logger.warn('[DeadlineService] Cache invalidation failed after marking contract overdue:', e)
+        );
         processed++;
       } catch (err) {
         logger.error(`[DeadlineService] Error marking contract ${contract.id} overdue:`, err);
@@ -183,6 +191,9 @@ export class DeadlineService {
             },
           });
           logger.warn(`[DeadlineService] Contract ${contract.id} marked disputed. No paid payment for auto-refund.`);
+          await invalidateApiCache('/api/v1/listings').catch((e) =>
+            logger.warn('[DeadlineService] Cache invalidation failed after marking contract disputed (no refund):', e)
+          );
           continue;
         }
 
@@ -244,6 +255,10 @@ export class DeadlineService {
         });
 
         logger.info(`[DeadlineService] Auto-refunded overdue contract ${contract.id}`);
+        // Invalidate listing cache — auto-refund reopens the listing
+        await invalidateApiCache('/api/v1/listings').catch((e) =>
+          logger.warn('[DeadlineService] Cache invalidation failed after auto-refund:', e)
+        );
         processed++;
       } catch (err) {
         logger.error(`[DeadlineService] Error auto-refunding contract ${contract.id}:`, err);
@@ -283,6 +298,10 @@ export class DeadlineService {
         });
 
         logger.info(`[DeadlineService] Auto-disputed contract ${contract.id} (revision expired)`);
+        // Invalidate listing cache — listing status may change due to auto-dispute
+        await invalidateApiCache('/api/v1/listings').catch((e) =>
+          logger.warn('[DeadlineService] Cache invalidation failed after auto-dispute:', e)
+        );
         processed++;
       } catch (err) {
         logger.error(`[DeadlineService] Error auto-disputing contract ${contract.id}:`, err);
@@ -336,6 +355,9 @@ export class DeadlineService {
             },
           });
           logger.warn(`[DeadlineService] Contract ${contract.id} marked disputed. No paid payment for auto-approve.`);
+          await invalidateApiCache('/api/v1/listings').catch((e) =>
+            logger.warn('[DeadlineService] Cache invalidation failed after marking contract disputed (no approve):', e)
+          );
           continue;
         }
 
@@ -399,6 +421,10 @@ export class DeadlineService {
         });
 
         logger.info(`[DeadlineService] Auto-approved contract ${contract.id} and released payment ${payment.id}`);
+        // Invalidate listing cache — auto-approve sets listing to 'completed'
+        await invalidateApiCache('/api/v1/listings').catch((e) =>
+          logger.warn('[DeadlineService] Cache invalidation failed after auto-approve:', e)
+        );
         processed++;
 
         // Schedule storage lifecycle cleanup — must not fail the deadline scan loop

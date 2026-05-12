@@ -461,3 +461,49 @@ JWT tabanlı authentication sistemi (`httpOnly` cookie):
 | **admin** | Tüm endpointlere erişim, kullanıcı yönetimi, normalize retry, debug annotation |
 | **client** | Dataset, listing yönetimi, proposal kabul/red, contract QC (approve/reject). Proposal oluşturamaz (403). Sadece kendi `clientUserId` ile eşleşen sözleşmeleri görür. |
 | **labeler** | İlanları görüntüleme, proposal oluşturma, görev lease/submit. Sadece kendi `labelerUserId` ile eşleşen sözleşmeleri görür. |
+
+## ⚡ Redis Cache Stratejisi
+
+Backend, Redis'i kısa süreli GET response caching için kullanmaktadır. Sadece güvenli ve nispeten stabil endpoint grupları cache kapsamına alınmaktadır.
+
+### 1. Cache Key Formatı
+
+Cache key yapısı **user-aware** (kullanıcıya duyarlı) ve **role-aware** (role duyarlı) olarak tasarlanmıştır:
+
+- **Authenticated:** `cache:u:<userId>:r:<role>:/api/v1/<resource>?<canonical-query>`
+- **Anonymous:** `cache:anon:/api/v1/<resource>?<canonical-query>`
+
+- **`userId` segmenti:** Cross-user cache sızıntısı (leak) riskini azaltır.
+- **`role` segmenti:** Kullanıcının rolü değiştiğinde eski role ait yetkisiz cached response dönmesini engeller.
+- **`canonical-query`:** Query parametreleri alfabetik sıralanarak canonical (standart) hale getirilir, böylece farklı sırayla gelen aynı parametreler aynı cache key'i üretir.
+
+### 2. Cache Kapsamındaki Endpoint Grupları
+- `listings`
+- `datasets`
+- `labelsets`
+
+### 3. Cache Dışında Bırakılan Endpoint Grupları
+Aşağıdaki endpointler dinamik yapıları veya içerdikleri veriler sebebiyle bilerek cache dışında tutulmuştur:
+- **`assets`:** Response içinde `signedUrl` üretildiği için cache edilmez.
+- **`contracts`:** Kullanıcıya özeldir ve lifecycle durumu sık değişir.
+- **`proposals`:** Operasyonel olarak hassas ve dinamiktir.
+- **`payments`:** Finansal veri içerir.
+- **`tasks`:** Lease (kilit) durumu çok dinamiktir.
+- **`reviews`:** QC durumu sürekli değişir.
+- **`admin` endpoints:** Audit, monitoring ve yönetim verileri içerdiği için anlık olmalıdır.
+
+### 4. Cache Invalidation Stratejisi
+- Cache invalidation route'larda değil, **service katmanında** yapılır.
+- Merkezi bir helper kullanılır: `invalidateApiCache('/api/v1/<resource>')`
+- Bu helper; user-aware, role-aware, anonymous, paginated ve filtered tüm varyantları wildcard pattern ile temizler.
+- Redis üzerinde production ortamını bloklamamak (single-threaded timeout) için `KEYS` yerine **`SCAN` tabanlı pattern deletion** kullanılır.
+
+### 5. Signed URL Güvenliği
+- Asset endpoint'leri cache edilmez çünkü asset response'larında S3/R2 signed URL bulunabilir.
+- Signed URL'ler güvenlik gereği **her request'te yeniden üretilmelidir**.
+- Bu sayede rol değişimi, asset silinmesi, sözleşme iptali veya storage purge işlemlerinden sonra "stale" (eski) URL dönme riski ortadan kaldırılır.
+
+### 6. Storage Lifecycle İlişkisi
+- Dataset'in `storageState`'i (örneğin purged veya purge_scheduled) değiştiğinde dataset cache'i invalidate edilir.
+- `purge_scheduled`, `purging`, `purged` veya `purge_failed` gibi durumların frontend'e stale gitmesi engellenir.
+- DB state değiştikten sonra R2, S3 veya BullMQ gibi dış servislerde hata oluşsa bile, kritik yerlerde `try/finally` blokları kullanılarak cache invalidation'ın mutlaka çalışması garanti altına alınmıştır.

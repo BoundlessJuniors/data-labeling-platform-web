@@ -76,7 +76,7 @@ const formatOptions = [
 
 // Fetch on mount
 onMounted(() => {
-  listingsStore.fetchListings();
+  listingsStore.fetchListings({ ownOnly: true });
   datasetsStore.fetchDatasets({ limit: 100 }); // Get datasets for create form
   labelSetsStore.fetchLabelSets(); // Get label sets for create form
 });
@@ -85,7 +85,7 @@ onMounted(() => {
 watch(searchInput, (value) => {
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
-    listingsStore.setSearch(value);
+    listingsStore.setSearch(value, { ownOnly: true });
   }, 300);
 });
 
@@ -208,7 +208,7 @@ async function handleDelete() {
               :options="statusOptions"
               class="sm:w-48"
               aria-label="Durum filtrele"
-              @update:model-value="(v) => listingsStore.setStatusFilter(v as ListingStatus | '')"
+              @update:model-value="(v) => listingsStore.setStatusFilter(v as ListingStatus | '', { ownOnly: true })"
             />
           </div>
         </div>
@@ -238,7 +238,7 @@ async function handleDelete() {
     <!-- Error state -->
     <div v-else-if="listingsStore.error && listingsStore.listings.length === 0" class="card text-center py-12">
       <p class="text-red-600 dark:text-red-400 mb-4">{{ listingsStore.error }}</p>
-      <BaseButton variant="secondary" @click="listingsStore.fetchListings()">
+      <BaseButton variant="secondary" @click="listingsStore.fetchListings({ ownOnly: true })">
         Tekrar Dene
       </BaseButton>
     </div>
@@ -275,7 +275,7 @@ async function handleDelete() {
       :total-pages="listingsStore.totalPages"
       :loading="listingsStore.loading"
       class="mt-6"
-      @page-change="listingsStore.goToPage"
+      @page-change="(page) => listingsStore.goToPage(page, { ownOnly: true })"
     />
 
     <!-- Create Modal -->

@@ -7,7 +7,7 @@ import {
   ForbiddenError,
   BadRequestError,
 } from "../utils/errors";
-import { cacheDelete, cacheDeletePattern } from "../lib/redis";
+import { invalidateApiCache } from "../lib/redis";
 import {
   uploadToR2,
   getSignedUrl,
@@ -144,8 +144,16 @@ export class AssetService {
       });
     });
 
-    // Generate Presigned PUT URL
-    const signedUrl = await getPresignedPutUrl(asset.objectKey, contentType);
+    let signedUrl: string;
+
+    try {
+      // Generate Presigned PUT URL
+      signedUrl = await getPresignedPutUrl(asset.objectKey, contentType);
+    } finally {
+      await invalidateApiCache('/api/v1/datasets').catch((cacheErr) => {
+        logger.warn('[AssetService] Cache invalidation failed after initiateUpload:', cacheErr);
+      });
+    }
 
     return {
       signedUrl,
@@ -260,9 +268,11 @@ export class AssetService {
 
     logger.info(`Asset upload confirmed: ${assetId} -> Queued for processing`);
 
-    // Invalidate caches
-    await cacheDeletePattern("cache:/api/v1/assets*");
-    await cacheDeletePattern("cache:/api/v1/datasets*");
+    // Invalidate dataset cache because completeUpload may flip dataset status
+    // (draft/uploading → ready) and asset list/counts are now stale.
+    // Note: asset route caching is disabled (signed URL safety), so only
+    // dataset cache needs to be cleared here.
+    await invalidateApiCache('/api/v1/datasets');
 
     return this.attachSignedUrl(updatedAsset);
   }
@@ -430,10 +440,10 @@ export class AssetService {
       },
     });
 
-    // Invalidate cache
-    await cacheDelete(`cache:/api/v1/assets/${assetId}`);
-
     logger.info(`Asset updated: ${asset.id}`);
+
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/assets');
 
     return this.attachSignedUrl(asset);
   }
@@ -483,9 +493,9 @@ export class AssetService {
       where: { id: assetId },
     });
 
-    // Invalidate cache
-    await cacheDelete(`cache:/api/v1/assets/${assetId}`);
-
     logger.info(`Asset deleted: ${assetId}`);
+
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/assets');
   }
 }

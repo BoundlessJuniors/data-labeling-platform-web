@@ -40,6 +40,7 @@ export const useListingsStore = defineStore('listings', () => {
         limit: params.limit ?? limit.value,
         search: params.search ?? (search.value || undefined),
         status: params.status ?? (statusFilter.value || undefined),
+        ownOnly: params.ownOnly,
       });
 
       listings.value = response.data.data;
@@ -145,28 +146,28 @@ export const useListingsStore = defineStore('listings', () => {
   /**
    * Set search term and refetch
    */
-  async function setSearch(term: string) {
+  async function setSearch(term: string, extraParams: Partial<ListingListParams> = {}) {
     search.value = term;
     page.value = 1;
-    return fetchListings();
+    return fetchListings({ ...extraParams, page: 1 });
   }
 
   /**
    * Set status filter and refetch
    */
-  async function setStatusFilter(status: ListingStatus | '') {
+  async function setStatusFilter(status: ListingStatus | '', extraParams: Partial<ListingListParams> = {}) {
     statusFilter.value = status;
     page.value = 1;
-    return fetchListings();
+    return fetchListings({ ...extraParams, page: 1 });
   }
 
   /**
    * Go to specific page
    */
-  async function goToPage(newPage: number) {
+  async function goToPage(newPage: number, extraParams: Partial<ListingListParams> = {}) {
     if (newPage >= 1 && newPage <= totalPages.value) {
       page.value = newPage;
-      return fetchListings();
+      return fetchListings({ ...extraParams, page: newPage });
     }
     return false;
   }

@@ -22,7 +22,7 @@ import prisma from '../lib/db';
 import { deleteFromR2Safe } from '../lib/storage';
 import { addStoragePurgeJob } from '../lib/queue';
 import { auditService } from './audit.service';
-import { cacheDeletePattern } from '../lib/redis';
+import { invalidateApiCache } from '../lib/redis';
 import logger from '../lib/logger';
 
 // Number of days after contract.approvedAt before purge becomes eligible.
@@ -146,21 +146,27 @@ export class StorageLifecycleService {
       },
     });
 
-    // Enqueue delayed job (smart deduplication is handled inside addStoragePurgeJob)
-    await addStoragePurgeJob(datasetId, eligibleAt);
-
-    logger.info(
-      `[StorageLifecycle] Dataset ${datasetId} scheduled for purge at ${eligibleAt.toISOString()} (source: ${source})`
-    );
-
     try {
-      await auditService.logAction(null, 'storage.purge_scheduled', 'dataset', datasetId, {
-        source,
-        eligibleAt: eligibleAt.toISOString(),
-        reason,
+      // Enqueue delayed job (smart deduplication is handled inside addStoragePurgeJob)
+      await addStoragePurgeJob(datasetId, eligibleAt);
+
+      logger.info(
+        `[StorageLifecycle] Dataset ${datasetId} scheduled for purge at ${eligibleAt.toISOString()} (source: ${source})`
+      );
+
+      try {
+        await auditService.logAction(null, 'storage.purge_scheduled', 'dataset', datasetId, {
+          source,
+          eligibleAt: eligibleAt.toISOString(),
+          reason,
+        });
+      } catch (auditErr) {
+        logger.warn(`[StorageLifecycle] Audit log failed for storage.purge_scheduled (dataset ${datasetId}):`, auditErr);
+      }
+    } finally {
+      await invalidateApiCache('/api/v1/datasets').catch((cacheErr) => {
+        logger.warn(`[StorageLifecycle] Cache invalidation failed after purge schedule for dataset ${datasetId}:`, cacheErr);
       });
-    } catch (auditErr) {
-      logger.warn(`[StorageLifecycle] Audit log failed for storage.purge_scheduled (dataset ${datasetId}):`, auditErr);
     }
   }
 
@@ -389,9 +395,10 @@ export class StorageLifecycleService {
     }
 
     // Invalidate caches so clients see updated storageState
+    // (both user-aware and anonymous keys are covered by the wildcard pattern).
     try {
-      await cacheDeletePattern('cache:/api/v1/datasets*');
-      await cacheDeletePattern('cache:/api/v1/assets*');
+      await invalidateApiCache('/api/v1/datasets');
+      await invalidateApiCache('/api/v1/assets');
     } catch (cacheErr) {
       logger.warn(`[StorageLifecycle] Cache invalidation failed for dataset ${datasetId}:`, cacheErr);
     }

@@ -11,6 +11,7 @@ import { ContractStatus, ListingStatus, PaymentStatus, EscrowType, UserRole, Pri
 import prisma from '../lib/db';
 import logger from '../lib/logger';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
+import { invalidateApiCache } from '../lib/redis';
 import { auditService } from './audit.service';
 import { mockPaymentProvider } from './payments/mock-payment.provider';
 
@@ -408,6 +409,10 @@ export class PaymentService {
       `Payment ${paymentId} mock-paid → Contract ${contract.id} activated ` +
       `(dueAt: ${dueAt.toISOString()}, autoCancelAt: ${autoCancelAt.toISOString()})`
     );
+
+    // Invalidate listing cache — mockSuccess moves listing to 'in_progress' and
+    // rejects other pending proposals, both of which affect listing responses.
+    await invalidateApiCache('/api/v1/listings');
 
     // ── 10. Audit (non-fatal) ──────────────────────────────────────────────
     try {

@@ -17,6 +17,7 @@ export interface ListingListParams {
   search?: string;
   status?: ListingStatus;
   datasetId?: string;
+  ownOnly?: boolean;
 }
 
 export const listingsApi = {

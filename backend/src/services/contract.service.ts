@@ -4,6 +4,7 @@ import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import logger from '../lib/logger';
+import { invalidateApiCache } from '../lib/redis';
 import { addNormalizeJob } from '../lib/queue';
 import { getSignedUrl } from '../lib/storage';
 import { ExportFormat, ExportableTaskRecord } from '../utils/export/export.types';
@@ -410,6 +411,8 @@ export class ContractService {
 
     logger.info(`Contract submitted: ${contractId}`);
 
+    await invalidateApiCache('/api/v1/listings');
+
     return updatedContract;
   }
 
@@ -513,6 +516,9 @@ export class ContractService {
 
     logger.info(`Contract approved: ${contractId}, payment ${paidPayment.id} released`);
 
+    // Invalidate listing cache — approveContract sets listing status to 'completed'
+    await invalidateApiCache('/api/v1/listings');
+
     try {
       await auditService.logAction(userId, 'contract.approve', 'contract', contractId, {
         clientUserId: contract.clientUserId,
@@ -598,6 +604,9 @@ export class ContractService {
 
       logger.info(`Contract disputed: ${contractId} (revision ${nextRevisionCount}/${contract.maxRevisionCount})`);
 
+      // Invalidate listing cache — rejectContract (dispute path) updates listing status
+      await invalidateApiCache('/api/v1/listings');
+
       try {
         await auditService.logAction(userId, 'contract.disputed', 'contract', contractId, {
           reason: reason || null, revisionCount: nextRevisionCount,
@@ -652,6 +661,9 @@ export class ContractService {
     });
 
     logger.info(`Contract revision requested: ${contractId}, reason: ${reason || 'No reason provided'}`);
+
+    // Invalidate listing cache — rejectContract (revision path) updates listing status
+    await invalidateApiCache('/api/v1/listings');
 
     try {
       await auditService.logAction(userId, 'contract.reject', 'contract', contractId, {
@@ -747,6 +759,9 @@ export class ContractService {
 
       logger.info(`Contract ${contractId} cancelled (pending_payment path, no refund)`);
 
+      // Invalidate listing cache — cancelContract (pending_payment path) reopens listing
+      await invalidateApiCache('/api/v1/listings');
+
       try {
         await auditService.logAction(userId, 'contract.cancel', 'contract', contractId, {
           reason: reason || null, previousStatus,
@@ -789,6 +804,8 @@ export class ContractService {
         });
 
         logger.info(`Contract ${contractId} disputed by client cancel (was ${previousStatus})`);
+        // Invalidate listing cache — listing may stay in_progress but cached data is stale
+        await invalidateApiCache('/api/v1/listings');
         try {
           await auditService.logAction(userId, 'contract.disputed', 'contract', contractId, {
             reason: trimmedReason,
@@ -872,6 +889,9 @@ export class ContractService {
       });
 
       logger.info(`Contract ${contractId} refunded by ${userRole} (was ${previousStatus}), payment ${paidPayment.id} refunded`);
+
+      // Invalidate listing cache — refund path reopens the listing
+      await invalidateApiCache('/api/v1/listings');
 
       try {
         await auditService.logAction(userId, 'contract.refunded', 'contract', contractId, {
@@ -1240,6 +1260,9 @@ export class ContractService {
 
       logger.info(`Dispute resolved (refund_client): contract ${contractId}, payment ${paidPayment.id} refunded by admin ${adminUserId}`);
 
+      // Invalidate listing cache — dispute refund reopens the listing
+      await invalidateApiCache('/api/v1/listings');
+
       try {
         await auditService.logAction(adminUserId, 'contract.dispute_refunded', 'contract', contractId, {
           decision: 'refund_client',
@@ -1323,6 +1346,9 @@ export class ContractService {
     });
 
     logger.info(`Dispute resolved (release_to_labeler): contract ${contractId}, payment ${paidPayment.id} released by admin ${adminUserId}`);
+
+    // Invalidate listing cache — dispute release sets listing to 'completed'
+    await invalidateApiCache('/api/v1/listings');
 
     try {
       await auditService.logAction(adminUserId, 'contract.dispute_released', 'contract', contractId, {
@@ -1442,6 +1468,10 @@ export class ContractService {
       } catch (auditErr) {
         logger.warn(`Audit logging failed for contract rating creation on contract ${contractId}`, auditErr);
       }
+
+      // Invalidate listing cache — rating changes labeler ratingAvg/ratingCount,
+      // which can appear in listing detail (owner.ratingAvg).
+      await invalidateApiCache('/api/v1/listings');
 
       return result;
     } catch (error: any) {

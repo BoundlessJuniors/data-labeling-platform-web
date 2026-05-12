@@ -2,7 +2,7 @@ import { AnnotationFormat, ListingStatus, Prisma, QcMode, StorageState } from '@
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
-import { cacheDeletePattern } from '../lib/redis';
+import { invalidateApiCache } from '../lib/redis';
 import logger from '../lib/logger';
 
 export class ListingService {
@@ -91,10 +91,11 @@ export class ListingService {
 
     logger.info(`Listing created: ${listing.id} by user ${userId}`);
 
-    // Invalidate listings cache so the new listing appears immediately
-    await cacheDeletePattern('cache:/api/v1/listings*');
-    await cacheDeletePattern('cache:/api/v1/datasets*');
-    await cacheDeletePattern('cache:/api/v1/labelsets*');
+    // Invalidate all affected resource caches using wildcard patterns
+    // that match both user-aware and anonymous cache keys.
+    await invalidateApiCache('/api/v1/listings');
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/labelsets');
 
     return listing;
   }
@@ -120,11 +121,25 @@ export class ListingService {
       where.status = status as ListingStatus;
     }
 
-    // If user wants to see only their listings
-    if (ownOnly && userId) {
+    // Role-based access control for listings
+    if (userRole === 'admin') {
+      // Admin: ownOnly=true ise sadece kendi ilanları, aksi halde tüm ilanlar
+      if (ownOnly && userId) {
+        where.ownerUserId = userId;
+      }
+    } else if (userRole === 'client') {
+      // Client: her zaman sadece kendi ilanları (güvenli varsayılan)
+      // Frontend ownOnly=true göndermese bile başka client ilanları sızamaz
+      if (!userId) {
+        where.status = ListingStatus.open;
+      } else {
+        where.ownerUserId = userId;
+      }
+    } else if (ownOnly && userId) {
+      // Labeler veya authenticated diğer roller: ownOnly=true ise sadece kendi
       where.ownerUserId = userId;
-    } else if (userRole !== 'admin') {
-      // Non-admin users see open listings or their own
+    } else {
+      // Unauthenticated veya labeler (ownOnly=false): açık ilanlar + kendi ilanları
       where.OR = [
         { status: ListingStatus.open },
         ...(userId ? [{ ownerUserId: userId }] : []),
@@ -268,9 +283,9 @@ export class ListingService {
     });
 
     // Invalidate cache (wildcard covers paginated/filtered variants)
-    await cacheDeletePattern('cache:/api/v1/listings*');
-    await cacheDeletePattern('cache:/api/v1/datasets*');
-    await cacheDeletePattern('cache:/api/v1/labelsets*');
+    await invalidateApiCache('/api/v1/listings');
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/labelsets');
 
     logger.info(`Listing updated: ${listing.id}`);
 
@@ -315,9 +330,9 @@ export class ListingService {
     });
 
     // Invalidate cache (wildcard covers paginated/filtered variants)
-    await cacheDeletePattern('cache:/api/v1/listings*');
-    await cacheDeletePattern('cache:/api/v1/datasets*');
-    await cacheDeletePattern('cache:/api/v1/labelsets*');
+    await invalidateApiCache('/api/v1/listings');
+    await invalidateApiCache('/api/v1/datasets');
+    await invalidateApiCache('/api/v1/labelsets');
 
     logger.info(`Listing deleted: ${listingId}`);
   }

@@ -62,15 +62,43 @@ export const cacheDelete = async (key: string): Promise<void> => {
   }
 };
 
+/**
+ * Delete all Redis keys matching `pattern` using cursor-based SCAN.
+ * Avoids the production-blocking KEYS command.
+ * Silently succeeds if no keys match; logs errors without crashing.
+ */
 export const cacheDeletePattern = async (pattern: string): Promise<void> => {
   try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+    let cursor = '0';
+    do {
+      // SCAN cursor MATCH pattern COUNT 200
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 200);
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } while (cursor !== '0');
   } catch (error) {
     logger.error(`Cache delete pattern error for ${pattern}:`, error);
   }
+};
+
+/**
+ * Invalidate all cache entries for a given API resource path.
+ *
+ * Covers both authenticated (user/role-aware) and anonymous cache keys:
+ *   cache:u:<userId>:r:<role>:/api/v1/<path>...
+ *   cache:anon:/api/v1/<path>...
+ *
+ * Usage:
+ *   await invalidateApiCache('/api/v1/listings');
+ *   await invalidateApiCache('/api/v1/datasets');
+ *   await invalidateApiCache('/api/v1/labelsets');
+ *   await invalidateApiCache('/api/v1/assets');
+ */
+export const invalidateApiCache = async (resourcePath: string): Promise<void> => {
+  // Wildcard matches all users, all roles, all query variants
+  await cacheDeletePattern(`cache:*:${resourcePath}*`);
 };
 
 export default redis;
