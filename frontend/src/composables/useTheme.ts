@@ -31,8 +31,7 @@ export function useTheme() {
     if (storedTheme === 'light' || storedTheme === 'dark') {
       applyTheme(storedTheme);
     } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      applyTheme(prefersDark ? 'dark' : 'light');
+      applyTheme('light');
     }
   };
 
