@@ -35,30 +35,20 @@ npm run dev
 
 **API:** `http://localhost:3000`
 
-## 📝 Son Güncellemeler (Patch Notes)
+## 📝 Son Güncellemeler
 
-- **Labeler Rating System (Marketplace Trust):** Onaylanmış (`approved`) ve ödemesi serbest bırakılmış (`released`) sözleşmeler için, müşterilerin etiketleyicileri değerlendirebildiği (1-5 yıldız + yorum) güven odaklı puanlama sistemi eklendi. Yarış durumlarını (race conditions) önlemek için veritabanı kilitleri (`FOR UPDATE`) ve atomik hesaplamalar kullanıldı. Tüm puanlama aksiyonları `AuditLog` sistemine entegre edildi.
-- **Beta Limits & Invite System:** Sistem güvenliği ve kaynak yönetimi için `.env` üzerinden yapılandırılabilen (dosya boyutu, max dataset, max kullanıcı, sözleşme kotaları) sıkı beta güvenlik limitleri (`beta-limits.ts`) eklendi. Ayrıca kontrollü halka açık beta süreci için davetiye kodu (Invite Code) talep etme ve kullanma sistemi entegre edildi.
-- **Storage Lifecycle:** Onaylanan sözleşmeler, ilgili dataset'in kaynak görsel objelerini R2/MinIO'dan `STORAGE_RETENTION_DAYS` (varsayılan: 7 gün) sonra otomatik olarak siler. DB metadata her zaman korunur. Yeni `StorageState` enum, `Dataset` ve `Asset` tablolarında depolama yaşam döngüsünü izler. Silinen assetler için `signedUrl: null` döner. Kaçırılan işler, `storage-cleanup` worker'ının tekrarlayan tarama (scan) jobı ile geri kazanılır.
-- **Auth Session Uyumlaştırılması:** JWT token `expiresIn` süresi ile çerez `maxAge` süresi tek bir kaynaktan (`JWT_EXPIRES_IN`) yönetilerek senkronize edildi.
-
-- **QC Canonical Raw Düzeltmesi:** Read ve QC endpoint'lerinde (`getTaskQcView` ve `getTaskById`) dönen en güncel ham verinin admin debug kayıtları değil, kanonik kayıt (`leaseToken != null`) olması sağlandı.
-- **Lease Response Tutarlılığı:** `POST /tasks/lease-batch` ve `POST /tasks/:id/lease` endpoint'lerinin yanıt yapısı düzleştirilerek, istemciler için `leaseToken` ve `leasedUntil` alanları `task` objesinin root seviyesine çıkarıldı.
-- **Payment-Gated Lifecycle (Faz 4):** Sözleşmeler için ödeme bariyeri (`pending_payment` durumu) eklendi. Ödeme yapılmadan görevlere başlanması engellendi.
-- **Deadline Automation (Faz 4):** Süresi dolan ödemelerin iptali, geciken sözleşmelerin (`overdue`) yönetimi ve otomatik iade süreçleri için `deadline.worker.ts` ve BullMQ entegrasyonu sağlandı.
-- **Refund Abuse Hardening (Faz 4):** Müşterilerin devam eden işlerde haksız iade taleplerini engellemek için doğrudan iptal işlemi kısıtlandı, zorunlu iptal nedeni ve `disputed` (ihtilaflı) durumu zorunlu kılındı.
-- **Multi-Shape Export Desteği:** Sadece Bounding Box (BBOX) yerine `polygon`, `polyline`, `keypoint` ve `circle` şekillerinin COCO, YOLO ve VOC formatlarında dışa aktarımı sağlandı. Sıkı geometri doğrulama, dinamik alan (area) hesaplamaları ve görüntü sınırlarına sıkı kenetlenme (`clampBboxToImage`) ile export hattı (pipeline) güvenli hale getirildi.
-
-### P0 Beta Upload/Storage Hardening
-
-- **Storage CORS (Env Tabanlı):** `backend/src/lib/storage.ts` içinde CORS origin listesi hardcoded olmaktan çıkarıldı. `STORAGE_ALLOWED_ORIGINS` (yoksa `ALLOWED_ORIGINS`) ortam değişkeninden okunuyor; prod ortamında liste boşsa konfigürasyon güvenli şekilde atlanıp loglanıyor.
-- **initiateUpload Race-Safe Quota:** `AssetService.initiateUpload` içindeki tüm kota kontrolleri `prisma.$transaction` bloğuna alındı. Non-admin kullanıcılar için `dataset` ve `user` satırları `SELECT … FOR UPDATE` ile kilitlenerek aynı anda gelen paralel isteklerin dataset asset veya depolama kotasını aşması engellendi. Dataset asset sayımına `storageState != purged` filtresi eklendi; böylece worker tarafından reddedilmiş/purged kayıtlar limit sayımına dahil edilmedi.
-- **completeUpload Concurrent-Safe (Atomic):** `prisma.asset.update` yerine `prisma.asset.updateMany(WHERE id=? AND status='pending')` kullanılarak `pending → uploaded` geçişi atomik hale getirildi. Yarışı kazanamayan eş zamanlı istek duplicate BullMQ job üretmeden idempotent yanıt alır.
-- **completeUpload Idempotency Guard'ları:** `storageState === purged` → `BadRequestError`; `status ∈ {uploaded, processing, ready}` → mevcut asset ile dön (no-op); `status === error` → yeniden yükleme talep eden `BadRequestError`. Bu guard'lar sayesinde frontend'in birden fazla confirm çağrısı güvenlidir.
-- **Asset Worker — Oversized Lifecycle Tutarlılığı:** Yüklenen nesne `BETA_MAX_FILE_SIZE_BYTES` sınırını aşarsa `rejectUploadedObject` helper'ı ile nesne storage'dan silinir; silme başarılıysa asset `storageState = purged`, `objectDeletedAt = now` olarak güncellenir. Silme başarısız olursa `storageState` değiştirilmez, `objectDeleteError` yazılır — fiziksel depolama ile DB metadatası her koşulda tutarlı kalır.
-- **Asset Worker — Toplam Storage Kota Kontrolü (Pre-Download):** HeadObject ile alınan gerçek `actualSizeBytes` kullanılarak download ve Sharp işlemine girmeden önce user toplam depolama kotası transaction içinde kontrol ediliyor. Kota aşılırsa `rejectUploadedObject` çağrılır, nesne silinir ve worker retry döngüsüne girmeden (`return`) sonlanır. Bu mekanizma, client'ın `/assets/initiate` isteğinde sahte küçük `fileSize` göndererek kotayı aşma saldırısını engeller.
-- **getAssets — Purged Filtre:** `AssetService.getAssets` liste sorgusu artık `storageState != purged` filtresiyle çalışıyor. `pagination.total` aktif (non-purged) asset sayısını yansıtır; bu sayede frontend `isAssetLimitReached` hesabı backend kota mantığıyla tutarlı olur.
-- **Admin Invite Request Reject:** `PATCH /api/v1/admin/invite-requests/:id/reject` endpoint'i eklendi. `pending` durumdaki davetiye istekleri `rejected` statüsüne çekilebiliyor; işlem audit log'a kaydediliyor.
+- **Etiketleyici Puanlama Sistemi:** Onaylanan sözleşmeler için müşteri değerlendirmesi, yıldız puanı ve yorum desteği eklendi.
+- **Beta Limitleri ve Davetiye Sistemi:** Kayıt, yükleme, dataset ve sözleşme limitleri ortam değişkenleriyle yönetilebilir hale getirildi; davetiye kodu akışı eklendi.
+- **Storage Lifecycle Yönetimi:** Onaylanan sözleşmelerden sonra kaynak görsellerin belirlenen saklama süresi sonunda MinIO/R2 üzerinden temizlenmesi sağlandı.
+- **Auth Session Yönetimi:** JWT süresi ile httpOnly cookie süresi tek yapılandırma üzerinden senkronize edildi.
+- **QC ve Annotation Akışı:** QC ekranlarında yalnızca kanonik labeler kayıtlarının kullanılması sağlandı; admin debug kayıtları normal pipeline’dan ayrıştırıldı.
+- **Lease Yanıt Tutarlılığı:** Görev kilitleme endpoint’lerinde `leaseToken` ve `leasedUntil` alanları istemci tarafı için daha tutarlı hale getirildi.
+- **Ödeme Kontrollü Sözleşme Akışı:** Sözleşmelerin ödeme tamamlanmadan aktif iş akışına geçmesi engellendi.
+- **Deadline ve İptal Yönetimi:** Süresi dolan ödemeler, geciken sözleşmeler, iade ve ihtilaf akışları için otomasyon ve güvenlik kontrolleri eklendi.
+- **Çoklu Şekil Export Desteği:** Bounding box dışında polygon, polyline, keypoint ve circle anotasyonlarının COCO, YOLO ve VOC formatlarında dışa aktarımı desteklendi.
+- **Upload ve Storage Güvenliği:** Presigned upload, kota kontrolü, eş zamanlı istek güvenliği, oversized dosya reddi ve purged asset filtreleme mekanizmaları güçlendirildi.
+- **Admin Davetiye Yönetimi:** Bekleyen davetiye taleplerinin admin panelinden reddedilebilmesi sağlandı.
+- **SonarQube Güvenlik İyileştirmeleri:** Güvenlik hotspot’ları için zayıf rastgelelik kullanımları temizlendi; QC sample seçimi güvenli random üretimiyle güncellendi.
 
 ## 📁 Proje Yapısı
 
@@ -198,29 +188,15 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | GET | `/invite-requests` | Beta davetiye taleplerini listele (sayfalı) |
 | PATCH | `/invite-requests/:id/reject` | Bekleyen davetiye talebini reddet — audit log kaydeder |
 
-> **Faz 2 Mimari Yönelim:** Sözleşme (Contract), Görev (Task) veya Review incelemeleri için admin paneli, gereksiz route kopyalaması yapmak yerine varolan root endpoint'leri (`/contracts`, `/tasks`, `/reviews`) kullanır. Sistemin rol kontrolü, admin yetkisine göre global erişim sağlar. Sadece admin iş akışı için hayati bir yapı olan **Annotation Debug** endpointleri izole olarak `/api/v1/annotations` içerisinde tasarlanmıştır.
+#### Admin Panel Özellikleri
 
-#### Admin Faz 2 — Operasyonel Kabiliyetler
-
-Admin paneli, Faz 1'deki monitoring odaklı yapıdan Faz 2 ile operasyonel kontrol paneline genişletilmiştir. Bu aşamada yeni bir paralel backend route seti oluşturulmamış; bunun yerine mevcut root kaynak endpoint'leri admin yetkisiyle yeniden kullanılmıştır.
-
-- **Contracts Operations:** Admin paneli sözleşme listeleme, sözleşme detayı, QC sample inceleme ve normalize retry işlemleri için ağırlıklı olarak `/api/v1/contracts` endpoint grubunu kullanır.
-- **Tasks Operations:** Task listeleme, QC görünümü, accept/reject ve expired lease cleanup işlemleri `/api/v1/tasks` endpoint grubu üzerinden yürütülür.
-- **Reviews Monitoring:** Review kayıtları bağımsız bir domain olarak `/api/v1/reviews` üzerinden izlenir ve güncellenir.
-- **Annotation Debug:** Admin'e özel manuel raw/normalized müdahale ve task annotation okuma işlemleri `/api/v1/annotations` altında izole tutulur.
-
-#### Admin Faz 3 — Operational Hardening
-
-Admin panelinin operasyonel güvenilirliği, denetlenebilirliği ve tip güvenliği bu fazda sağlamlaştırılmıştır.
-
-- **AuditService** (`services/audit.service.ts`): `logAction()` metodu; hem standalone hem de Prisma transaction context destekler. Tüm kritik admin mutasyonları —kullanıcı güncelleme/silme, sözleşme onaylama/reddetme/normalize retry, görev kabul/red/lease temizleme, annotation debug kaydetme— otomatik olarak `AuditLog` tablosuna yazılır.
-- **GET `/admin/audit-logs`**: Denetim loglarını sayfalama ve çoklu filtreleme (`action`, `entityType`, `entityId`, `actorSearch`) desteğiyle listeler.
-- **GET `/admin/users/:id` genişletmesi**: Kullanıcı detay endpoint'i artık ilişki sayılarını (datasets, contracts, taskLeases vb.), son 5 proposal özetini ve bu kullanıcıyı hedef alan son 5 audit log özetini döner.
-
-#### Admin Faz 10 — Payment Dashboard
-
-- **Platform Finansal Gözlem**: `/admin/payments/dashboard` endpoint'i eklenerek Prisma aggregate metodlarıyla aktif escrow, iade, kesinti ve başarıyla serbest bırakılmış fonların toplam bakiyelerinin raporlanması sağlandı.
-- **Ödeme Kayıtları**: `/admin/payments` endpoint'i eklenerek mock veya gerçek tüm ödeme hareketleri sisteme güvenli (UUID ve contains filtreleme opsiyonlarıyla) listelenebilir hale geldi. Hiçbir existing mock payment statü akışı bozulmadı.
+- Admin paneli; kullanıcı yönetimi, sistem metrikleri, upload takibi, kuyruk izleme, sözleşme/görev/review inceleme ve ödeme gözlemleme işlemlerini destekler.
+- Contract, Task ve Review operasyonları için mevcut root endpoint'ler admin yetkisiyle yeniden kullanılır; gereksiz paralel route kopyaları oluşturulmaz.
+- Annotation debug işlemleri `/api/v1/annotations` altında izole tutulur ve normal labeler submit pipeline'ının yerine geçmez.
+- Kritik admin mutasyonları `AuditLog` tablosuna kaydedilir.
+- Audit log kayıtları filtreleme ve sayfalama desteğiyle listelenebilir.
+- Kullanıcı detay endpoint'i ilişkili kayıt özetlerini, son proposal verilerini ve ilgili audit log kayıtlarını döner.
+- Payment dashboard, ödeme kayıtlarını ve escrow durumlarını read-only olarak izlemeyi sağlar.
 ### Dataset Routes (`/api/v1/datasets`)
 
 | Method | Endpoint | Açıklama |

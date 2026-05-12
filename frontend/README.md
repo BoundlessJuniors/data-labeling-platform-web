@@ -209,7 +209,7 @@ frontend/
 | `/admin/reviews` | Admin | Revizyon kararlarının bağımsız izlenmesi |
 | `/admin/annotations` | Admin | Annotation debug ve manuel raw/normalize akışı |
 | `/admin/audit-logs` | Admin | Yönetimsel işlem denetim kayıtları (filtreli, sayfalı) |
-| `/admin/payments` | Admin | Admin ödeme dashboard ve işlemleri (Faz 10) |
+| `/admin/payments` | Admin | Admin ödeme dashboard ve işlemleri |
 | `/admin/invite-requests` | Admin | Beta davetiye taleplerini inceleme, davet kodu oluşturma ve **reddetme** |
 | `/client/datasets` | Client | Dataset CRUD işlemleri |
 | `/client/datasets/:id` | Client | Dataset detay sayfası |
@@ -222,18 +222,14 @@ frontend/
 | `/labeler/contracts` | Labeler | Sözleşmelerimi görüntüle |
 | `/labeler/tasks` | Labeler | Görevlerimi yönet |
 
-### Admin Panel Gelişim Özeti
+### Admin Panel Özellikleri
 
-Admin paneli üç aşamada geliştirilmiştir:
-
-- **Faz 1 (Monitoring):** Dashboard, kullanıcı yönetimi, upload monitoring ve queue monitoring ekranları eklenmiştir. Bu aşamada admin paneli sistem görünürlüğü kazanmıştır.
-- **Faz 2 (Operations):** Contracts, Tasks, Reviews ve Annotation Debug ekranları eklenmiştir. Böylece admin paneli yalnızca sistem izleyen bir alan olmaktan çıkıp, sözleşme, görev, kalite kontrol ve annotation debug süreçlerine müdahale edebilen operasyonel bir konsola dönüşmüştür.
-- **Faz 3 (Operational Hardening):** Admin paneli operasyonel güvenilirlik, denetlenebilirlik ve tip güvenliği açısından sertleştirilmiştir. Audit log sistemi, kullanıcı detay modal'ı, URL tabanlı durum senkronizasyonu, kontrollü onay iş akışları ve kapsamlı TypeScript düzeltmeleri bu fazda tamamlanmıştır.
-- **Faz 10 (Payment Dashboard):** Admin paneline mock payment lifecycle'ı etkilemeyecek şekilde sadece read-only listeleme ve analiz imkanı sunan detaylı `AdminPaymentsPage` eklenmiştir. Escrow durumları, labeler kazançları, platform ücretleri gibi kırılımların takibi sağlanmıştır.
-
-> **Mimari Not:** Admin sayfaları `AdminLayout` altında çalışır ve `AppLayout` ile karışmaz. Bu ayrım, admin panelini client/labeler akışlarından görsel ve mantıksal olarak izole eder.
-
-> **Annotation Debug Notu:** Admin annotation ekranı, normal labeler submit akışının yerine geçmez. Buradaki manuel raw/normalized işlemler debug/reprocess amaçlıdır.
+- Admin paneli; kullanıcı yönetimi, dashboard metrikleri, upload takibi ve kuyruk izleme ekranlarını içerir.
+- Contract, Task, Review ve Annotation ekranlarıyla operasyonel süreçlerin takip edilmesini sağlar.
+- Audit log ekranı ile kritik yönetim işlemleri filtrelenebilir ve incelenebilir.
+- Payment dashboard üzerinden mock ödeme, escrow ve platform gelirleri read-only olarak izlenebilir.
+- Admin sayfaları `AdminLayout` altında izole çalışır ve client/labeler ekranlarından ayrılır.
+- Annotation debug ekranı yalnızca inceleme ve müdahale amaçlıdır; normal labeler submit akışının yerine geçmez.
 
 ## 🔐 Authentication Sistemi
 
@@ -363,81 +359,22 @@ VITE_API_URL=http://localhost:3000/api/v1
 
 ## 🚧 Geliştirme Durumu
 
-### Tamamlanan Özellikler ✅
+### Tamamlanan Temel Özellikler ✅
 
-- [x] Vue 3 + Vite proje kurulumu
-- [x] Tailwind CSS entegrasyonu
-- [x] Vue Router kurulumu ve guard'lar
-- [x] Pinia store (auth, datasets, assets, listings, contracts, tasks, toast)
-- [x] Axios client & interceptors
-- [x] Login/Register sayfaları
-- [x] HomePage (landing page)
-- [x] Role-based routing (admin/client/labeler)
-- [x] Admin sayfaları (Dashboard, Users)
-- [x] Client sayfaları (Datasets, Listings, Contracts)
-- [x] Labeler sayfaları (Listings, Contracts, Tasks)
-- [x] 8 reusable UI bileşeni
-- [x] Toast notification sistemi
-- [x] TypeScript type tanımları
-- [x] ESLint + Prettier konfigürasyonu
-- [x] Vitest test altyapısı
-- [x] Asset upload bileşeni (Cloudflare R2)
-- [x] LabelSet seçimi (ilan oluşturma)
-- [x] LabelSet yönetimi (oluştur, düzenle, sil + kullanım koruması)
-- [x] Dataset kullanım koruması (düzenle/sil engelleri, upload kilitleri)
-- [x] Dataset Asset yönetimi detay (Toplu görsel silme / Bulk delete özelliği)
-- [x] Proposal (başvuru) yönetim sayfası (client)
-- [x] Labeler başvuru takip sayfası (`MyProposalsPage.vue`) — durum, fiyat teklifi, geri çekme
-- [x] Proposal → Contract lifecycle (başvur → kabul → sözleşme + görev oluşturma)
-- [x] Contract type refactoring (`totalPayment` → `agreedPriceTotal`, `active` status)
-- [x] Toplam fiyat modeli (`priceTotal`) — ilan oluşturma/düzenleme/listeleme
-- [x] İlan kartlarında dataset adı gösterimi
-- [x] Düzenleme modalında dataset adı salt-okunur gösterim
-- [x] İlan ve başvuru listeleri için modüler/reuseable kart bileşenlerinin oluşturulması (`ListingCard`, `ClientListingCard`, `ProposalCard`)
-- [x] `annotationFormat` first-class DB column refactoring (COCO/YOLO/VOC/Custom) — oluşturma ve düzenleme desteği
-- [x] `remainingAssets` mock verisi ve progress bar UI borcu temizliği (`ListingCard`, `AvailableListingsPage`)
-- [x] Role-based UI refactoring: Client ContractsPage'e progress bar eklendi, Labeler MyContractsPage'den kaldırıldı
-- [x] `Contract` type fix: `createdAt` kaldırıldı, `startedAt` non-nullable yapıldı, `tasks[]` eklendi
-- [x] Labeler TasksPage `useTasksStore` entegrasyonuna geçirildi (404 hatası düzeltildi)
-- [x] `ContractDetailPage.vue` silindi, `client-contract-detail` route kaldırıldı
-- [x] Backend arama desteği: Dataset (`name`) ve Listing (`title`) için `?search=` query parametresi (case-insensitive)
-- [x] Frontend enum düzeltmeleri: `ListingsPage` status filtreleri `ListingStatus` enum'una, `ContractsPage` status filtreleri `ContractStatus` enum'una uyumlu hale getirildi
-- [x] QC Preview modülü parser güncellemeleri: Envelope objelerini (`{type: "export", data: [...]}`) algılama, DOM görsel sizing düzeltmeleri (`nextTick` + `rAF`), SVG skeleton loading state ayrıştırması
-- [x] Approved Contract Export mekanizması: Onaylanmış sözleşmelerin çıktılarını BBOX-only olarak COCO (JSON), YOLO (ZIP) veya Pascal VOC (ZIP) formatlarında direkt indirebilme
-- [x] **Admin Faz 1**: Yeni mimari ile AdminLayout / AppLayout ayrımı; `/admin` rotalarında çift layout karmaşası giderildi
-- [x] **Admin Faz 1**: Kırık dashboard çağrıları yerine tek bir yeni `/api/admin/dashboard` endpoint'ini kullanan istatistik paneli eklendi
-- [x] **Admin Faz 1**: UsersPage revizesi - Tablodan DB/Şema'da olmayan `isActive` alanı kaldırıldı; API ve payload güncellendi
-- [x] **Admin Faz 1**: Upload Monitoring sayfası - sistemdeki assetlerin güncel pipeline durumlarını gösteren admin takip ekranı eklendi
-- [x] **Admin Faz 1**: Queue Monitoring sayfası - BullMQ kuyruk özetini, güncel logları ve otomatik yenileme (Auto 15s) desteğini barındıran kontrol paneli eklendi
-- [x] **Admin Faz 2**: Admin paneli izleme modundan operasyon moduna devredildi (Contracts, Tasks, Reviews, Annotations sayfaları).
-- [x] **Admin Faz 2**: Global typescript modellerinden kaynaklı sorunları aşmak için admine özel izole frontend tipleri yaratıldı (`AdminContractStatus`, vb).
-- [x] **Admin Faz 2**: Redundant backend api çağırmaları yerine tekil root endpoint'ler admin aksiyonlarında yeniden kullanıldı.
-- [x] **Admin Faz 2**: Annotation Debug ekranında Lease Token kısıtlamasına takılmadan sisteme manuel raw/normalized data stream edebilme özelliği ve görüntüleme mekanizması (QC View) eklendi.
-- [x] **Admin Faz 2**: Admin paneli için layout, routing ve ekran ayrımı netleştirilerek monitoring ve operasyon alanları tek panel altında düzenli biçimde toplandı.
-- [x] **Admin Faz 3**: Merkezi `AuditService` ile tüm kritik admin mutasyonları (`user.update/delete`, `contract.approve/reject/normalize_retry`, `task.accept/reject/release_leases`, `annotation.raw_debug_create`, `annotation.normalized_upsert`) denetim loglarına yazılmaya başlandı.
-- [x] **Admin Faz 3**: `AdminAuditLogsPage` eklendi — action, entityType, entityId, actorSearch filtre desteği; sayfalama; meta JSON inceleme modalı; URL query param senkronizasyonu.
-- [x] **Admin Faz 3**: `UsersPage` kullanıcı detay modalı `getUserById` API çağrısıyla `AdminUserDetail` tipiyle çalışır hale getirildi — auditLogs ve proposals type-safe olarak gösterilmektedir.
-- [x] **Admin Faz 3**: `AdminContractsPage`, `AdminTasksPage`, `AdminReviewsPage`, `AdminAnnotationsPage` sayfalarında URL query param senkronizasyonu eklendi (deep-link ve sayfa yenileme kalıcılığı).
-- [x] **Admin Faz 3**: Tüm yıkıcı admin aksiyonlarında `window.confirm/prompt` kaldırılarak `BaseModal` kontrollü onay iş akışlarına geçildi.
-- [x] **Admin Faz 3**: `AdminAnnotationsPage`'de `?taskId=` ile deep-link desteği eklendi.
-- [x] **Admin Faz 3**: `BaseModal` API standardizasyonu — tüm admin sayfalarında `v-model` kullanımı `open` + `@close` event API'sine dönüştürüldü.
-- [x] **Admin Faz 3**: `AdminUserDetail` ve ilişkili summary tipleri (`AdminUserAuditLogSummary`, `AdminUserProposalSummary` vb.) `types/admin.ts`'e eklendi; `AdminUserListItem` bozulmadan korundu.
-- [x] **Admin Faz 3**: `AdminAuditLogsPage`'de `AuditLogRow` view-model ile recursive `JsonValue` tipi template'ten izole edilerek "Type instantiation is excessively deep" hatası kalıcı olarak çözüldü.
-- [x] **Faz 4 (Lifecycle Hardening)**: Payment-gated sözleşme akışı entegre edildi. Sözleşmeler ilk olarak `pending_payment` durumunda başlar; mock ödeme sonrası `active` olur.
-- [x] **Faz 4 (Lifecycle Hardening)**: İptal (Cancel) ve iade (Refund) suistimalini önlemek için `ContractsPage` UI üzerinde zorunlu neden belirterek iptal akışı (dispute mekanizması) eklendi.
-- [x] **Faz 4 (Lifecycle Hardening)**: Labeler UI güncellemeleri — `MyContractsPage` ve `TasksPage` üzerinde `pending_payment` durumu için bilgilendirme eklendi, ödemesi tamamlanmayan işlerde task işlemleri engellendi.
-- [x] **Faz 4 (Lifecycle Hardening)**: Regresyon testleri için manuel kontrol listesi (`docs/lifecycle-regression-checklist.md`) standartlaştırıldı.
-- [x] **UI İyileştirmeleri**: Koyu/Açık Tema (Dark/Light mode) geçişleri `useTheme.ts` composable ile sisteme kalıcı olarak entegre edildi. Tüm public, auth, client, labeler ve admin sayfaları masaüstü uygulaması renk paletine hizalandı.
-
-- [x] **Faz 10 (Payment Dashboard)**: Admin paneline mock payment lifecycle'ı değiştirmeyen read-only listeleme, analiz ve escrow raporlama dashboard'u eklendi. Backend tarafında yeni `getPayments` API'leri Prisma aggregation desteğiyle yazıldı.
-- [x] **Public & Beta Security**: Kayıt sayfasına davetiye kodu (`inviteCode`) gereksinimi ve e-posta ile davetiye talep etme bileşeni (`InviteRequestModal`) eklendi. Landing ve layout seviyesinde platformun teknik demo olduğunu belirten uyarılar (`BetaNotice`) yerleştirildi.
-- [x] **Public & Beta Security**: İlan, sözleşme ve ödeme ekranlarında "mock/test ödeme" sürecinin gerçek para veya kart bilgisi içermediğine dair bilgilendirmeler ve modal onayları eklendi.
-- [x] **Public & Beta Security**: Beta sınırlarını (`betaLimits.ts`) merkeze alan kota kontrolleri (dataset oluşturma limiti, dosya yükleme boyutu ve maksimum asset limitleri) devreye alındı. Aşım durumları için bilgilendirici Toast ve UI bildirimleri eklendi.
-- [x] **Admin (Invites)**: Admin paneline beta davetiye isteklerini (Invite Requests) listeleyebilen ve onaylanan e-postalara davetiye kodu oluşturabilen `AdminInviteRequestsPage` ekranı eklendi.
-- [x] **Admin (Invites)**: `AdminInviteRequestsPage` üzerine `pending` durumdaki davetiye istekleri için "Reddet" butonu ve onay modalı eklendi; `adminApi.rejectInviteRequest` API metodu oluşturuldu.
-- [x] **P0 Beta Upload Hardening**: Backend `getAssets` sorgusu artık `storageState != purged` filtresiyle çalışıyor. `pagination.total` aktif asset sayısını yansıtır; `DatasetDetailPage` upload butonu artık purged/reddedilmiş yüklemeler yüzünden yanlışlıkla disabled görünmez.
-- [x] **P1 Labeler Rating System (Marketplace Trust)**: Onaylanmış sözleşmeler (`approved`) için "Değerlendir" butonu, rating modalı ve "Değerlendirme yok" badge'leri eklendi. Backend entevalüasyonu sağlandı, ilan başvuru (proposal) kartlarına ve admin kullanıcı detay modalına etiketleyicilerin dinamik 5-yıldız puanı ve sayısı (`ratingAvg`, `ratingCount`) dahil edildi.
-- [x] **Desktop Download Page**: Public desktop indirme sayfası yapısı eklendi; installer dosyaları daha sonra config üzerinden aktif edilebilir.
+- [x] Vue 3, Vite, TypeScript ve Tailwind CSS tabanlı frontend altyapısı
+- [x] Role-based routing ve layout ayrımı
+- [x] Cookie tabanlı authentication akışı
+- [x] Client dataset, asset, label set, listing ve contract yönetimi
+- [x] Labeler listing görüntüleme, proposal gönderme, contract ve task takip ekranları
+- [x] Admin dashboard, kullanıcı yönetimi, upload/queue monitoring ve operasyon ekranları
+- [x] Proposal → Contract → Payment → Task → QC akışına uygun frontend entegrasyonu
+- [x] QC preview ve annotation payload görüntüleme desteği
+- [x] Contract export, payment dashboard ve invite request yönetimi
+- [x] Beta uyarıları, mock ödeme bilgilendirmeleri ve kota limitleri için UI desteği
+- [x] Dark/Light theme desteği
+- [x] Desktop uygulama indirme sayfası
+- [x] Login/Register hata mesajı gösterimi ve kullanıcı deneyimi iyileştirmeleri
+- [x] SonarQube güvenlik uyarıları için frontend toast ID üretimi iyileştirmesi
 
 ### Geliştirme Bekleyen Özellikler 🔄
 
