@@ -259,7 +259,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PATCH | `/:id/reject` | Başvuruyu reddet |
 | PATCH | `/:id/withdraw` | Başvuruyu geri çek (labeler) |
 
-> **Mimari Not:** `acceptProposal` — sözleşme oluşturmanın tek kanonik yoludur. Transaction içinde: Proposal kabul → Contract oluştur → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `in_progress`'e güncelle. Yeni sistemde Contract ilk olarak `pending_payment` statüsünde oluşur.
+> **Mimari Not:** `acceptProposal` — sözleşme oluşturmanın tek kanonik yoludur. Transaction içinde: Proposal kabul → Contract oluştur (`pending_payment`) → Dataset asset'leri için Task'lar oluştur → Diğer başvuruları reddet → Listing status `payment_pending`'e güncelle. Ödeme tamamlandığında Contract `active`, Listing `in_progress` statüsüne geçer.
 
 ### Payment Routes (`/api/v1/payments`)
 
@@ -348,7 +348,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 - **Label** - LabelSet içindeki tek etiket
 
 ### Marketplace Models
-- **Listing** - Etiketleme ilanları (open, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom), `qcMode` (none, client_approval, internal_reviewer)
+- **Listing** - Etiketleme ilanları (open, payment_pending, in_progress, completed, cancelled) — Toplam fiyat modeli (`priceTotal`), `annotationFormat` enum (COCO/YOLO/VOC/Custom), `qcMode` (none, client_approval, internal_reviewer)
 - **Proposal** - İlan başvuruları (pending, accepted, rejected, withdrawn) 
 - **Contract** - İş sözleşmeleri (pending_payment, active, submitted, approved, revision_requested, disputed, cancelled) — `revisionReason`, `revisionRequestedAt`, `revisionCount` alanları ile revizyon takibi. Ödeme sonrası aktif olma mekanizması.
 - **ContractRating** - Tamamlanan sözleşmelerin müşteri tarafından yapılan değerlendirme kayıtları (1-5 yıldız, `CHECK` kısıtlamalı, `AuditLog` destekli).
