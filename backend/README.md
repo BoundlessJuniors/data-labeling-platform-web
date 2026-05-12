@@ -49,6 +49,7 @@ npm run dev
 - **Upload ve Storage Güvenliği:** Presigned upload, kota kontrolü, eş zamanlı istek güvenliği, oversized dosya reddi ve purged asset filtreleme mekanizmaları güçlendirildi.
 - **Admin Davetiye Yönetimi:** Bekleyen davetiye taleplerinin admin panelinden reddedilebilmesi sağlandı.
 - **SonarQube Güvenlik İyileştirmeleri:** Güvenlik hotspot’ları için zayıf rastgelelik kullanımları temizlendi; QC sample seçimi güvenli random üretimiyle güncellendi.
+- **CSRF, CORS ve Production Security Hardening:** httpOnly cookie tabanlı auth yapısı için signed CSRF token koruması, strict CORS whitelist, JSON-only unsafe request kontrolü ve production ortamında fail-fast güvenlik konfigürasyonu eklendi.
 
 ## 📁 Proje Yapısı
 
@@ -61,7 +62,8 @@ backend/
 │
 ├── src/
 │   ├── config/            # YENİ
-│   │   └── beta-limits.ts # Beta güvenlik limitleri helper
+│   │   ├── beta-limits.ts # Beta güvenlik limitleri helper
+│   │   └── security.ts    # Merkezi güvenlik ve cookie konfigürasyonu
 │   ├── controllers/       # 11 API endpoint handler
 │   │   ├── auth.controller.ts
 │   │   ├── admin.controller.ts
@@ -115,7 +117,7 @@ backend/
 │   │   ├── annotation.routes.ts
 │   │   └── review.routes.ts
 │   │
-│   ├── middlewares/       # 9 Express middleware
+│   ├── middlewares/       # Express middleware
 │   │   ├── auth.middleware.ts        # JWT doğrulama
 │   │   ├── role.middleware.ts        # Rol tabanlı erişim
 │   │   ├── validate.middleware.ts    # Joi validation
@@ -124,6 +126,7 @@ backend/
 │   │   ├── upload.middleware.ts      # Multer file upload (MinIO/R2)
 │   │   ├── rate-limit.middleware.ts  # Rate limiting
 │   │   ├── security.middleware.ts    # Helmet & CORS
+│   │   ├── csrf.middleware.ts        # CSRF koruması ve JSON guard
 │   │   └── request-logger.middleware.ts
 │   │
 │   ├── validators/        # Joi validation schemas
@@ -376,10 +379,12 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 Request 
   → Trust Proxy (if set) 
   → Security (Helmet/CORS) 
-  → Body Parsers (JSON/Urlencoded) 
+  → JSON-only Unsafe Request Guard
+  → Body Parser (JSON) 
   → Cookie Parser 
   → Request Logger 
   → Rate Limiting 
+  → CSRF Protection
   → API Routes (Auth (JWT via httpOnly cookie) → Role Check → Validation → Controller) 
   → Error Handler (Not Found / Global Error)
 ```
@@ -424,9 +429,11 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5433/labelgun
 # Redis
 REDIS_URL=redis://localhost:6379
 
-# JWT
+# JWT & Security
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=7d
+CSRF_SECRET=optional-secret-key
+COOKIE_SAMESITE=lax
 
 # MinIO / S3-Compatible Storage (replaces Cloudflare R2 in development)
 R2_ACCOUNT_ID="minio-local"
@@ -447,12 +454,13 @@ STORAGE_ALLOWED_ORIGINS="http://localhost:5173"
 
 JWT tabanlı authentication sistemi (`httpOnly` cookie):
 
-1. **Register/Login** → Sunucu JWT'yi `httpOnly`, `secure`, `SameSite=lax` cookie olarak set eder
+1. **Register/Login** → Sunucu JWT'yi `httpOnly`, `secure`, `SameSite` cookie olarak set eder
 2. **Her istekte** → Tarayıcı cookie'yi otomatik gönderir (frontend `withCredentials: true`)
-3. **Logout** → `POST /api/v1/auth/logout` cookie'yi temizler
-4. **Token expire** → Yeniden login gerekli
+3. **Unsafe İstekler** (POST/PUT vb.) → `GET /api/v1/auth/csrf` üzerinden alınan CSRF token, `X-CSRF-Token` header'ı ile gönderilir. Sunucu bu token'ı imzalı ve `httpOnly` olan `csrf_token` cookie'si ile doğrular.
+4. **Logout** → `POST /api/v1/auth/logout` hem auth hem de csrf cookie'lerini temizler.
+5. **Token expire** → Yeniden login gerekli
 
-> **Not:** Token artık response body'de dönmez ve `localStorage`'da tutulmaz — XSS saldırılarına karşı güvenli.
+> **Not:** JWT ve CSRF token response body'de dönülüp `localStorage`'da tutulmaz — XSS saldırılarına karşı güvenli.
 
 ## 📊 Rol Tabanlı Erişim
 

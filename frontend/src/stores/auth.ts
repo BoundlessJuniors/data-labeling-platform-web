@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authApi, type User, type LoginRequest, type RegisterRequest } from '@/api/auth';
 import { getErrorMessage } from '@/types/api';
+import { clearCsrfToken } from '@/api/client';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(JSON.parse(localStorage.getItem('user') || 'null'))
@@ -77,6 +78,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
     user.value = null
     localStorage.removeItem('user')
+    // Clear the in-memory CSRF token so it is not reused after logout
+    clearCsrfToken()
   }
 
   function clearError() {

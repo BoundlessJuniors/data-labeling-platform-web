@@ -12,11 +12,17 @@ dotenv.config();
   return Number(this);
 };
 
+// Fail fast in production if critical security config is missing or insecure.
+// Must run after dotenv.config() and before any other imports that read env vars.
+import { validateSecurityConfig } from './config/security';
+validateSecurityConfig();
+
 import routes from './routes';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 import { requestLogger } from './middlewares/request-logger.middleware';
 import { defaultRateLimiter } from './middlewares/rate-limit.middleware';
 import { setupSecurity } from './middlewares/security.middleware';
+import { csrfProtection, rejectNonJsonUnsafeRequests } from './middlewares/csrf.middleware';
 import logger from './lib/logger';
 import redis from './lib/redis';
 import { ensureBucket } from './lib/storage';
@@ -35,25 +41,33 @@ app.set('trust proxy', 1);
 // Security middleware (Helmet, CORS)
 setupSecurity(app);
 
-// Body parsers
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// JSON-only guard for /api/v1 unsafe requests.
+// Runs BEFORE body parsers so Content-Type is inspected before any body is consumed.
+app.use('/api/v1', rejectNonJsonUnsafeRequests);
 
-// Cookie parser (populates req.cookies)
+// Body parsers
+// express.urlencoded is intentionally omitted — no existing route needs it.
+app.use(express.json({ limit: '2mb' }));
+
+// Cookie parser (populates req.cookies — required by auth and CSRF middleware)
 app.use(cookieParser());
 
 // Request logging
 app.use(requestLogger);
 
-// Rate limiting
+// Rate limiting (global)
 app.use(defaultRateLimiter);
+
+// CSRF protection for /api/v1 (after rate limiter, before routes)
+// The /health endpoint is outside /api/v1 so it is not subject to CSRF checks.
+app.use('/api/v1', csrfProtection);
 
 // Health check endpoint
 app.get('/health', async (_req, res) => {
   const redisStatus = redis.status === 'ready' ? 'connected' : 'disconnected';
-  
-  res.json({ 
-    status: 'ok', 
+
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'data-labeling-backend',
     redis: redisStatus,
@@ -82,8 +96,12 @@ const startServer = async () => {
     startNormalizeWorker();
     startDeadlineWorker();
     startStorageCleanupWorker();
-    await addDeadlineScanJob().catch(err => logger.warn('Failed to add deadline scan job:', err));
-    await addStorageCleanupScanJob().catch(err => logger.warn('Failed to add storage cleanup scan job:', err));
+    await addDeadlineScanJob().catch((err) =>
+      logger.warn('Failed to add deadline scan job:', err),
+    );
+    await addStorageCleanupScanJob().catch((err) =>
+      logger.warn('Failed to add storage cleanup scan job:', err),
+    );
 
     // Ensure the storage bucket exists (creates it on MinIO if missing)
     await ensureBucket();

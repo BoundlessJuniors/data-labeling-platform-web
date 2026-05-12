@@ -4,6 +4,8 @@ import { UnauthorizedError } from '../utils/errors';
 import prisma from '../lib/db';
 import { UserRole } from '@prisma/client';
 import { JWT_EXPIRES_IN } from '../utils/auth.util';
+import { getJwtSecret } from '../config/security';
+
 // Extended Express Request with user info
 export interface AuthRequest extends Request {
   user?: {
@@ -19,12 +21,10 @@ export interface JwtPayload {
   role: UserRole;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
 export const authenticate = async (
   req: AuthRequest,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const token = req.cookies?.token;
@@ -33,7 +33,7 @@ export const authenticate = async (
       throw new UnauthorizedError('No token provided');
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
 
     // Verify user exists in database
     const user = await prisma.user.findUnique({
@@ -67,7 +67,7 @@ export const authenticate = async (
 export const optionalAuth = async (
   req: AuthRequest,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const token = req.cookies?.token;
@@ -75,7 +75,7 @@ export const optionalAuth = async (
     if (!token) {
       return next();
     }
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -98,5 +98,5 @@ export const optionalAuth = async (
 };
 
 export const generateToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN as any });
 };

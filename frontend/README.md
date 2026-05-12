@@ -285,11 +285,14 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/
 // Config
 - withCredentials: true      // httpOnly cookie otomatik gönderilir
 
-// Interceptors
+// Interceptors & CSRF
+- CSRF Token: /auth/csrf'den alınır, sadece memory'de tutulur.
+- Request: POST/PUT/PATCH/DELETE isteklerine otomatik X-CSRF-Token ekler.
+- Response: CSRF validation hataları (403) otomatik olarak tek seferlik yeni token alınıp retry edilir.
 - Response: 401 hata yakalama → logout
 ```
 
-> **Not:** Token artık `localStorage`'da tutulmaz ve `Authorization` header'ı gönderilmez.
+> **Not:** JWT ve CSRF token `localStorage`'da tutulmaz ve `Authorization` header'ı gönderilmez. Sadece kullanıcı profil verisi `localStorage`'da tutulur.
 
 ### API Servisleri
 
@@ -375,6 +378,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Desktop uygulama indirme sayfası
 - [x] Login/Register hata mesajı gösterimi ve kullanıcı deneyimi iyileştirmeleri
 - [x] SonarQube güvenlik uyarıları için frontend toast ID üretimi iyileştirmesi
+- [x] CSRF entegrasyonu eklendi; unsafe API isteklerinde X-CSRF-Token header’ı memory-only token ile otomatik gönderilir.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

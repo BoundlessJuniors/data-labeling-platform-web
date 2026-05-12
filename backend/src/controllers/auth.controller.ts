@@ -2,22 +2,21 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AuthService } from '../services/auth.service';
 import { UserRole } from '@prisma/client';
-import { JWT_EXPIRES_IN, parseExpirationToMs } from '../utils/auth.util';
+import {
+  getAuthCookieOptions,
+  getAuthCookieClearOptions,
+  getCsrfCookieOptions,
+  getCsrfCookieClearOptions,
+  generateCsrfToken,
+  signCsrfToken,
+} from '../config/security';
 
 const authService = new AuthService();
-
-/** Shared cookie options for the JWT token cookie */
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: parseExpirationToMs(JWT_EXPIRES_IN),
-};
 
 export const register = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const { email, password, role, displayName, inviteCode } = req.body;
@@ -31,7 +30,7 @@ export const register = async (
     });
 
     // Set token as httpOnly cookie instead of returning in body
-    res.cookie('token', result.token, cookieOptions);
+    res.cookie('token', result.token, getAuthCookieOptions());
 
     res.status(201).json({
       success: true,
@@ -45,7 +44,7 @@ export const register = async (
 export const inviteRequest = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const { email } = req.body;
@@ -63,7 +62,7 @@ export const inviteRequest = async (
 export const login = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const { email, password } = req.body;
@@ -71,7 +70,7 @@ export const login = async (
     const result = await authService.login({ email, password });
 
     // Set token as httpOnly cookie instead of returning in body
-    res.cookie('token', result.token, cookieOptions);
+    res.cookie('token', result.token, getAuthCookieOptions());
 
     res.json({
       success: true,
@@ -85,16 +84,40 @@ export const login = async (
 export const logout = async (
   _req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-    });
+    // Clear both the auth token and the CSRF token cookies
+    res.clearCookie('token', getAuthCookieClearOptions());
+    res.clearCookie('csrf_token', getCsrfCookieClearOptions());
 
     res.json({ success: true, message: 'Logged out' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/v1/auth/csrf
+ *
+ * Issues a signed CSRF token:
+ * - Generates a random token
+ * - Signs it with HMAC-SHA256 and stores token.signature in an httpOnly cookie
+ * - Returns the plain token in the response body for the frontend to use as a header
+ */
+export const getCsrf = (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
+  try {
+    const token = generateCsrfToken();
+    const signed = signCsrfToken(token); // "token.signature"
+    res.cookie('csrf_token', signed, getCsrfCookieOptions());
+    res.json({
+      success: true,
+      data: { csrfToken: token },
+    });
   } catch (error) {
     next(error);
   }
@@ -103,7 +126,7 @@ export const logout = async (
 export const getProfile = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const userId = req.user!.id;
