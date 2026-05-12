@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { ContractStatus, EscrowType, ListingStatus, PaymentStatus, Prisma, SubmissionStatus, TaskStatus } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import prisma from '../lib/db';
@@ -947,7 +948,7 @@ export class ContractService {
     // Fisher-Yates shuffle
     const shuffled = [...allTasks];
     for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = randomInt(i + 1);
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 

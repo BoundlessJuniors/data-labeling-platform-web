@@ -12,12 +12,18 @@ export interface Toast {
   message: string;
   duration?: number;
 }
+let toastIdSequence = 0;
+
+function createToastId(): string {
+  toastIdSequence = (toastIdSequence + 1) % Number.MAX_SAFE_INTEGER;
+  return `toast-${Date.now()}-${toastIdSequence}`;
+}
 
 export const useToastStore = defineStore('toast', () => {
   const toasts = ref<Toast[]>([]);
 
   function show(message: string, type: ToastType = 'info', duration = 5000) {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const id = createToastId();
     const toast: Toast = { id, type, message, duration };
 
     toasts.value.push(toast);
