@@ -3,12 +3,10 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { AssetService } from '../services/asset.service';
 import { BadRequestError } from '../utils/errors';
 import { getBetaLimits } from '../config/beta-limits';
+import { isAllowedImageMimeType, ALLOWED_MIME_TYPES } from '../config/upload-security';
 
 const assetService = new AssetService();
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
-// Initiate upload (Get Presigned URL)
 export const initiateUpload = async (
   req: AuthRequest,
   res: Response,
@@ -23,8 +21,8 @@ export const initiateUpload = async (
       throw new BadRequestError('Filename, Content-Type ve File Size zorunludur.');
     }
 
-    // Security Check: MIME Type
-    if (!ALLOWED_MIME_TYPES.includes(contentType)) {
+    // Security Check: MIME Type (centralized allowlist)
+    if (!isAllowedImageMimeType(contentType)) {
       throw new BadRequestError(
         `Desteklenmeyen dosya formatı. İzin verilen formatlar: ${ALLOWED_MIME_TYPES.join(', ')}`
       );

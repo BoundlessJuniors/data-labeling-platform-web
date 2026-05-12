@@ -130,9 +130,16 @@ export const initiateUploadSchema = Joi.object({
   filename: Joi.string().min(1).max(255).required().messages({
     'any.required': 'Filename is required',
   }),
-  contentType: Joi.string().max(100).required().messages({
-    'any.required': 'Content-Type is required',
-  }),
+  // Strict allowlist — only raster image types supported by the processing pipeline.
+  // SVG, GIF, AVIF, text/html, application/octet-stream and all other types are
+  // rejected here before any controller or service logic runs.
+  contentType: Joi.string()
+    .valid('image/jpeg', 'image/png', 'image/webp')
+    .required()
+    .messages({
+      'any.only': 'Desteklenmeyen dosya formatı. İzin verilen formatlar: image/jpeg, image/png, image/webp',
+      'any.required': 'Content-Type zorunludur.',
+    }),
   fileSize: Joi.number().integer().positive().required().messages({
     'any.required': 'File size is required',
   }),

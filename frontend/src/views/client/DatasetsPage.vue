@@ -140,11 +140,24 @@ function onFilesSelected(event: Event) {
   if (!input.files || input.files.length === 0) return;
   
   const allFiles = Array.from(input.files);
-  const validFiles = allFiles.filter(file => file.size <= betaLimits.maxFileSizeBytes);
-  
-  if (validFiles.length < allFiles.length) {
+
+  // 0. MIME type guard (UX layer — backend is the source of truth).
+  // Blocks SVG, GIF, AVIF, and any type not on the allowlist even if the
+  // browser accept attribute is bypassed.
+  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  const typeValidFiles = allFiles.filter(f => ALLOWED_MIME_TYPES.includes(f.type));
+  const typeRejectedCount = allFiles.length - typeValidFiles.length;
+  if (typeRejectedCount > 0) {
     toastStore.warning(
-      `${allFiles.length - validFiles.length} dosya ${betaLimits.maxFileSizeMbLabel} sınırını aştığı için eklenmedi.`
+      `${typeRejectedCount} dosya desteklenmeyen format nedeniyle reddedildi. Sadece JPEG, PNG ve WEBP kabul edilir.`
+    );
+  }
+
+  const validFiles = typeValidFiles.filter(file => file.size <= betaLimits.maxFileSizeBytes);
+  
+  if (validFiles.length < typeValidFiles.length) {
+    toastStore.warning(
+      `${typeValidFiles.length - validFiles.length} dosya ${betaLimits.maxFileSizeMbLabel} sınırını aştığı için eklenmedi.`
     );
   }
 

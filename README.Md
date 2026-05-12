@@ -141,6 +141,15 @@ npm run dev
 | **Client** | `/client/*` | Dataset, listing, proposal kabul/red, contract QC. Proposal oluşturamaz. |
 | **Labeler** | `/labeler/*` | Proposal oluşturma, görev lease/submit, teslim |
 
+## 🔐 Güvenlik
+
+- **Auth:** JWT httpOnly cookie tabanlı oturum yönetimi. Token ve CSRF değerleri asla `localStorage`'da tutulmaz.
+- **CSRF:** Unsafe API metodları (POST/PUT/PATCH/DELETE) için imzalı CSRF token zorunludur (`X-CSRF-Token` header).
+- **CORS:** Üretimde yalnızca gerçek HTTPS frontend kaynakları kabul edilir. Wildcard ve `localhost` kaynaklarına üretimde izin verilmez.
+- **Startup Validation:** Üretim ortamında `JWT_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE` gibi kritik değişkenler eksikse sunucu başlamaz.
+- **Upload Güvenliği:** Yalnızca JPEG, PNG ve WEBP yüklemelerine izin verilir. Nesne anahtarları MIME türünden türetilen güvenli uzantılarla oluşturulur. Onay öncesi depolama meta verisi doğrulanır, worker Sharp ile gerçek görsel formatını doğrular.
+- **Storage CORS:** Doğrudan yükleme için yalnızca açık kaynaklar, `PUT/GET/HEAD` metodları ve sınırlı başlıklara izin verilir.
+
 ## 📖 Detaylı Dokümantasyon
 
 | Proje | Dokümantasyon |

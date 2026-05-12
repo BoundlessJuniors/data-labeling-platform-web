@@ -7,8 +7,8 @@
  */
 import multer, { FileFilterCallback } from 'multer';
 import { Request } from 'express';
+import { isAllowedImageMimeType } from '../config/upload-security';
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 const fileFilter = (
@@ -16,7 +16,7 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: FileFilterCallback,
 ): void => {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+  if (isAllowedImageMimeType(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('Yalnızca resim dosyalarına izin verilir (JPEG, PNG, WEBP).'));

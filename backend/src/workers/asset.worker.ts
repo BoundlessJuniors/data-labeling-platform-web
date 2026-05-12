@@ -9,6 +9,7 @@ import { redisConfig, invalidateApiCache } from '../lib/redis';
 import logger from '../lib/logger';
 import { Readable } from 'stream';
 import { getBetaLimits } from '../config/beta-limits';
+import { ALLOWED_SHARP_FORMATS, MIME_TO_SHARP_FORMAT } from '../config/upload-security';
 
 const WORKER_NAME = 'asset-processing';
 
@@ -80,7 +81,12 @@ export function startAssetWorker() {
         // If the dataset has been purged since this job was enqueued, skip processing.
         const freshAsset = await prisma.asset.findUnique({
           where: { id: assetId },
-          select: { id: true, storageState: true, dataset: { select: { ownerUserId: true } } },
+          select: {
+            id: true,
+            mimeType: true,
+            storageState: true,
+            dataset: { select: { ownerUserId: true } },
+          },
         });
         if (!freshAsset) {
           logger.warn(`[AssetWorker] Asset ${assetId} not found; skipping job ${job.id}`);
@@ -177,13 +183,63 @@ export function startAssetWorker() {
         // 4. Download to buffer for Sharp
         const buffer = await streamToBuffer(response.Body as Readable);
 
-        // 5. Extract metadata
-        const metadata = await sharp(buffer).metadata();
-        const width = metadata.width;
-        const height = metadata.height;
         const finalSizeBytes = Math.max(actualSizeBytes, buffer.length);
 
-        // 6. Mark asset ready
+        // 5. Parse image metadata using Sharp.
+        // Wrap in try/catch: invalid/corrupt bytes (e.g. a real SVG) will throw here.
+        // That is a deliberate rejection, not a transient error — do NOT rethrow.
+        let metadata: Awaited<ReturnType<typeof sharp.prototype.metadata>>;
+        try {
+          metadata = await sharp(buffer).metadata();
+        } catch {
+          await rejectUploadedObject({
+            assetId,
+            objectKey,
+            actualSizeBytes: finalSizeBytes,
+            processingError:
+              'Invalid or unsupported image content. Only JPEG, PNG, and WEBP are accepted.',
+          });
+          return;
+        }
+
+        const width = metadata.width;
+        const height = metadata.height;
+        const detectedFormat = metadata.format;
+
+        // 6. Validate actual image format — MUST be jpeg, png, or webp.
+        // SVG, GIF, AVIF, and any unrecognised format are rejected here.
+        // HeadObject ContentType proved the storage metadata was correct,
+        // but only Sharp can confirm the real file bytes match the declared type.
+        if (!detectedFormat || !(ALLOWED_SHARP_FORMATS as string[]).includes(detectedFormat)) {
+          const formatLabel = detectedFormat ?? 'unknown';
+          await rejectUploadedObject({
+            assetId,
+            objectKey,
+            actualSizeBytes: finalSizeBytes,
+            processingError:
+              `Desteklenmeyen görsel formatı tespit edildi: "${formatLabel}". ` +
+              `Yalnızca JPEG, PNG ve WEBP kabul edilir.`,
+          });
+          return;
+        }
+
+        // 7. Cross-check: detected Sharp format must match the declared MIME type.
+        // Prevents a PNG uploaded with Content-Type: image/jpeg from being accepted.
+        const declaredMime = freshAsset.mimeType.toLowerCase().trim();
+        const expectedFormat = MIME_TO_SHARP_FORMAT[declaredMime];
+        if (!expectedFormat || detectedFormat !== expectedFormat) {
+          await rejectUploadedObject({
+            assetId,
+            objectKey,
+            actualSizeBytes: finalSizeBytes,
+            processingError:
+              `Image content does not match declared MIME type. ` +
+              `Declared: ${freshAsset.mimeType}, detected: ${detectedFormat}.`,
+          });
+          return;
+        }
+
+        // 7. Mark asset ready
         await prisma.asset.update({
           where: { id: assetId },
           data: {

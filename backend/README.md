@@ -62,8 +62,9 @@ backend/
 │
 ├── src/
 │   ├── config/            # YENİ
-│   │   ├── beta-limits.ts # Beta güvenlik limitleri helper
-│   │   └── security.ts    # Merkezi güvenlik ve cookie konfigürasyonu
+│   │   ├── beta-limits.ts     # Beta güvenlik limitleri helper
+│   │   ├── security.ts        # Merkezi güvenlik ve cookie konfigürasyonu
+│   │   └── upload-security.ts # İzin verilen MIME türleri, uzantı haritası, Sharp format listesi
 │   ├── controllers/       # 11 API endpoint handler
 │   │   ├── auth.controller.ts
 │   │   ├── admin.controller.ts
@@ -461,6 +462,23 @@ JWT tabanlı authentication sistemi (`httpOnly` cookie):
 5. **Token expire** → Yeniden login gerekli
 
 > **Not:** JWT ve CSRF token response body'de dönülüp `localStorage`'da tutulmaz — XSS saldırılarına karşı güvenli.
+
+### 🛡️ Security Hardening
+
+**CORS & Startup Validation**
+- Production `ALLOWED_ORIGINS` must be real HTTPS frontend origins. Localhost and wildcard origins are rejected at startup.
+- Critical environment variables (`JWT_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE`) are validated on startup; the server refuses to start if any are missing or insecure in production.
+- `CSRF_SECRET` is optional but recommended in production for stronger CSRF token signing.
+
+**Upload Pipeline**
+- Allowed MIME types are strictly `image/jpeg`, `image/png`, and `image/webp`. SVG, GIF, AVIF, `text/html`, and all other types are rejected at the Joi schema layer before any service logic runs.
+- Object keys use MIME-derived safe extensions (e.g. `.jpg`, `.png`, `.webp`); the original filename extension is never trusted.
+- On `POST /assets/:id/confirm`, a `HeadObject` call verifies the actual uploaded object's `Content-Type` and `Content-Length` against the database record before the asset is confirmed. Invalid objects are deleted from storage and marked `storageState: purged` so they do not consume quota.
+- The asset worker downloads the object and runs `sharp(buffer).metadata()` to verify the real image format. Files whose detected format does not match the declared MIME type, or whose format is not in the allowed list, are rejected and purged before being marked `ready`.
+
+**Storage CORS**
+- Direct-upload CORS is applied to the bucket with explicit origin allowlist, `AllowedMethods: [PUT, GET, HEAD]`, and `AllowedHeaders: [Content-Type, x-amz-*]`.
+- In production, non-HTTPS and localhost origins are silently dropped; the server throws if no valid origins remain.
 
 ## 📊 Rol Tabanlı Erişim
 

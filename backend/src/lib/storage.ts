@@ -13,6 +13,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   CreateBucketCommand,
   PutBucketCorsCommand,
 } from '@aws-sdk/client-s3';
@@ -31,9 +32,61 @@ const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY ?? '';
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME ?? '';
 const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT ?? '';
 
-function getStorageAllowedOrigins(): string[] {
+/**
+ * Parse and validate the storage CORS allowed-origins list from env.
+ * Rules enforced:
+ *  - Wildcard "*" is always rejected.
+ *  - Invalid URLs are silently dropped (with a warning).
+ *  - Production additionally rejects:
+ *      - http:// origins (must be https)
+ *      - localhost / 127.0.0.1 origins
+ *  - Duplicates are removed.
+ *
+ * @param forProduction - pass true when NODE_ENV === 'production'
+ */
+function getStorageAllowedOrigins(forProduction = false): string[] {
   const raw = process.env.STORAGE_ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || '';
-  return raw.split(',').map(s => s.trim()).filter(Boolean);
+  const entries = raw.split(',').map(s => s.trim()).filter(Boolean);
+
+  const validated: string[] = [];
+
+  for (const entry of entries) {
+    // Never allow wildcard.
+    if (entry === '*') {
+      logger.warn(`[Storage] CORS: wildcard "*" is not permitted and will be ignored.`);
+      continue;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(entry);
+    } catch {
+      logger.warn(`[Storage] CORS: invalid origin URL "${entry}" will be ignored.`);
+      continue;
+    }
+
+    // Use the normalized origin (scheme + host + port) to strip any path/query.
+    const normalized = parsed.origin;
+
+    if (forProduction) {
+      // Production requires HTTPS.
+      if (parsed.protocol !== 'https:') {
+        logger.warn(`[Storage] CORS: non-HTTPS origin "${normalized}" is not permitted in production and will be ignored.`);
+        continue;
+      }
+      // Production must not allow localhost or loopback.
+      const hostname = parsed.hostname.toLowerCase();
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+        logger.warn(`[Storage] CORS: localhost/loopback origin "${normalized}" is not permitted in production and will be ignored.`);
+        continue;
+      }
+    }
+
+    validated.push(normalized);
+  }
+
+  // Deduplicate while preserving order.
+  return [...new Set(validated)];
 }
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -135,32 +188,55 @@ export async function ensureBucket(): Promise<void> {
     }
   }
 
-  // Apply CORS policy to allow direct browser uploads
+  // Apply CORS policy to allow direct browser uploads.
+  // Production: requires at least one explicit origin — throws if empty (fail-fast).
+  // Development: uses STORAGE_ALLOWED_ORIGINS / ALLOWED_ORIGINS with a safe localhost fallback.
+  // Wildcard "*" is never used in either environment.
   try {
-    const allowedOrigins = isDevelopment ? ['*'] : getStorageAllowedOrigins();
-    
-    if (!isDevelopment && allowedOrigins.length === 0) {
-      logger.warn('STORAGE_ALLOWED_ORIGINS or ALLOWED_ORIGINS is empty in production; storage CORS configuration may fail or be skipped.');
+    let allowedOrigins: string[];
+
+    if (isDevelopment) {
+      const configuredOrigins = getStorageAllowedOrigins(false);
+      allowedOrigins = configuredOrigins.length > 0
+        ? configuredOrigins
+        : ['http://localhost:5173', 'http://localhost:3000'];
+      logger.info(`[Storage] CORS dev origins: ${allowedOrigins.join(', ')}`);
     } else {
-      const corsCommand = new PutBucketCorsCommand({
-        Bucket: R2_BUCKET_NAME,
-        CORSConfiguration: {
-          CORSRules: [
-            {
-              AllowedHeaders: ['*'],
-              AllowedMethods: ['PUT', 'GET', 'HEAD', 'POST'],
-              AllowedOrigins: allowedOrigins,
-              ExposeHeaders: ['ETag'],
-              MaxAgeSeconds: 3000,
-            },
-          ],
-        },
-      });
-      await s3Client.send(corsCommand);
-      logger.info(`✅ CORS configuration applied to bucket "${R2_BUCKET_NAME}"`);
+      allowedOrigins = getStorageAllowedOrigins(true);
+      if (allowedOrigins.length === 0) {
+        throw new Error(
+          'STORAGE_ALLOWED_ORIGINS (or ALLOWED_ORIGINS) must be set in production. ' +
+          'Refusing to apply CORS with no allowed origins.'
+        );
+      }
+      logger.info(`[Storage] CORS prod origins: ${allowedOrigins.join(', ')}`);
     }
+
+    const corsCommand = new PutBucketCorsCommand({
+      Bucket: R2_BUCKET_NAME,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            // Narrow headers: only Content-Type and AWS-specific signing headers.
+            AllowedHeaders: ['Content-Type', 'x-amz-*'],
+            // Narrow methods: only what direct upload + read + existence-check need.
+            AllowedMethods: ['PUT', 'GET', 'HEAD'],
+            AllowedOrigins: allowedOrigins,
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 3000,
+          },
+        ],
+      },
+    });
+    await s3Client.send(corsCommand);
+    logger.info(`✅ CORS configuration applied to bucket "${R2_BUCKET_NAME}"`);
   } catch (corsErr) {
-    logger.warn(`⚠️ Failed to apply CORS configuration:`, corsErr);
+    // In production, a missing origin config is a hard error — re-throw.
+    if (!isDevelopment) {
+      logger.error(`❌ Failed to apply storage CORS configuration (production):`, corsErr);
+      throw corsErr;
+    }
+    logger.warn(`⚠️ Failed to apply CORS configuration (dev, non-fatal):`, corsErr);
   }
 }
 
@@ -284,4 +360,31 @@ export async function deleteFromR2Safe(key: string): Promise<boolean> {
     }
     throw err;
   }
+}
+
+/**
+ * Fetch HEAD metadata for an object without downloading its body.
+ * Returns the content-type, content-length, and ETag reported by storage.
+ *
+ * Throws an error (not silently) if the object does not exist or the
+ * request fails — callers should treat any thrown error as "object absent"
+ * or a genuine storage failure and act accordingly.
+ */
+export async function getObjectMetadata(key: string): Promise<{
+  contentType?: string;
+  contentLength?: number;
+  etag?: string;
+}> {
+  const command = new HeadObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+  });
+
+  const response = await s3Client.send(command);
+
+  return {
+    contentType: response.ContentType,
+    contentLength: response.ContentLength,
+    etag: response.ETag,
+  };
 }

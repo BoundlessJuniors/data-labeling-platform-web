@@ -1,5 +1,4 @@
 import { Prisma, StorageState, UserRole } from "@prisma/client";
-import path from "path";
 import { randomUUID } from "crypto";
 import prisma from "../lib/db";
 import {
@@ -9,14 +8,15 @@ import {
 } from "../utils/errors";
 import { invalidateApiCache } from "../lib/redis";
 import {
-  uploadToR2,
   getSignedUrl,
   deleteFromR2Safe,
   getPresignedPutUrl,
+  getObjectMetadata,
 } from "../lib/storage";
 import { addAssetJob } from "../lib/queue";
 import logger from "../lib/logger";
 import { getBetaLimits } from '../config/beta-limits';
+import { getExtensionForMimeType, isAllowedImageMimeType } from '../config/upload-security';
 
 // Interface for Multer file (since we don't import 'express' here)
 interface UploadedFile {
@@ -128,8 +128,8 @@ export class AssetService {
         }
       }
 
-      // Build a unique object key
-      const ext = path.extname(filename) || "";
+      // Build a unique object key — extension derived from MIME type, never from filename.
+      const ext = getExtensionForMimeType(contentType);
       const objectKey = `assets/${datasetId}/${randomUUID()}${ext}`;
 
       // Create pending asset record
@@ -203,6 +203,105 @@ export class AssetService {
     if (asset.status === "error") {
       throw new BadRequestError(
         "Bu asset hata durumunda olduğu için tekrar onaylanamaz. Lütfen yeniden yükleyin."
+      );
+    }
+
+    // -----------------------------------------------------------------------
+    // HeadObject validation: verify the actual uploaded object before confirm.
+    // This prevents accepting uploads that don't match what was initiated.
+    // On any failure: delete the object, mark the asset as error+purged, throw.
+    // -----------------------------------------------------------------------
+    const { maxFileSizeBytes } = getBetaLimits();
+    let objectMeta: Awaited<ReturnType<typeof getObjectMetadata>>;
+
+    const rejectInvalidUpload = async (reason: string): Promise<never> => {
+      logger.warn(`[AssetService] Rejecting confirm for asset ${asset.id}: ${reason}`);
+      // Best-effort: delete the uploaded object so quota is freed.
+      // Track whether deletion actually succeeded — the DB must not claim
+      // the object is purged if storage deletion failed.
+      let objectDeleted = false;
+      let objectDeleteError: string | null = null;
+      try {
+        await deleteFromR2Safe(asset.objectKey);
+        objectDeleted = true;
+      } catch (delErr: any) {
+        objectDeleteError = delErr?.message || 'Failed to delete object from storage';
+        logger.warn(`[AssetService] Failed to delete object during confirm rejection (key: ${asset.objectKey}):`, delErr);
+      }
+      // Only set storageState=purged when the object was actually deleted.
+      // storageState=purged is excluded from dataset asset count and user storage
+      // aggregate queries — marking it purged when it isn't would leave a dangling object.
+      await prisma.asset.update({
+        where: { id: asset.id },
+        data: {
+          status: 'error',
+          processingError: reason,
+          ...(objectDeleted
+            ? {
+                storageState: StorageState.purged,
+                objectDeletedAt: new Date(),
+                objectDeleteError: null,
+              }
+            : {
+                objectDeleteError,
+              }),
+        },
+      }).catch((dbErr) =>
+        logger.warn(`[AssetService] Failed to mark asset ${asset.id} as error:`, dbErr)
+      );
+      // Invalidate caches so quota counts are immediately consistent.
+      await invalidateApiCache('/api/v1/datasets').catch(() => {});
+      await invalidateApiCache('/api/v1/assets').catch(() => {});
+      throw new BadRequestError(reason);
+    };
+
+    try {
+      objectMeta = await getObjectMetadata(asset.objectKey);
+    } catch {
+      await rejectInvalidUpload(
+        'Yüklenen nesne depolama alanında bulunamadı. Lütfen dosyayı tekrar yükleyin.'
+      );
+    }
+
+    // Narrow TS: rejectInvalidUpload always throws, so objectMeta is defined here.
+    const meta = objectMeta!;
+
+    if (meta.contentLength === undefined || meta.contentLength === null) {
+      await rejectInvalidUpload('Depolama alanından nesne boyutu alınamadı.');
+    }
+
+    const actualSize = meta.contentLength!;
+
+    if (actualSize <= 0) {
+      await rejectInvalidUpload('Yüklenen nesne boş veya sıfır boyutlu.');
+    }
+
+    // Strict equality: actual size must match what was declared during initiate.
+    const declaredSize = Number(asset.sizeBytes);
+    if (actualSize !== declaredSize) {
+      await rejectInvalidUpload(
+        `Nesne boyutu uyuşmazlığı: beklenen ${declaredSize} bayt, depolamada ${actualSize} bayt bulundu.`
+      );
+    }
+
+    if (actualSize > maxFileSizeBytes) {
+      const maxMb = (maxFileSizeBytes / (1024 * 1024)).toFixed(1);
+      await rejectInvalidUpload(
+        `Yüklenen nesne boyutu ${maxMb} MB beta sınırını aşıyor.`
+      );
+    }
+
+    const actualContentType = meta.contentType ? meta.contentType.split(';')[0].trim().toLowerCase() : '';
+    if (!isAllowedImageMimeType(actualContentType)) {
+      await rejectInvalidUpload(
+        `Depolama alanındaki nesnenin içerik türü desteklenmiyor: "${meta.contentType}".`
+      );
+    }
+
+    const expectedContentType = asset.mimeType.toLowerCase().trim();
+    if (actualContentType !== expectedContentType) {
+      await rejectInvalidUpload(
+        `İçerik türü uyuşmazlığı: beklenen "${expectedContentType}", depolamada "${actualContentType}" bulundu.`
       );
     }
 

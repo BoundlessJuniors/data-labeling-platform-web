@@ -84,6 +84,18 @@ export const useAssetsStore = defineStore('assets', () => {
       error.value = null;
     }
 
+    // 0. Client-side Validation: File Type (UX guard — backend is the source of truth)
+    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      const msg = `"${file.name}" desteklenmeyen dosya formatı. Sadece JPEG, PNG ve WEBP kabul edilir.`;
+      toastStore.warning(msg);
+      if (updateState) {
+        error.value = msg;
+        uploading.value = false;
+      }
+      return null;
+    }
+
     // 1. Client-side Validation: File Size Limit (Beta)
     const MAX_FILE_SIZE_BYTES = betaLimits.maxFileSizeBytes;
     if (file.size > MAX_FILE_SIZE_BYTES) {
