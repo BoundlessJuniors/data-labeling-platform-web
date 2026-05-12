@@ -15,6 +15,7 @@ const authStore = useAuthStore();
 const email = ref('');
 const password = ref('');
 const showError = ref(false);
+const localError = ref('');
 
 useSeo({
   title: 'Giriş Yap',
@@ -27,8 +28,14 @@ onMounted(() => {
 
 async function handleSubmit() {
   showError.value = false;
+  localError.value = '';
 
-  if (!email.value || !password.value) {
+  if (!email.value) {
+    localError.value = 'E-posta zorunludur.';
+    return;
+  }
+  if (!password.value) {
+    localError.value = 'Şifre zorunludur.';
     return;
   }
 
@@ -67,12 +74,12 @@ async function handleSubmit() {
 
         <!-- Error Message -->
         <div
-          v-if="showError && authStore.error"
+          v-if="localError || (showError && authStore.error)"
           class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg"
           role="alert"
           aria-live="assertive"
         >
-          <p class="text-sm text-red-600 dark:text-red-400">{{ authStore.error }}</p>
+          <p class="text-sm text-red-600 dark:text-red-400">{{ localError || authStore.error }}</p>
         </div>
 
         <!-- Form -->

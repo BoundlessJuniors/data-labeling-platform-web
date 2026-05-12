@@ -3,7 +3,7 @@
  * RegisterPage - User registration
  * Accessibility: Form labels, fieldset for role selection, error announcements
  */
-import { ref, onMounted } from 'vue';
+import { ref, nextTick, onMounted } from 'vue';
 import { useRouter, RouterLink } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useSeo } from '@/composables/useSeo';
@@ -21,6 +21,7 @@ const inviteCode = ref('');
 const isInviteModalOpen = ref(false);
 const showError = ref(false);
 const validationError = ref('');
+const errorAlertRef = ref<HTMLElement | null>(null);
 
 useSeo({
   title: 'Kayıt Ol',
@@ -31,23 +32,47 @@ onMounted(() => {
   authStore.clearError();
 });
 
+async function scrollToError() {
+  await nextTick();
+  errorAlertRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  errorAlertRef.value?.focus({ preventScroll: true });
+}
+
 async function handleSubmit() {
   showError.value = false;
   validationError.value = '';
 
+  const trimmedEmail = email.value.trim();
+
+  // Frontend validation
+  if (!trimmedEmail) {
+    validationError.value = 'E-posta zorunludur.';
+    await scrollToError();
+    return;
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(trimmedEmail)) {
+    validationError.value = 'Geçerli bir e-posta adresi giriniz.';
+    await scrollToError();
+    return;
+  }
+
   // Validation
   if (password.value !== confirmPassword.value) {
     validationError.value = 'Şifreler eşleşmiyor';
+    await scrollToError();
     return;
   }
 
   if (password.value.length < 6) {
     validationError.value = 'Şifre en az 6 karakter olmalıdır';
+    await scrollToError();
     return;
   }
 
   const success = await authStore.register({
-    email: email.value,
+    email: trimmedEmail,
     password: password.value,
     role: role.value,
     displayName: displayName.value || undefined,
@@ -58,6 +83,7 @@ async function handleSubmit() {
     router.push('/dashboard');
   } else {
     showError.value = true;
+    await scrollToError();
   }
 }
 </script>
@@ -84,9 +110,11 @@ async function handleSubmit() {
         <!-- Error Message -->
         <div
           v-if="validationError || (showError && authStore.error)"
+          ref="errorAlertRef"
           class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg"
           role="alert"
           aria-live="assertive"
+          tabindex="-1"
         >
           <p class="text-sm text-red-600 dark:text-red-400">{{ validationError || authStore.error }}</p>
         </div>
