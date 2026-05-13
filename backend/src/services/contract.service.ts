@@ -1021,18 +1021,52 @@ export class ContractService {
       throw new NotFoundError('Contract');
     }
 
-    // Find latest retryable submission (failed or pending)
-    let submission = await prisma.submission.findFirst({
+    if (contract.status !== ContractStatus.submitted) {
+      throw new BadRequestError(`Cannot retry normalize for contract with status: ${contract.status}. Status must be 'submitted'.`);
+    }
+
+    const taskCount = await prisma.task.count({ where: { contractId } });
+    if (taskCount === 0) {
+      throw new BadRequestError('Contract has no tasks, cannot normalize.');
+    }
+
+    // Check if any tasks don't have valid raw
+    const tasksWithoutValidRaw = await prisma.task.findMany({
       where: {
         contractId,
-        format: 'CUSTOM_JSON',
-        status: { in: ['failed', 'pending'] },
+        annotationsRaw: {
+          none: {
+            leaseToken: { not: null },
+            labelerUserId: contract.labelerUserId,
+          },
+        },
       },
+      select: { id: true },
+      take: 1,
+    });
+
+    if (tasksWithoutValidRaw.length > 0) {
+      throw new BadRequestError(
+        `Cannot retry normalize. Every task must have at least one valid raw annotation (lease_token != null, correct labeler). First failing task: ${tasksWithoutValidRaw[0].id}`
+      );
+    }
+
+    // Find latest submission
+    let submission = await prisma.submission.findFirst({
+      where: { contractId, format: 'CUSTOM_JSON' },
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!submission) {
-      // No retryable submission — create a new one
+    if (submission) {
+      if (submission.status === 'processing') {
+        throw new BadRequestError('Normalization is already processing.');
+      }
+      if (submission.status === 'completed') {
+        throw new BadRequestError('Normalization is already completed. Retry is only allowed for failed or pending submissions.');
+      }
+      // If failed or pending, reuse it
+    } else {
+      // Create new submission
       submission = await prisma.submission.create({
         data: {
           contractId,

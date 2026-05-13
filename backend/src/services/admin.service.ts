@@ -394,7 +394,10 @@ export class AdminService {
     ]);
 
     return {
-      assets,
+      assets: assets.map((asset) => ({
+        ...asset,
+        sizeBytes: asset.sizeBytes?.toString() ?? null,
+      })),
       pagination: {
         page: safePage,
         limit: safeLimit,
@@ -439,14 +442,22 @@ export class AdminService {
           queue.getJobs(['completed'], 0, Math.min(safeJobLimit - 1, 4)),
         ]);
 
-        const allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs, ...completedJobs];
+        const taggedJobs = [
+          ...waitingJobs.map(job => ({ job, state: 'waiting' })),
+          ...activeJobs.map(job => ({ job, state: 'active' })),
+          ...delayedJobs.map(job => ({ job, state: 'delayed' })),
+          ...failedJobs.map(job => ({ job, state: 'failed' })),
+          ...completedJobs.map(job => ({ job, state: 'completed' })),
+        ];
+
+        taggedJobs.sort((a, b) => b.job.timestamp - a.job.timestamp);
 
         // Map jobs to a serializable format
-        const recentJobs = allJobs.slice(0, safeJobLimit).map((job) => ({
+        const recentJobs = taggedJobs.slice(0, safeJobLimit).map(({ job, state }) => ({
           id: job.id,
           name: job.name,
           queueName: name,
-          state: job.failedReason ? 'failed' : (job.finishedOn ? 'completed' : (job.processedOn ? 'active' : 'waiting')),
+          state,
           attemptsMade: job.attemptsMade,
           timestamp: job.timestamp,
           processedOn: job.processedOn ?? null,

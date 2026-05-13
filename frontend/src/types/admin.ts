@@ -158,7 +158,7 @@ export interface AdminUploadMonitoringItem {
   datasetId: string;
   objectKey: string;
   mimeType: string;
-  sizeBytes: number | null;
+  sizeBytes: string | null;
   width: number | null;
   height: number | null;
   status: AdminAssetStatus;

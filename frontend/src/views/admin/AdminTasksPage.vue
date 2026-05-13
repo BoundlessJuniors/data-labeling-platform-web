@@ -20,7 +20,6 @@ const router = useRouter();
 
 const tasks = ref<AdminTaskListItem[]>([]);
 const isLoading = ref(true);
-const isProcessing = ref(false);
 
 const currentPage = ref(1);
 const totalPages = ref(1);
@@ -136,7 +135,11 @@ async function executeConfirmAction() {
   try {
     if (confirmAction.value === 'release') {
       const res = await adminApi.releaseExpiredLeases();
-      toastStore.success(`Başarılı: ${res.data.data?.releasedCount || 0} lease serbest bırakıldı`);
+      const released = res.data.data?.releasedCount || 0;
+      const stale = res.data.data?.staleDeletedCount || 0;
+      let msg = `Başarılı: ${released} lease serbest bırakıldı.`;
+      if (stale > 0) msg += ` (${stale} stale lease silindi)`;
+      toastStore.success(msg);
     } else if (confirmAction.value === 'accept') {
       await adminApi.acceptTask(activeTaskId.value);
       toastStore.success('Görev onaylandı');
@@ -209,12 +212,10 @@ function truncate(str: string | undefined | null, len: number = 8) {
           Filtrele
         </BaseButton>
         <BaseButton
-          :disabled="isProcessing"
           variant="primary"
           @click="promptReleaseLeases"
         >
-          <template v-if="isProcessing">İşleniyor...</template>
-          <template v-else>Release Expired</template>
+          Release Expired
         </BaseButton>
       </div>
     </div>

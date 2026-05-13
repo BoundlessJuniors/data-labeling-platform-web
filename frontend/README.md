@@ -230,6 +230,10 @@ frontend/
 - Payment dashboard üzerinden mock ödeme, escrow ve platform gelirleri read-only olarak izlenebilir.
 - Admin sayfaları `AdminLayout` altında izole çalışır ve client/labeler ekranlarından ayrılır.
 - Annotation debug ekranı yalnızca inceleme ve müdahale amaçlıdır; normal labeler submit akışının yerine geçmez.
+- **Upload Monitoring Ekranı:** Backend'den `sizeBytes` değeri (BigInt serialization hatası önlemi olarak) string formatında gelir. UI'da bu değer güvenli bir şekilde parse edilip gösterilir (`AdminUploadMonitoringItem.sizeBytes`).
+- **Queue Monitoring Ekranı:** BullMQ kuyruk durumlarını zaman damgasından bağımsız, backend'den dönen gerçek BullMQ liste değerlerine (waiting, active, delayed, failed, completed) göre gösterir.
+- **Admin Contracts Ekranı:** Retry Normalize aksiyonu sadece `submitted` durumundaki sözleşmeler için açık olup, genel amaçlı bir "tekrar çalıştır" komutu değildir. İşlem kısıtlamaları ve doğrulama aşaması UI'da net bir şekilde belirtilmiştir.
+- **Admin Tasks Ekranı:** Release Expired işlemi, süresi dolan kilitleri temizler. Backend response'una uyumlu olarak UI üzerinde temizlenen normal lease'leri (`releasedCount`) ve geçersiz asılı kayıtları (`staleDeletedCount`) detaylı bir toast mesajıyla raporlar. Ekranın processing yükleme durumu merkezi `modalLoading` ile yönetilmektedir.
 
 ## 🔐 Authentication Sistemi
 
@@ -379,6 +383,7 @@ VITE_API_URL=http://localhost:3000/api/v1
 - [x] Login/Register hata mesajı gösterimi ve kullanıcı deneyimi iyileştirmeleri
 - [x] SonarQube güvenlik uyarıları için frontend toast ID üretimi iyileştirmesi
 - [x] CSRF entegrasyonu eklendi; unsafe API isteklerinde X-CSRF-Token header’ı memory-only token ile otomatik gönderilir.
+- [x] Admin operasyonel ekranları (Upload, Queue, Contracts, Tasks) için backend response uyumu sağlandı; BigInt serialization koruması eklendi, kuyruk durumları kesinleştirildi ve Retry Normalize / Release Expired lease işlemleri UI üzerinden kontrollü, güvenli senaryolara bağlandı.
 
 ### Geliştirme Bekleyen Özellikler 🔄
 

@@ -51,6 +51,7 @@ npm run dev
 - **SonarQube Güvenlik İyileştirmeleri:** Güvenlik hotspot’ları için zayıf rastgelelik kullanımları temizlendi; QC sample seçimi güvenli random üretimiyle güncellendi.
 - **CSRF, CORS ve Production Security Hardening:** httpOnly cookie tabanlı auth yapısı için signed CSRF token koruması, strict CORS whitelist, JSON-only unsafe request kontrolü ve production ortamında fail-fast güvenlik konfigürasyonu eklendi.
 - **Desktop/Web Auth Ayrımı:** Web tarafı cookie + CSRF modeliyle korunurken Electron desktop istemcisi ayrı `/api/v1/desktop/auth/*` endpointleri ve `Authorization: Bearer` token modeliyle çalışacak şekilde ayrıldı.
+- **Admin Operasyonel Güvenlik İyileştirmeleri:** BigInt (Prisma özel tipleri) API response serialization sızıntıları kapatıldı. Queue state'leri (BullMQ) timestamp türetmesinden kurtarılıp gerçek BullMQ listeleriyle etiketlendi. Retry Normalize sadece `submitted` durumu ve kontrollü senaryolara kilitlendi. Süresi dolan lease (stale lease) temizliği görev durumlarını bozmayacak şekilde güvenli hale getirildi ve admin route'larında UUID param doğrulaması (idParamSchema) sağlandı.
 
 ## 📁 Proje Yapısı
 
@@ -207,7 +208,10 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 
 - Admin paneli; kullanıcı yönetimi, sistem metrikleri, upload takibi, kuyruk izleme, sözleşme/görev/review inceleme ve ödeme gözlemleme işlemlerini destekler.
 - Contract, Task ve Review operasyonları için mevcut root endpoint'ler admin yetkisiyle yeniden kullanılır; gereksiz paralel route kopyaları oluşturulmaz.
-- Annotation debug işlemleri `/api/v1/annotations` altında izole tutulur ve normal labeler submit pipeline'ının yerine geçmez.
+- Annotation debug işlemleri `/api/v1/annotations` altında izole tutulur ve normal labeler submit pipeline'ının yerine geçmez. Bu admin debug route'ları (`GET /annotations/task/:id` dahil) `idParamSchema` ile UUID param doğrulamalarından (validation) geçirilmektedir.
+- BigInt ve Decimal gibi Prisma'ya özel veri tiplerinin API response'a sızarak JSON serialization hatalarına yol açmasını engellemek için, upload monitoring ve task/review detail (QC view) API endpoint'lerinde bu değerler (`sizeBytes` vb.) güvenli bir şekilde string formatına dönüştürülerek döner.
+- Queue Monitoring ekranında queue counts BullMQ'dan çekilir, recent jobs ise gerçek BullMQ state listelerine göre tag'lenir. Tamamlanan işler `removeOnComplete` nedeniyle listede sınırlı/boş olabilir. `recentJobs` listesi timestamp'e göre yeniden eskiye (descending) sıralanır.
+- Retry Normalize özelliği jenerik bir "işlemi baştan başlat" operasyonu değildir; yalnızca `submitted` durumunda, geçerli raw annotation'ları bulunan ve mevcut submission'ı `processing` veya `completed` olmayan sözleşmeler için `pending`/`failed` işlemlerin yeniden denenmesi operasyonudur.
 - Kritik admin mutasyonları `AuditLog` tablosuna kaydedilir.
 - Audit log kayıtları filtreleme ve sayfalama desteğiyle listelenebilir.
 - Kullanıcı detay endpoint'i ilişkili kayıt özetlerini, son proposal verilerini ve ilgili audit log kayıtlarını döner.
@@ -300,7 +304,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | PATCH | `/:id/reject` | Sözleşmeyi revision_requested'a çevir (client) — task statülerini sıfırlar |
 | PATCH | `/:id/cancel` | Sözleşmeyi iptal et (client/admin). İhtilaflı (disputed) durumuna çekebilir. |
 | POST | `/:id/rating` | Sözleşme için etiketleyiciyi (labeler) değerlendir (sadece müşteri) |
-| POST | `/:id/normalize-retry` | Normalize job'ı tekrar enqueue et (admin only) |
+| POST | `/:id/normalize-retry` | Sadece `submitted` statüsündeki failed/pending normalize operasyonunu kontrollü olarak tekrar başlatır (admin only) |
 
 > **Mimari Not:** Doğrudan `POST /contracts` endpoint'i yoktur. Contract oluşturma yalnızca `PATCH /proposals/:id/accept` ile gerçekleşir.
 
@@ -317,11 +321,11 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/:id/submit` | Görevi teslim et — **tam snapshot** (atomic, idempotent via payloadHash) |
 | PATCH | `/:id/accept` | Görevi onayla (QC) |
 | PATCH | `/:id/reject` | Görevi reddet (QC) |
-| POST | `/release-expired` | Süresi dolan kilitleri kaldır (admin) |
+| POST | `/release-expired` | Süresi dolan (expired) kilitleri temizler. Dönüş: `{ releasedCount, staleDeletedCount }` (admin) |
 
 > **Snapshot Semantiği:** `POST /:id/submit` her çağrıda görevin **tamamen nihai annotation**'ını bekler (partial patch değil). Normalize worker her görev için en son geçerli raw kaydı kullanır.
 > 
-> **Lease Semantiği:** Görev kilit işlemleri (`POST /:id/lease` ve `POST /lease-batch`), süresi dolmuş (`leasedUntil <= now`) veya asılı kalmış (stale row) kilitleri otomatik olarak üzerine yazarak (reclaim) sisteme kazandırır. `POST /release-expired` yalnızca yardımcı bir admin opsiyonudur, normal işleyişte gerekli değildir.
+> **Lease Semantiği:** Görev kilit işlemleri (`POST /:id/lease` ve `POST /lease-batch`), süresi dolmuş (`leasedUntil <= now`) veya asılı kalmış (stale row) kilitleri otomatik olarak üzerine yazarak (reclaim) sisteme kazandırır. `POST /release-expired` yalnızca yardımcı bir admin opsiyonudur, normal işleyişte gerekli değildir. Bu temizlik operasyonunda, normal süresi dolmuş `leased` durumundaki görevler `ready` statüsüne döner; `submitted/accepted/rejected` gibi durumlardaki "stale lease" satırları ise görev statüsü korunarak izole şekilde silinir.
 >
 > **QC View Payload İşleme Notu:** `/:id/qc-view` endpointinden dönen verilerdeki annotation payload'ları frontend tarafında akıllıca parse edilir. Örn: `{ type: "export", data: [...] }` formatındaki envelope (zarf) tipli objeler frontend parser (`extractAnnotationShapes`) tarafından artık otomatik ayırt edilip içindeki array üzerinden işlenmektedir. Herhangi bir ekstra backend string manipulation'a gerek kalmadan JSON formatındaki raw/normalized annotation payload'unu olduğu gibi iletmeniz yeterlidir.
 

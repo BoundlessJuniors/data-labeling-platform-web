@@ -205,7 +205,13 @@ export class TaskService {
       throw new ForbiddenError('You do not have access to this task');
     }
 
-    return task;
+    return {
+      ...task,
+      asset: task.asset ? {
+        ...task.asset,
+        sizeBytes: task.asset.sizeBytes?.toString() ?? null,
+      } : null,
+    };
   }
 
   /**
@@ -657,31 +663,44 @@ export class TaskService {
       include: { task: true },
     });
 
+    let releasedCount = 0;
+    let staleDeletedCount = 0;
+
     // Reset tasks and delete leases
     for (const lease of expiredLeases) {
-      await prisma.$transaction([
-        prisma.task.update({
-          where: { id: lease.taskId },
-          data: { status: TaskStatus.ready },
-        }),
-        prisma.taskLease.delete({
+      if (lease.task.status === TaskStatus.leased) {
+        await prisma.$transaction([
+          prisma.task.update({
+            where: { id: lease.taskId },
+            data: { status: TaskStatus.ready },
+          }),
+          prisma.taskLease.delete({
+            where: { taskId: lease.taskId },
+          }),
+        ]);
+        releasedCount++;
+      } else {
+        await prisma.taskLease.delete({
           where: { taskId: lease.taskId },
-        }),
-      ]);
+        });
+        staleDeletedCount++;
+        logger.warn(`Deleted stale expired lease for task ${lease.taskId} with status ${lease.task.status}`);
+      }
     }
 
-    logger.info(`Released ${expiredLeases.length} expired leases`);
+    logger.info(`Released ${releasedCount} expired leases, deleted ${staleDeletedCount} stale leases`);
 
-    if (adminUserId && expiredLeases.length > 0) {
+    if (adminUserId && (releasedCount > 0 || staleDeletedCount > 0)) {
       // Use adminUserId as entityId — AuditLog.entityId is @db.Uuid and 'leases' is not a UUID.
       // The actual scope is captured in metaJson.
       await auditService.logAction(adminUserId, 'task.release_expired_leases', 'system', adminUserId, {
-        releasedCount: expiredLeases.length,
+        releasedCount,
+        staleDeletedCount,
         target: 'expired_task_leases',
       });
     }
 
-    return { releasedCount: expiredLeases.length };
+    return { releasedCount, staleDeletedCount };
   }
 
   /**
@@ -870,7 +889,10 @@ export class TaskService {
     return {
       id: task.id,
       status: task.status,
-      asset: task.asset,
+      asset: task.asset ? {
+        ...task.asset,
+        sizeBytes: task.asset.sizeBytes?.toString() ?? null,
+      } : null,
       imageUrl,
       latestRaw: task.annotationsRaw[0] || null,
       normalized: task.annotationNormalized || null,

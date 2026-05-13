@@ -306,7 +306,7 @@ function truncateString(str: string, len: number = 10) {
                       Revizyon İste
                     </button>
                     <button
-                      v-if="contract.status === 'submitted' || contract.status === 'revision_requested' || contract.status === 'active'"
+                      v-if="contract.status === 'submitted'"
                       class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                       title="Normalize işlemini kuyruğa tekrar ekle"
                       @click="promptRetryNormalize(contract.id)"
@@ -374,7 +374,7 @@ function truncateString(str: string, len: number = 10) {
           Bu sözleşmeyi onaylamak istediğinize emin misiniz? Ödeme labeler'a aktarılacaktır.
         </p>
         <p v-if="confirmAction === 'retry'" class="text-sm text-gray-600 dark:text-gray-300">
-          Bu sözleşmedeki taskları tekrar normalize kuyruğuna almak istediğinize emin misiniz?
+          Sadece submitted durumdaki ve normalize işlemi failed/pending olan sözleşmeler için kullanılmalıdır. Bu sözleşmedeki taskları tekrar normalize kuyruğuna almak istediğinize emin misiniz?
         </p>
         <div v-if="confirmAction === 'revision'">
           <BaseInput

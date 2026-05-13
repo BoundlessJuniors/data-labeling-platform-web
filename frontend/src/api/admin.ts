@@ -176,7 +176,7 @@ export const adminApi = {
     return apiClient.patch<ApiResponse<AdminTaskListItem>>(`/tasks/${id}/reject`, { reason });
   },
   releaseExpiredLeases() {
-    return apiClient.post<ApiResponse<{ releasedCount: number }>>('/tasks/release-expired');
+    return apiClient.post<ApiResponse<{ releasedCount: number; staleDeletedCount?: number }>>('/tasks/release-expired');
   },
   getTaskQcView(id: string) {
     return apiClient.get<ApiResponse<AdminTaskQcViewResponse>>(`/tasks/${id}/qc-view`);

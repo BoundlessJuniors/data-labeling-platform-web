@@ -178,7 +178,16 @@ export class ReviewService {
       throw new ForbiddenError('You do not have access to this review');
     }
 
-    return review;
+    return {
+      ...review,
+      task: {
+        ...review.task,
+        asset: review.task.asset ? {
+          ...review.task.asset,
+          sizeBytes: review.task.asset.sizeBytes?.toString() ?? null,
+        } : null,
+      },
+    };
   }
 
   /**

@@ -112,8 +112,10 @@ function formatDate(dateString: string) {
   });
 }
 
-function formatBytes(bytes: number | null): string {
-  if (bytes === null || bytes === undefined) return '—';
+function formatBytes(bytesVal: string | number | null): string {
+  if (bytesVal === null || bytesVal === undefined || bytesVal === '') return '—';
+  const bytes = Number(bytesVal);
+  if (!Number.isFinite(bytes)) return '—';
   if (bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];

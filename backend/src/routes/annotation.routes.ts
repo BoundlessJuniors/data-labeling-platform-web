@@ -6,6 +6,7 @@ import { validate } from '../middlewares/validate.middleware';
 import { 
   createAnnotationRawSchema,
   normalizeAnnotationSchema,
+  idParamSchema
 } from '../validators/validation.schemas';
 
 // ============================================================================
@@ -57,6 +58,7 @@ router.post(
 router.get(
   '/task/:id',
   adminOnly,
+  validate(idParamSchema, 'params'),
   annotationController.getTaskAnnotations
 );
 
