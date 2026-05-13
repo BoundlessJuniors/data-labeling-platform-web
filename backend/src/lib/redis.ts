@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import Redis, { type RedisOptions } from 'ioredis';
 import logger from './logger';
 
 const REDIS_URL = process.env.REDIS_URL;
@@ -9,6 +9,46 @@ export const redisConfig = {
   password: process.env.REDIS_PASSWORD,
   db: parseInt(process.env.REDIS_DB || '0'),
 };
+
+/**
+ * BullMQ connection options.
+ *
+ * Important:
+ * - Runtime cache Redis client can use REDIS_URL directly.
+ * - BullMQ queues/workers must also use REDIS_URL in production.
+ * - Without this, Render falls back to localhost:6379 and fails.
+ */
+export function getBullMqRedisConnection(): RedisOptions {
+  const baseOptions: RedisOptions = {
+    maxRetriesPerRequest: null,
+  };
+
+  if (REDIS_URL) {
+    const parsed = new URL(REDIS_URL);
+
+    return {
+      ...baseOptions,
+      host: parsed.hostname,
+      port: parsed.port
+        ? Number(parsed.port)
+        : parsed.protocol === 'rediss:'
+          ? 6380
+          : 6379,
+      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+      db:
+        parsed.pathname && parsed.pathname !== '/'
+          ? Number(parsed.pathname.slice(1))
+          : 0,
+      tls: parsed.protocol === 'rediss:' ? {} : undefined,
+    };
+  }
+
+  return {
+    ...baseOptions,
+    ...redisConfig,
+  };
+}
 
 // Create connection
 export const redis = REDIS_URL 

@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client, deleteFromR2Safe } from '../lib/storage';
 import prisma from '../lib/db';
-import { redisConfig, invalidateApiCache } from '../lib/redis';
+import { getBullMqRedisConnection, invalidateApiCache } from '../lib/redis';
 import logger from '../lib/logger';
 import { Readable } from 'stream';
 import { getBetaLimits } from '../config/beta-limits';
@@ -280,12 +280,7 @@ export function startAssetWorker() {
       }
     },
     {
-      connection: {
-        host: redisConfig.host,
-        port: redisConfig.port,
-        password: redisConfig.password,
-        db: redisConfig.db
-      },
+      connection: getBullMqRedisConnection(),
       concurrency: 5, // Process 5 images concurrently
     }
   );

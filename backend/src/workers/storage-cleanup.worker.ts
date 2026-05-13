@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { redisConfig } from '../lib/redis';
+import { getBullMqRedisConnection } from '../lib/redis';
 import logger from '../lib/logger';
 import { storageLifecycleService } from '../services/storage-lifecycle.service';
 
@@ -29,12 +29,7 @@ export function startStorageCleanupWorker() {
       }
     },
     {
-      connection: {
-        host: redisConfig.host,
-        port: redisConfig.port,
-        password: redisConfig.password,
-        db: redisConfig.db,
-      },
+      connection: getBullMqRedisConnection(),
       // Concurrency 1: avoid concurrent purge state conflicts
       concurrency: 1,
     }

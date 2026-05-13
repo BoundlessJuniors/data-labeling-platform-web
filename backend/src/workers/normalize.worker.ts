@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import prisma from '../lib/db';
-import { redisConfig } from '../lib/redis';
+import { getBullMqRedisConnection } from '../lib/redis';
 import logger from '../lib/logger';
 import { normalizeRawPayload } from '../utils/normalize.util';
 import { Prisma } from '@prisma/client';
@@ -141,12 +141,7 @@ export function startNormalizeWorker() {
       }
     },
     {
-      connection: {
-        host: redisConfig.host,
-        port: redisConfig.port,
-        password: redisConfig.password,
-        db: redisConfig.db,
-      },
+      connection: getBullMqRedisConnection(),
       concurrency: 2, // Low concurrency to avoid DB pressure
     }
   );

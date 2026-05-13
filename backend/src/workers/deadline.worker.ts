@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { redisConfig } from '../lib/redis';
+import { getBullMqRedisConnection } from '../lib/redis';
 import logger from '../lib/logger';
 import { deadlineService } from '../services/deadline.service';
 
@@ -25,12 +25,7 @@ export function startDeadlineWorker() {
       }
     },
     {
-      connection: {
-        host: redisConfig.host,
-        port: redisConfig.port,
-        password: redisConfig.password,
-        db: redisConfig.db,
-      },
+      connection: getBullMqRedisConnection(),
       concurrency: 1,
     }
   );

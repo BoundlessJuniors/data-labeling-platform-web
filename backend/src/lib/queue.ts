@@ -1,14 +1,9 @@
 
 import { Queue } from 'bullmq';
-import { redisConfig } from './redis'; // Reuse the redisConfig
+import { getBullMqRedisConnection } from './redis';
 import logger from './logger';
 
-const redisConnection = {
-  host: redisConfig.host,
-  port: redisConfig.port,
-  password: redisConfig.password,
-  db: redisConfig.db,
-};
+const redisConnection = getBullMqRedisConnection();
 
 // Create a new Queue instance for asset processing
 export const assetQueue = new Queue('asset-processing', {
