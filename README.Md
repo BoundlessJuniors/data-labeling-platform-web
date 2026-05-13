@@ -81,7 +81,7 @@ npm run dev
 | **ORM** | Prisma 5.22 |
 | **Database** | PostgreSQL 16 |
 | **Cache** | Redis 7 |
-| **Auth** | JWT (httpOnly cookie) + bcrypt |
+| **Auth** | Web: JWT httpOnly cookie + CSRF; Desktop: JWT Bearer token |
 | **Testing** | Vitest (Frontend) |
 
 ## 🗄️ Veritabanı Şeması
@@ -113,6 +113,7 @@ npm run dev
 | Grup | Endpoint | Açıklama |
 |------|----------|----------|
 | Auth | `/api/v1/auth/*` | Kayıt, giriş, profil |
+| Desktop Auth | `/api/v1/desktop/auth/*` | Electron native-client login, profil, logout |
 | Datasets | `/api/v1/datasets/*` | Dataset CRUD (`?search=` ile isim araması) |
 | Assets | `/api/v1/assets/*` | Görsel yükleme (MinIO/R2) & varlıklar |
 | LabelSets | `/api/v1/labelsets/*` | Etiket setleri (CRUD + edit guard) |
@@ -143,8 +144,9 @@ npm run dev
 
 ## 🔐 Güvenlik
 
-- **Auth:** JWT httpOnly cookie tabanlı oturum yönetimi. Token ve CSRF değerleri asla `localStorage`'da tutulmaz.
-- **CSRF:** Unsafe API metodları (POST/PUT/PATCH/DELETE) için imzalı CSRF token zorunludur (`X-CSRF-Token` header).
+- **Web Auth:** JWT `httpOnly` cookie tabanlı oturum yönetimi. Token ve CSRF değerleri asla `localStorage`'da tutulmaz.
+- **Desktop Auth:** Electron istemcisi `/api/v1/desktop/auth/*` üzerinden `Authorization: Bearer <token>` modeliyle çalışır. Token renderer'a açılmaz, Electron main process tarafında saklanır.
+- **CSRF:** Unsafe browser API metodları (POST/PUT/PATCH/DELETE) için imzalı CSRF token zorunludur (`X-CSRF-Token` header). Cookie kullanmayan bearer-auth desktop istekleri CSRF'ye tabi değildir.
 - **CORS:** Üretimde yalnızca gerçek HTTPS frontend kaynakları kabul edilir. Wildcard ve `localhost` kaynaklarına üretimde izin verilmez.
 - **Startup Validation:** Üretim ortamında `JWT_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE` gibi kritik değişkenler eksikse sunucu başlamaz.
 - **Upload Güvenliği:** Yalnızca JPEG, PNG ve WEBP yüklemelerine izin verilir. Nesne anahtarları MIME türünden türetilen güvenli uzantılarla oluşturulur. Onay öncesi depolama meta verisi doğrulanır, worker Sharp ile gerçek görsel formatını doğrular.

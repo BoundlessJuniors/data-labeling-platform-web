@@ -15,7 +15,7 @@ Görsel veri etiketleme platformu için RESTful API.
 | **Hashing** | fast-json-stable-stringify | ^2.x |
 | **Concurrency** | p-limit | ^6.x |
 | **Image Proc** | Sharp | ^0.33.x |
-| **Auth** | JWT (httpOnly cookie) + bcrypt | ^9.0.3 / ^6.0.0 |
+| **Auth** | Web JWT httpOnly cookie + CSRF; Desktop JWT Bearer token + bcrypt | ^9.0.3 / ^6.0.0 |
 | **Validation** | Joi | ^18.0.2 |
 | **Security** | Helmet, Rate Limiting | ^8.1.0 / ^6.11.2 |
 | **Logging** | Winston | ^3.19.0 |
@@ -50,6 +50,7 @@ npm run dev
 - **Admin Davetiye Yönetimi:** Bekleyen davetiye taleplerinin admin panelinden reddedilebilmesi sağlandı.
 - **SonarQube Güvenlik İyileştirmeleri:** Güvenlik hotspot’ları için zayıf rastgelelik kullanımları temizlendi; QC sample seçimi güvenli random üretimiyle güncellendi.
 - **CSRF, CORS ve Production Security Hardening:** httpOnly cookie tabanlı auth yapısı için signed CSRF token koruması, strict CORS whitelist, JSON-only unsafe request kontrolü ve production ortamında fail-fast güvenlik konfigürasyonu eklendi.
+- **Desktop/Web Auth Ayrımı:** Web tarafı cookie + CSRF modeliyle korunurken Electron desktop istemcisi ayrı `/api/v1/desktop/auth/*` endpointleri ve `Authorization: Bearer` token modeliyle çalışacak şekilde ayrıldı.
 
 ## 📁 Proje Yapısı
 
@@ -174,6 +175,14 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | POST | `/login` | Kullanıcı girişi (httpOnly cookie set) |
 | POST | `/logout` | Çıkış (cookie temizle) |
 | GET | `/profile` | Profil bilgisi (Auth) |
+
+### Desktop Auth Routes (`/api/v1/desktop/auth`)
+
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| POST | `/login` | Desktop login; JSON body içinde desktop bearer token döner, cookie set etmez |
+| POST | `/logout` | Bearer auth ile korunur; mevcut minimal modelde desktop token lokalden silinir |
+| GET | `/profile` | Desktop bearer token ile profil doğrulama |
 
 ### Admin Routes (`/api/v1/admin`)
 
@@ -386,7 +395,7 @@ Request
   → Request Logger 
   → Rate Limiting 
   → CSRF Protection
-  → API Routes (Auth (JWT via httpOnly cookie) → Role Check → Validation → Controller) 
+  → API Routes (Web auth: JWT via httpOnly cookie; Desktop auth: Bearer token → Role Check → Validation → Controller) 
   → Error Handler (Not Found / Global Error)
 ```
 
@@ -433,6 +442,7 @@ REDIS_URL=redis://localhost:6379
 # JWT & Security
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=7d
+DESKTOP_JWT_EXPIRES_IN=24h
 CSRF_SECRET=optional-secret-key
 COOKIE_SAMESITE=lax
 
@@ -453,7 +463,7 @@ STORAGE_ALLOWED_ORIGINS="http://localhost:5173"
 
 ## 🔐 Authentication
 
-JWT tabanlı authentication sistemi (`httpOnly` cookie):
+Web authentication sistemi (`httpOnly` cookie + CSRF):
 
 1. **Register/Login** → Sunucu JWT'yi `httpOnly`, `secure`, `SameSite` cookie olarak set eder
 2. **Her istekte** → Tarayıcı cookie'yi otomatik gönderir (frontend `withCredentials: true`)
@@ -462,6 +472,14 @@ JWT tabanlı authentication sistemi (`httpOnly` cookie):
 5. **Token expire** → Yeniden login gerekli
 
 > **Not:** JWT ve CSRF token response body'de dönülüp `localStorage`'da tutulmaz — XSS saldırılarına karşı güvenli.
+
+Desktop authentication sistemi (`Authorization: Bearer`):
+
+1. **Desktop Login** → `POST /api/v1/desktop/auth/login` JSON içinde `clientType: "desktop"` claim'li bearer token döner, cookie set etmez.
+2. **Desktop API çağrıları** → Electron main process `Authorization: Bearer <token>` header'ını ekler; renderer token'a erişmez.
+3. **CSRF sınırı** → Bearer token cookie gibi ambient credential olmadığı için desktop bearer istekleri CSRF kontrolüne tabi değildir. Web cookie isteklerinde CSRF zorunlu kalır.
+4. **Logout** → `POST /api/v1/desktop/auth/logout` bearer auth ile korunur; mevcut minimal modelde server-side revoke yoktur, desktop token lokalden silinir.
+5. **Production hardening TODO** → Desktop için `DesktopSession` tablosu, hash'li refresh token saklama, refresh token rotation ve session revocation eklenecektir.
 
 ### 🛡️ Security Hardening
 

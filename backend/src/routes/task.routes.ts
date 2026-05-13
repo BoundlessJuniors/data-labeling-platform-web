@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as taskController from '../controllers/task.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticateAny } from '../middlewares/auth.middleware';
 import { adminOnly } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { 
@@ -14,7 +14,7 @@ import {
 const router = Router();
 
 // All task routes require authentication
-router.use(authenticate);
+router.use(authenticateAny);
 
 // GET /api/tasks - Get all tasks
 router.get(

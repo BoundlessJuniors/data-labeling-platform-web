@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as assetController from '../controllers/asset.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, authenticateAny } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { updateAssetSchema, idParamSchema, initiateUploadSchema } from '../validators/validation.schemas';
 
@@ -14,7 +14,7 @@ const router = Router();
 // contract cancellations, or asset deletions.
 router.get(
   '/',
-  authenticate,
+  authenticateAny,
   assetController.getAssets,
 );
 
@@ -38,7 +38,7 @@ router.post(
 // NOTE: cacheMiddleware is intentionally omitted — see comment on GET / above.
 router.get(
   '/:id',
-  authenticate,
+  authenticateAny,
   validate(idParamSchema, 'params'),
   assetController.getAssetById,
 );

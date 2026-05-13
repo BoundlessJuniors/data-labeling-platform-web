@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as contractController from '../controllers/contract.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticateAny } from '../middlewares/auth.middleware';
 import { adminOrLabeler, adminOrClient, adminOnly } from '../middlewares/role.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { 
@@ -16,7 +16,7 @@ import {
 const router = Router();
 
 // All contract routes require authentication
-router.use(authenticate);
+router.use(authenticateAny);
 
 // ============================================================================
 // ARCHITECTURAL NOTE:

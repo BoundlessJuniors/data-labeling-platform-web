@@ -1,4 +1,5 @@
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+export const DESKTOP_JWT_EXPIRES_IN = process.env.DESKTOP_JWT_EXPIRES_IN || JWT_EXPIRES_IN || '24h';
 
 export const parseExpirationToMs = (expiresIn: string): number => {
   const match = expiresIn.match(/^(\d+)([dhms])$/);

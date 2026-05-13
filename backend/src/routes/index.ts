@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import desktopAuthRoutes from './desktop-auth.routes';
 import datasetRoutes from './dataset.routes';
 import assetRoutes from './asset.routes';
 import labelsetRoutes from './labelset.routes';
@@ -20,7 +21,9 @@ import { idParamSchema } from '../validators/validation.schemas';
 const router = Router();
 
 // Mount all route modules
+// Mount all route modules
 router.use('/auth', authRoutes);
+router.use('/desktop/auth', desktopAuthRoutes);
 router.use('/datasets', datasetRoutes);
 router.use('/assets', assetRoutes);
 router.use('/labelsets', labelsetRoutes);

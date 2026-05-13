@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import prisma from '../lib/db';
-import { generateToken } from '../middlewares/auth.middleware';
+import { generateToken, generateDesktopToken } from '../middlewares/auth.middleware';
 import { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } from '../utils/errors';
 import logger from '../lib/logger';
 import { UserRole, InviteRequestStatus } from '@prisma/client';
@@ -105,6 +105,7 @@ export class AuthService {
         userId: user.id,
         email: user.email,
         role: user.role,
+        clientType: 'browser',
       });
 
       logger.info(`User registered: ${user.email}`);
@@ -152,7 +153,7 @@ export class AuthService {
   /**
    * Login user
    */
-  async login(data: { email: string; password: string }) {
+  async login(data: { email: string; password: string; clientType?: 'browser' | 'desktop' }) {
     const normalizedEmail = data.email.trim().toLowerCase();
 
     // Find user
@@ -172,11 +173,17 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const token = generateToken({
+    const payload = {
       userId: user.id,
       email: user.email,
       role: user.role,
-    });
+      clientType: data.clientType || 'browser',
+    };
+    
+    const token = payload.clientType === 'desktop' 
+      ? generateDesktopToken(payload) 
+      : generateToken(payload);
+
 
     logger.info(`User logged in: ${user.email}`);
 

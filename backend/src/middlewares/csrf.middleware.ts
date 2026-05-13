@@ -77,6 +77,30 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   // Safe methods pass immediately
   if (!UNSAFE_METHODS.has(method)) return next();
 
+  // --- Desktop login CSRF bypass ---
+  // The desktop login endpoint receives credentials but no cookies, and desktop clients
+  // do not send Origin/Referer natively. We explicitly allow POST /api/v1/desktop/auth/login.
+  // We strictly check the exact path to prevent bypassing CSRF globally.
+  if (req.originalUrl.split('?')[0] === '/api/v1/desktop/auth/login' && method === 'POST') {
+    return next();
+  }
+
+  // --- Bearer token CSRF bypass ---
+  // If the request is authenticated with a Bearer token and contains NO cookies
+  // that could be abused by an ambient cross-site request, we can safely bypass CSRF.
+  // Explicit Authorization headers are not automatically sent by browsers cross-site.
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const hasTokenCookie = !!req.cookies?.token;
+    const hasCsrfCookie = !!req.cookies?.csrf_token;
+    
+    // Narrow bypass: Only skip CSRF if no auth/csrf cookies are present.
+    // If a cookie is present, we still enforce CSRF to prevent mixed-auth attacks.
+    if (!hasTokenCookie && !hasCsrfCookie) {
+      return next();
+    }
+  }
+
   const allowedOrigins = getAllowedOrigins();
 
   // --- 1. Origin/Referer validation ---
