@@ -70,6 +70,7 @@ backend/
 │   │   ├── auth.controller.ts
 │   │   ├── admin.controller.ts
 │   │   ├── dataset.controller.ts
+│   │   ├── desktop-auth.controller.ts
 │   │   ├── asset.controller.ts
 │   │   ├── labelset.controller.ts
 │   │   ├── listing.controller.ts
@@ -109,6 +110,7 @@ backend/
 │   │   ├── auth.routes.ts
 │   │   ├── admin.routes.ts
 │   │   ├── dataset.routes.ts
+│   │   ├── desktop-auth.routes.ts
 │   │   ├── asset.routes.ts
 │   │   ├── labelset.routes.ts
 │   │   ├── listing.routes.ts
