@@ -33,6 +33,11 @@ export function getCsrfSecret(): string {
   return process.env.CSRF_SECRET || getJwtSecret();
 }
 
+/** Lazily read DESKTOP_REFRESH_TOKEN_SECRET. Required in production. */
+export function getDesktopRefreshTokenSecret(): string {
+  return process.env.DESKTOP_REFRESH_TOKEN_SECRET || getJwtSecret();
+}
+
 // ---------------------------------------------------------------------------
 // CORS origin list
 // ---------------------------------------------------------------------------
@@ -298,6 +303,36 @@ export function validateSecurityConfig(): void {
     const msg = 'CSRF_SECRET must be at least 32 characters if provided';
     if (prod) errors.push(msg);
     else warnings.push(msg);
+  }
+
+  // --- DESKTOP_REFRESH_TOKEN_SECRET (production-only) ---
+  if (prod) {
+    const desktopRefreshSecret = process.env.DESKTOP_REFRESH_TOKEN_SECRET;
+    if (!desktopRefreshSecret) {
+      errors.push('DESKTOP_REFRESH_TOKEN_SECRET is required in production');
+    } else if (desktopRefreshSecret.length < 32) {
+      errors.push('DESKTOP_REFRESH_TOKEN_SECRET must be at least 32 characters in production');
+    }
+  } else {
+    if (!process.env.DESKTOP_REFRESH_TOKEN_SECRET) {
+      warnings.push('DESKTOP_REFRESH_TOKEN_SECRET is missing. Falling back to JWT_SECRET for desktop refresh tokens in development.');
+    }
+  }
+
+  // --- Object storage (production-only) ---
+  if (prod) {
+    const requiredStorageVars = [
+      'R2_ACCOUNT_ID',
+      'R2_ACCESS_KEY_ID',
+      'R2_SECRET_ACCESS_KEY',
+      'R2_BUCKET_NAME',
+    ];
+
+    for (const name of requiredStorageVars) {
+      if (!process.env[name]) {
+        errors.push(`${name} is required in production`);
+      }
+    }
   }
 
   // Emit warnings in development

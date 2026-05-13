@@ -183,7 +183,7 @@ Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test ed
 | Method | Endpoint | Açıklama |
 |--------|----------|----------|
 | POST | `/login` | Desktop login; JSON body içinde desktop bearer token döner, cookie set etmez |
-| POST | `/logout` | Bearer auth ile korunur; mevcut minimal modelde desktop token lokalden silinir |
+| POST | `/logout` | Bearer auth ile korunur; server-side session revoke edilir ve lokal token'lar silinir |
 | GET | `/profile` | Desktop bearer token ile profil doğrulama |
 
 ### Admin Routes (`/api/v1/admin`)
@@ -426,6 +426,14 @@ docker-compose up -d
 | Redis | 6379 | labelgun-redis |
 | MinIO | 9000 (API) / 9001 (Console) | labelgun-minio |
 
+### Desktop authentication sistemi (`Authorization: Bearer`):
+
+1. **Desktop Login** -> `POST /api/v1/desktop/auth/login` JSON içinde `clientType: "desktop"` ve `tokenUse: "access"` claim'li kisa ömürlü (15m) bearer token, uzun ömürlü (30d) opaque refresh token ve bir `sessionId` döner. Cookie set etmez.
+2. **Desktop API Çağrıları** -> Electron main process `Authorization: Bearer <accessToken>` header'ını ekler; renderer token'lara erişemez.
+3. **Refresh Rotation** -> Süresi dolan access token'lar, arka planda `POST /api/v1/desktop/auth/refresh` çağrısı ile yenilenir. Her yenilemede `refreshToken` güncellenir ve veritabanında `DesktopSession` tablosu üzerinde versiyon artırılır. Eski veya tekrar kullanılan bir refresh token yakalanırsa güvenlik gereği oturum iptal edilir (revoked).
+4. **CSRF Sınırı** -> Bearer token cookie gibi ambient credential olmadığı için desktop bearer istekleri CSRF kontrolüne tabi değildir. Web cookie isteklerinde CSRF zorunlu kalır. `/refresh` endpointi cookie göndermediği sürece CSRF denetimini by-pass eder.
+5. **Logout & Session Revocation** -> `POST /api/v1/desktop/auth/logout` çağrısı veritabanındaki `DesktopSession` kaydını anında `revokedAt` ile işaretler ve oturumu kalıcı olarak sunucu tarafında geçersiz kılar. Lokal token'lar da temizlenir.
+
 ## 🔧 Environment Variables
 
 `.env.example` dosyasını `.env` olarak kopyala:
@@ -444,7 +452,9 @@ REDIS_URL=redis://localhost:6379
 # JWT & Security
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=7d
-DESKTOP_JWT_EXPIRES_IN=24h
+DESKTOP_ACCESS_TOKEN_EXPIRES_IN=15m
+DESKTOP_REFRESH_TOKEN_EXPIRES_IN=30d
+DESKTOP_REFRESH_TOKEN_SECRET=your-refresh-token-secret-for-desktop
 CSRF_SECRET=optional-secret-key
 COOKIE_SAMESITE=lax
 
@@ -477,17 +487,17 @@ Web authentication sistemi (`httpOnly` cookie + CSRF):
 
 Desktop authentication sistemi (`Authorization: Bearer`):
 
-1. **Desktop Login** → `POST /api/v1/desktop/auth/login` JSON içinde `clientType: "desktop"` claim'li bearer token döner, cookie set etmez.
-2. **Desktop API çağrıları** → Electron main process `Authorization: Bearer <token>` header'ını ekler; renderer token'a erişmez.
-3. **CSRF sınırı** → Bearer token cookie gibi ambient credential olmadığı için desktop bearer istekleri CSRF kontrolüne tabi değildir. Web cookie isteklerinde CSRF zorunlu kalır.
-4. **Logout** → `POST /api/v1/desktop/auth/logout` bearer auth ile korunur; mevcut minimal modelde server-side revoke yoktur, desktop token lokalden silinir.
-5. **Production hardening TODO** → Desktop için `DesktopSession` tablosu, hash'li refresh token saklama, refresh token rotation ve session revocation eklenecektir.
+1. **Desktop Login** → `POST /api/v1/desktop/auth/login` JSON içinde kısa ömürlü access token, opaque refresh token ve `sessionId` döner; cookie set etmez.
+2. **Desktop API çağrıları** → Electron main process `Authorization: Bearer <accessToken>` header'ını ekler; renderer token'a erişmez.
+3. **Refresh rotation** → `POST /api/v1/desktop/auth/refresh` refresh token'ı döndürür; backend yalnızca HMAC-SHA256 hash saklar ve `DesktopSession` üzerinden revocation/expiry kontrolü yapar.
+4. **CSRF sınırı** → Bearer token cookie gibi ambient credential olmadığı için desktop bearer istekleri CSRF kontrolüne tabi değildir. Web cookie isteklerinde CSRF zorunlu kalır.
+5. **Logout** → `POST /api/v1/desktop/auth/logout` bearer auth ile korunur; server-side olarak `revokedAt` set edilerek oturum geçersiz kılınır ve lokal token'lar temizlenir.
 
 ### 🛡️ Security Hardening
 
 **CORS & Startup Validation**
 - Production `ALLOWED_ORIGINS` must be real HTTPS frontend origins. Localhost and wildcard origins are rejected at startup.
-- Critical environment variables (`JWT_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE`) are validated on startup; the server refuses to start if any are missing or insecure in production.
+- Critical environment variables (`JWT_SECRET`, `DESKTOP_REFRESH_TOKEN_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE`, and R2 storage credentials) are validated on startup; the server refuses to start if any are missing or insecure in production.
 - `CSRF_SECRET` is optional but recommended in production for stronger CSRF token signing.
 
 **Upload Pipeline**

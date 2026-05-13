@@ -3,6 +3,9 @@ import prisma from '../lib/db';
 import { generateToken, generateDesktopToken } from '../middlewares/auth.middleware';
 import { ConflictError, UnauthorizedError, NotFoundError, BadRequestError } from '../utils/errors';
 import logger from '../lib/logger';
+import crypto from 'node:crypto';
+import { getDesktopRefreshTokenSecret } from '../config/security';
+import { parseExpirationToMs, DESKTOP_REFRESH_TOKEN_EXPIRES_IN, DESKTOP_JWT_EXPIRES_IN } from '../utils/auth.util';
 import { UserRole, InviteRequestStatus } from '@prisma/client';
 import { getBetaLimits } from '../config/beta-limits';
 
@@ -151,9 +154,9 @@ export class AuthService {
 
 
   /**
-   * Login user
+   * Login user specifically for Browser/Web, issuing an httpOnly cookie.
    */
-  async login(data: { email: string; password: string; clientType?: 'browser' | 'desktop' }) {
+  async login(data: { email: string; password: string }) {
     const normalizedEmail = data.email.trim().toLowerCase();
 
     // Find user
@@ -177,12 +180,10 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       role: user.role,
-      clientType: data.clientType || 'browser',
+      clientType: 'browser' as const,
     };
     
-    const token = payload.clientType === 'desktop' 
-      ? generateDesktopToken(payload) 
-      : generateToken(payload);
+    const token = generateToken(payload);
 
 
     logger.info(`User logged in: ${user.email}`);
@@ -196,6 +197,181 @@ export class AuthService {
       },
       token,
     };
+  }
+
+  /**
+   * Login user specifically for Desktop Client, issuing access and refresh tokens.
+   */
+  async loginDesktop(data: { email: string; password: string; deviceName?: string; userAgent?: string; ipAddress?: string }) {
+    const normalizedEmail = data.email.trim().toLowerCase();
+
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      throw new UnauthorizedError('Invalid email or password');
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(data.password, user.passwordHash);
+
+    if (!isValidPassword) {
+      throw new UnauthorizedError('Invalid email or password');
+    }
+
+    const sessionId = crypto.randomUUID();
+    const randomSecret = crypto.randomBytes(64).toString('hex');
+    const refreshTokenHash = crypto.createHmac('sha256', getDesktopRefreshTokenSecret()).update(randomSecret).digest('hex');
+    const rawRefreshToken = `${sessionId}.${randomSecret}`;
+
+    const nowMs = Date.now();
+    const accessTokenExpiresAt = new Date(nowMs + parseExpirationToMs(DESKTOP_JWT_EXPIRES_IN));
+    const refreshTokenExpiresAt = new Date(nowMs + parseExpirationToMs(DESKTOP_REFRESH_TOKEN_EXPIRES_IN));
+
+    await prisma.desktopSession.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        refreshTokenHash,
+        deviceName: data.deviceName,
+        userAgent: data.userAgent,
+        ipAddress: data.ipAddress,
+        accessTokenExpiresAt,
+        refreshTokenExpiresAt,
+        lastUsedAt: new Date(),
+      }
+    });
+
+    // Generate JWT token
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      clientType: 'desktop' as const,
+      sessionId,
+      tokenUse: 'access' as const,
+    };
+    
+    const token = generateDesktopToken(payload);
+
+    logger.info(`User logged in from desktop: ${user.email}`);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        displayName: user.displayName,
+      },
+      accessToken: token,
+      refreshToken: rawRefreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt,
+      sessionId,
+    };
+  }
+
+  /**
+   * Refresh Desktop Session and rotate refresh token.
+   */
+  async refreshDesktopSession(refreshToken: string) {
+    if (typeof refreshToken !== 'string') {
+      throw new UnauthorizedError('Invalid refresh token format');
+    }
+
+    const parts = refreshToken.split('.');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new UnauthorizedError('Invalid refresh token format');
+    }
+
+    const [sessionId, randomSecret] = parts;
+    
+    const session = await prisma.desktopSession.findUnique({
+      where: { id: sessionId },
+      include: { user: true }
+    });
+
+    if (!session) {
+      throw new UnauthorizedError('Invalid or expired session');
+    }
+
+    const providedHash = crypto.createHmac('sha256', getDesktopRefreshTokenSecret()).update(randomSecret).digest('hex');
+
+    if (session.refreshTokenHash !== providedHash) {
+      // Refresh token reuse or mismatch - revoke session immediately for safety
+      await prisma.desktopSession.update({
+        where: { id: sessionId },
+        data: { revokedAt: new Date(), revokedReason: 'refresh_token_reuse' }
+      });
+      throw new UnauthorizedError('Invalid or expired session');
+    }
+
+    if (session.revokedAt) {
+      throw new UnauthorizedError('Invalid or expired session');
+    }
+
+    if (session.refreshTokenExpiresAt < new Date()) {
+      throw new UnauthorizedError('Invalid or expired session');
+    }
+
+    const newRandomSecret = crypto.randomBytes(64).toString('hex');
+    const newRefreshTokenHash = crypto.createHmac('sha256', getDesktopRefreshTokenSecret()).update(newRandomSecret).digest('hex');
+    const rawNewRefreshToken = `${sessionId}.${newRandomSecret}`;
+
+    const nowMs = Date.now();
+    const newAccessTokenExpiresAt = new Date(nowMs + parseExpirationToMs(DESKTOP_JWT_EXPIRES_IN));
+    const newRefreshTokenExpiresAt = new Date(nowMs + parseExpirationToMs(DESKTOP_REFRESH_TOKEN_EXPIRES_IN));
+
+    const result = await prisma.desktopSession.updateMany({
+      where: {
+        id: sessionId,
+        refreshTokenHash: providedHash,
+        refreshTokenVersion: session.refreshTokenVersion,
+        revokedAt: null
+      },
+      data: {
+        refreshTokenHash: newRefreshTokenHash,
+        refreshTokenVersion: session.refreshTokenVersion + 1,
+        lastUsedAt: new Date(),
+        accessTokenExpiresAt: newAccessTokenExpiresAt,
+        refreshTokenExpiresAt: newRefreshTokenExpiresAt,
+      }
+    });
+
+    if (result.count === 0) {
+      throw new UnauthorizedError('Invalid or expired session');
+    }
+
+    const payload = {
+      userId: session.user.id,
+      email: session.user.email,
+      role: session.user.role,
+      clientType: 'desktop' as const,
+      sessionId,
+      tokenUse: 'access' as const,
+    };
+
+    const newAccessToken = generateDesktopToken(payload);
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: rawNewRefreshToken,
+      accessTokenExpiresAt: newAccessTokenExpiresAt,
+      refreshTokenExpiresAt: newRefreshTokenExpiresAt,
+      sessionId,
+    };
+  }
+
+  /**
+   * Revoke Desktop Session.
+   */
+  async revokeDesktopSession(sessionId: string) {
+    await prisma.desktopSession.updateMany({
+      where: { id: sessionId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: 'logout' }
+    });
   }
 
   /**

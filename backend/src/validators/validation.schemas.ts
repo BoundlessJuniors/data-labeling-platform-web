@@ -467,3 +467,15 @@ export const qcSampleQuerySchema = Joi.object({
   }),
 });
 
+// ============================================================================
+// Desktop Auth Schemas
+// ============================================================================
+
+export const desktopRefreshSchema = Joi.object({
+  refreshToken: Joi.string().trim().min(32).required().messages({
+    'any.required': 'Refresh token is required',
+    'string.empty': 'Refresh token cannot be empty',
+    'string.min': 'Refresh token is invalid',
+  }),
+});
+

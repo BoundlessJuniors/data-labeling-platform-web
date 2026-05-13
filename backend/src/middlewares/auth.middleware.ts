@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     role: UserRole;
+    sessionId?: string;
   };
 }
 
@@ -20,6 +21,8 @@ export interface JwtPayload {
   email: string;
   role: UserRole;
   clientType?: 'browser' | 'desktop';
+  sessionId?: string;
+  tokenUse?: 'access';
 }
 
 export const authenticate = async (
@@ -124,6 +127,30 @@ export const authenticateBearer = async (
       throw new UnauthorizedError('Token is not a desktop client token');
     }
 
+    if (decoded.tokenUse !== 'access' || !decoded.sessionId) {
+      throw new UnauthorizedError('Invalid token format');
+    }
+
+    const session = await prisma.desktopSession.findUnique({
+      where: { id: decoded.sessionId }
+    });
+
+    if (!session) {
+      throw new UnauthorizedError('Session not found');
+    }
+
+    if (session.userId !== decoded.userId) {
+      throw new UnauthorizedError('Session user mismatch');
+    }
+
+    if (session.revokedAt) {
+      throw new UnauthorizedError('Session revoked');
+    }
+
+    if (session.refreshTokenExpiresAt < new Date()) {
+      throw new UnauthorizedError('Session expired');
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: { id: true, email: true, role: true },
@@ -137,6 +164,7 @@ export const authenticateBearer = async (
       id: user.id,
       email: user.email,
       role: user.role,
+      sessionId: decoded.sessionId,
     };
 
     next();

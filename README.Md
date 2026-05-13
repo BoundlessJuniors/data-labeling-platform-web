@@ -148,7 +148,7 @@ npm run dev
 - **Desktop Auth:** Electron istemcisi `/api/v1/desktop/auth/*` üzerinden `Authorization: Bearer <token>` modeliyle çalışır. Token renderer'a açılmaz, Electron main process tarafında saklanır.
 - **CSRF:** Unsafe browser API metodları (POST/PUT/PATCH/DELETE) için imzalı CSRF token zorunludur (`X-CSRF-Token` header). Cookie kullanmayan bearer-auth desktop istekleri CSRF'ye tabi değildir.
 - **CORS:** Üretimde yalnızca gerçek HTTPS frontend kaynakları kabul edilir. Wildcard ve `localhost` kaynaklarına üretimde izin verilmez.
-- **Startup Validation:** Üretim ortamında `JWT_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE` gibi kritik değişkenler eksikse sunucu başlamaz.
+- **Startup Validation:** Üretim ortamında `JWT_SECRET`, `DESKTOP_REFRESH_TOKEN_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE` ve R2 storage değişkenleri eksikse sunucu başlamaz.
 - **Upload Güvenliği:** Yalnızca JPEG, PNG ve WEBP yüklemelerine izin verilir. Nesne anahtarları MIME türünden türetilen güvenli uzantılarla oluşturulur. Onay öncesi depolama meta verisi doğrulanır, worker Sharp ile gerçek görsel formatını doğrular.
 - **Storage CORS:** Doğrudan yükleme için yalnızca açık kaynaklar, `PUT/GET/HEAD` metodları ve sınırlı başlıklara izin verilir.
 

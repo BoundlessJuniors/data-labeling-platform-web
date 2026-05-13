@@ -180,6 +180,7 @@ model User {
   submissions           Submission[]
   inviteCodesCreated    InviteCode[]           @relation("InviteCodeCreatedBy")
   inviteCodesUsed       InviteCode?            @relation("InviteCodeUsedBy")
+  desktopSessions       DesktopSession[]
 
   @@map("users")
 }
@@ -396,10 +397,10 @@ model Contract {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  proposal      Proposal?      @relation(fields: [proposalId], references: [id])
-  listing       Listing        @relation(fields: [listingId], references: [id])
-  client        User           @relation("ContractClient", fields: [clientUserId], references: [id])
-  labeler       User           @relation("ContractLabeler", fields: [labelerUserId], references: [id])
+  proposal      Proposal?       @relation(fields: [proposalId], references: [id])
+  listing       Listing         @relation(fields: [listingId], references: [id])
+  client        User            @relation("ContractClient", fields: [clientUserId], references: [id])
+  labeler       User            @relation("ContractLabeler", fields: [labelerUserId], references: [id])
   rating        ContractRating?
   tasks         Task[]
   payments      Payment[]
@@ -774,4 +775,34 @@ model ContractRating {
   @@index([rating])
   @@index([createdAt])
   @@map("contract_ratings")
+}
+
+// ============================================================================
+// 21. DESKTOP SESSIONS
+// Desktop application session and refresh token management.
+// ============================================================================
+
+model DesktopSession {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  refreshTokenHash      String    @map("refresh_token_hash")
+  refreshTokenVersion   Int       @default(1) @map("refresh_token_version")
+  deviceName            String?   @map("device_name")
+  userAgent             String?   @map("user_agent")
+  ipAddress             String?   @map("ip_address")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt            DateTime? @map("last_used_at") @db.Timestamptz
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz
+  refreshTokenExpiresAt DateTime  @map("refresh_token_expires_at") @db.Timestamptz
+  revokedAt             DateTime? @map("revoked_at") @db.Timestamptz
+  revokedReason         String?   @map("revoked_reason")
+  replacedBySessionId   String?   @map("replaced_by_session_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@index([revokedAt])
+  @@index([refreshTokenExpiresAt])
+  @@map("desktop_sessions")
 }
