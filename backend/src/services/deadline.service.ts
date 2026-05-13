@@ -4,6 +4,8 @@ import logger from '../lib/logger';
 import { invalidateApiCache } from '../lib/redis';
 import { storageLifecycleService } from './storage-lifecycle.service';
 
+const logDeadlineScans = process.env.LOG_DEADLINE_SCANS === 'true';
+
 export interface DeadlineProcessSummary {
   expiredPendingPayments: number;
   markedOverdue: number;
@@ -25,7 +27,9 @@ export class DeadlineService {
       autoApproved: 0,
     };
 
-    logger.info('[DeadlineService] Starting deadline scan...');
+    if (logDeadlineScans) {
+      logger.info('[DeadlineService] Starting deadline scan...');
+    }
 
     try {
       summary.expiredPendingPayments = await this.expirePendingPayments(now, batchSize);
@@ -34,7 +38,10 @@ export class DeadlineService {
       summary.autoDisputedRevisions = await this.autoDisputeExpiredRevisions(now, batchSize);
       summary.autoApproved = await this.autoApproveSubmittedContracts(now, batchSize);
       
-      logger.info(`[DeadlineService] Processed deadlines: ${JSON.stringify(summary)}`);
+      const hasChanges = Object.values(summary).some((count) => count > 0);
+      if (hasChanges || logDeadlineScans) {
+        logger.info(`[DeadlineService] Processed deadlines: ${JSON.stringify(summary)}`);
+      }
     } catch (error) {
       logger.error('[DeadlineService] Error during processDeadlines:', error);
     }

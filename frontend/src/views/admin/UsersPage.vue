@@ -304,8 +304,8 @@ function formatDate(dateString: string) {
     <div v-if="detailLoading" class="py-8 text-center text-slate-500 text-sm">Yükleniyor...</div>
     <div v-else-if="detailUser" class="space-y-6">
       <div class="grid grid-cols-2 gap-4">
-        <div class="bg-slate-50 p-3 rounded border border-slate-200">
-          <p class="text-xs text-slate-500 uppercase tracking-wider">Temel Bilgiler</p>
+        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-200 dark:border-slate-700">
+          <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Temel Bilgiler</p>
           <p class="font-medium text-sm mt-1">İsim: {{ detailUser.displayName || 'Yok' }}</p>
           <p class="font-medium text-sm">Email: {{ detailUser.email }}</p>
           <p class="font-medium text-sm">Rol: <span class="capitalize">{{ detailUser.role }}</span></p>
@@ -313,8 +313,8 @@ function formatDate(dateString: string) {
           <p class="font-medium text-sm">Puan: {{ detailUser.ratingAvg ? `${detailUser.ratingAvg} (${detailUser.ratingCount || 0})` : 'Yok' }}</p>
         </div>
 
-        <div class="bg-slate-50 p-3 rounded border border-slate-200">
-          <p class="text-xs text-slate-500 uppercase tracking-wider">İlişki Sayıları</p>
+        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-200 dark:border-slate-700">
+          <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">İlişki Sayıları</p>
           <p class="font-medium text-sm mt-1">Datasets: {{ detailUser._count?.datasets ?? 0 }}</p>
           <p class="font-medium text-sm">Listings: {{ detailUser._count?.listingsOwned ?? 0 }}</p>
           <p class="font-medium text-sm">Contracts (Client): {{ detailUser._count?.contractsAsClient ?? 0 }}</p>
@@ -326,23 +326,23 @@ function formatDate(dateString: string) {
 
       <!-- Recent interactions snippet if necessary -->
       <div v-if="detailUser.auditLogs?.length" class="mt-4">
-        <h4 class="text-sm font-semibold mb-2">Son 5 Admin Aktivitesi (Audit Logs)</h4>
+        <h4 class="text-sm font-semibold mb-2 dark:text-slate-200">Son 5 Admin Aktivitesi (Audit Logs)</h4>
         <ul class="text-xs space-y-1">
-          <li v-for="log in detailUser.auditLogs" :key="log.id" class="flex justify-between bg-white border border-slate-200 rounded px-2 py-1">
-            <span class="font-mono text-blue-600">{{ log.action }}</span>
-            <span class="text-slate-500">{{ formatDate(log.createdAt) }}</span>
+          <li v-for="log in detailUser.auditLogs" :key="log.id" class="flex justify-between bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1">
+            <span class="font-mono text-blue-600 dark:text-blue-400">{{ log.action }}</span>
+            <span class="text-slate-500 dark:text-slate-400">{{ formatDate(log.createdAt) }}</span>
           </li>
         </ul>
       </div>
       <div v-if="detailUser.proposals?.length" class="mt-4">
-        <h4 class="text-sm font-semibold mb-2">Son 5 Teklif (Proposals)</h4>
+        <h4 class="text-sm font-semibold mb-2 dark:text-slate-200">Son 5 Teklif (Proposals)</h4>
         <ul class="text-xs space-y-1">
-          <li v-for="p in detailUser.proposals" :key="p.id" class="flex flex-col bg-white border border-slate-200 rounded px-2 py-1">
+          <li v-for="p in detailUser.proposals" :key="p.id" class="flex flex-col bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1">
             <div class="flex justify-between">
-              <span class="font-mono">{{ p.status }}</span>
-              <span class="text-slate-500">{{ p.priceQuote }}</span>
+              <span class="font-mono dark:text-slate-300">{{ p.status }}</span>
+              <span class="text-slate-500 dark:text-slate-400">{{ p.priceQuote }}</span>
             </div>
-            <span class="text-slate-400 mt-1 line-clamp-1 border-t border-slate-100 pt-1">{{ formatDate(p.createdAt) }}</span>
+            <span class="text-slate-400 dark:text-slate-500 mt-1 line-clamp-1 border-t border-slate-100 dark:border-slate-700 pt-1">{{ formatDate(p.createdAt) }}</span>
           </li>
         </ul>
       </div>

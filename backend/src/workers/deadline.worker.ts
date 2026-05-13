@@ -4,6 +4,7 @@ import logger from '../lib/logger';
 import { deadlineService } from '../services/deadline.service';
 
 let deadlineWorker: Worker | null = null;
+const logDeadlineScans = process.env.LOG_DEADLINE_SCANS === 'true';
 
 export function startDeadlineWorker() {
   if (deadlineWorker) {
@@ -15,7 +16,9 @@ export function startDeadlineWorker() {
     'deadline-processing',
     async (job) => {
       if (job.name === 'scan-deadlines') {
-        logger.info(`[DeadlineWorker] Starting scheduled deadline scan (Job ID: ${job.id})`);
+        if (logDeadlineScans) {
+          logger.info(`[DeadlineWorker] Starting scheduled deadline scan (Job ID: ${job.id})`);
+        }
         await deadlineService.processDeadlines();
       } else {
         logger.warn(`[DeadlineWorker] Unknown job name: ${job.name}`);
@@ -33,7 +36,9 @@ export function startDeadlineWorker() {
   );
 
   deadlineWorker.on('completed', (job) => {
-    logger.info(`[DeadlineWorker] Job ${job.id} completed successfully`);
+    if (logDeadlineScans) {
+      logger.info(`[DeadlineWorker] Job ${job.id} completed successfully`);
+    }
   });
 
   deadlineWorker.on('failed', (job, err) => {

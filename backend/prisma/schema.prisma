@@ -416,6 +416,10 @@ model Contract {
   @@index([autoCancelAt])
   @@index([reviewDueAt])
   @@index([revisionDueAt])
+  @@index([status, dueAt])
+  @@index([status, autoCancelAt])
+  @@index([status, reviewDueAt])
+  @@index([status, revisionDueAt])
   @@map("contracts")
 }
 
@@ -573,6 +577,8 @@ model Payment {
   @@index([labelerUserId])
   @@index([status])
   @@index([paymentExpiresAt])
+  @@index([status, paymentExpiresAt])
+  @@index([contractId, status, paidAt])
   @@index([provider])
   @@index([providerPaymentId])
   @@index([providerTransactionId])
@@ -707,6 +713,7 @@ model Submission {
   @@index([contractId])
   @@index([labelerUserId])
   @@index([status])
+  @@index([contractId, format, status])
   @@map("submissions")
 }
 

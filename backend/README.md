@@ -500,6 +500,10 @@ Desktop authentication sistemi (`Authorization: Bearer`):
 - Critical environment variables (`JWT_SECRET`, `DESKTOP_REFRESH_TOKEN_SECRET`, `ALLOWED_ORIGINS`, `COOKIE_SAMESITE`, and R2 storage credentials) are validated on startup; the server refuses to start if any are missing or insecure in production.
 - `CSRF_SECRET` is optional but recommended in production for stronger CSRF token signing.
 
+**Operational Logging**
+- Prisma SQL query logging is opt-in via `PRISMA_QUERY_LOG=true`. Keep it disabled in production and enable it only temporarily while debugging.
+- Empty deadline scans are quiet by default. Set `LOG_DEADLINE_SCANS=true` only when investigating the deadline worker.
+
 **Upload Pipeline**
 - Allowed MIME types are strictly `image/jpeg`, `image/png`, and `image/webp`. SVG, GIF, AVIF, `text/html`, and all other types are rejected at the Joi schema layer before any service logic runs.
 - Object keys use MIME-derived safe extensions (e.g. `.jpg`, `.png`, `.webp`); the original filename extension is never trusted.
