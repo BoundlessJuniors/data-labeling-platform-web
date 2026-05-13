@@ -1,8 +1,9 @@
 /**
  * Configuration for LabelGun Desktop downloads.
  * 
- * Desktop installers are produced by `label_gun/electron-builder.yml` directly into
- * `frontend/public/downloads/`, so these hrefs must stay aligned with its artifact names.
+ * Desktop installers are published as GitHub Releases assets, not from
+ * `frontend/public`. Keep options disabled until the corresponding release asset
+ * exists and its URL has been verified.
  */
 
 export interface DownloadOption {
@@ -24,19 +25,20 @@ export interface DownloadsConfig {
   appName: string;
   currentVersion: string;
   releaseStatus: string;
-  downloadsBasePath: string;
+  releaseBaseUrl: string;
   platforms: PlatformConfig[];
 }
 
 const version = "1.0.0";
-const downloadsBasePath = "/downloads";
-const artifact = (fileName: string): string => `${downloadsBasePath}/${fileName}`;
+const releaseBaseUrl = (import.meta.env.VITE_DESKTOP_RELEASE_BASE_URL || "").replace(/\/$/, "");
+const githubReleaseAsset = (fileName: string): string | null =>
+  releaseBaseUrl ? `${releaseBaseUrl}/${fileName}` : null;
 
 export const downloadsConfig: DownloadsConfig = {
   appName: "LabelGun Desktop",
   currentVersion: version,
-  releaseStatus: "LabelGun Desktop beta kurulum dosyaları Windows, macOS ve Linux için indirilebilir.",
-  downloadsBasePath,
+  releaseStatus: "LabelGun Desktop beta kurulum dosyaları hazırlanıyor. İlk yayın Windows x64 için GitHub Releases üzerinden paylaşılacak.",
+  releaseBaseUrl,
   platforms: [
     {
       id: "macos",
@@ -67,14 +69,16 @@ export const downloadsConfig: DownloadsConfig = {
         {
           id: "win-x64",
           label: "Windows x64",
-          enabled: true,
-          href: artifact(`LabelGun-Desktop-${version}-windows-x64-setup.exe`)
+          enabled: false,
+          href: githubReleaseAsset(`LabelGun-Desktop-${version}-windows-x64-setup.exe`),
+          badge: "Hazırlanıyor"
         },
         {
           id: "win-arm64",
           label: "Windows ARM64",
-          enabled: true,
-          href: artifact(`LabelGun-Desktop-${version}-windows-arm64-setup.exe`)
+          enabled: false,
+          href: githubReleaseAsset(`LabelGun-Desktop-${version}-windows-arm64-setup.exe`),
+          badge: "Yakında"
         }
       ]
     },
@@ -86,26 +90,30 @@ export const downloadsConfig: DownloadsConfig = {
         {
           id: "linux-appimage-x64",
           label: "AppImage x64",
-          enabled: true,
-          href: artifact(`LabelGun-Desktop-${version}-linux-x64.AppImage`)
+          enabled: false,
+          href: githubReleaseAsset(`LabelGun-Desktop-${version}-linux-x64.AppImage`),
+          badge: "Yakında"
         },
         {
           id: "linux-appimage-arm64",
           label: "AppImage ARM64",
-          enabled: true,
-          href: artifact(`LabelGun-Desktop-${version}-linux-arm64.AppImage`)
+          enabled: false,
+          href: githubReleaseAsset(`LabelGun-Desktop-${version}-linux-arm64.AppImage`),
+          badge: "Yakında"
         },
         {
           id: "linux-deb-x64",
           label: "Debian/Ubuntu x64",
-          enabled: true,
-          href: artifact(`LabelGun-Desktop-${version}-linux-x64.deb`)
+          enabled: false,
+          href: githubReleaseAsset(`LabelGun-Desktop-${version}-linux-x64.deb`),
+          badge: "Yakında"
         },
         {
           id: "linux-deb-arm64",
           label: "Debian/Ubuntu ARM64",
-          enabled: true,
-          href: artifact(`LabelGun-Desktop-${version}-linux-arm64.deb`)
+          enabled: false,
+          href: githubReleaseAsset(`LabelGun-Desktop-${version}-linux-arm64.deb`),
+          badge: "Yakında"
         }
       ]
     }

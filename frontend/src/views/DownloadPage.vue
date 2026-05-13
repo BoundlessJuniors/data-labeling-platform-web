@@ -74,7 +74,7 @@ function getOsIconPath(osId: string): string {
                 Beta Bilgilendirmesi
               </h3>
               <ul class="text-sm text-gray-600 dark:text-slate-400 space-y-3">
-                <li>• Kurulum dosyaları desktop build sürecinden sonra bu sayfadaki indirme linklerine yayınlanır.</li>
+                <li>• Kurulum dosyaları GitHub Releases üzerinde yayınlandıktan sonra indirme seçenekleri aktif hale gelir.</li>
                 <li>• Gerçek ödeme veya kart bilgisi alınmaz; platform teknik demo/beta test kapsamındadır.</li>
               </ul>
             </div>
@@ -104,7 +104,8 @@ function getOsIconPath(osId: string): string {
                   <a 
                     v-if="option.enabled && option.href"
                     :href="option.href"
-                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
                     class="flex items-center justify-between p-3 rounded-lg border border-primary-200 dark:border-primary-900/50 bg-primary-50 dark:bg-primary-900/10 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/20 transition-colors group"
                   >
                     <span class="font-medium">{{ option.label }}</span>
