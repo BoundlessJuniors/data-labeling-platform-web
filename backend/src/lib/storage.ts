@@ -189,28 +189,21 @@ export async function ensureBucket(): Promise<void> {
   }
 
   // Apply CORS policy to allow direct browser uploads.
-  // Production: requires at least one explicit origin — throws if empty (fail-fast).
+  // Production: CORS is managed manually in Cloudflare Dashboard so narrow
+  // object-only R2 tokens do not need bucket policy write permissions.
   // Development: uses STORAGE_ALLOWED_ORIGINS / ALLOWED_ORIGINS with a safe localhost fallback.
   // Wildcard "*" is never used in either environment.
-  try {
-    let allowedOrigins: string[];
+  if (!isDevelopment) {
+    logger.info('[Storage] CORS is managed manually in production; skipping automatic CORS configuration.');
+    return;
+  }
 
-    if (isDevelopment) {
-      const configuredOrigins = getStorageAllowedOrigins(false);
-      allowedOrigins = configuredOrigins.length > 0
-        ? configuredOrigins
-        : ['http://localhost:5173', 'http://localhost:3000'];
-      logger.info(`[Storage] CORS dev origins: ${allowedOrigins.join(', ')}`);
-    } else {
-      allowedOrigins = getStorageAllowedOrigins(true);
-      if (allowedOrigins.length === 0) {
-        throw new Error(
-          'STORAGE_ALLOWED_ORIGINS (or ALLOWED_ORIGINS) must be set in production. ' +
-          'Refusing to apply CORS with no allowed origins.'
-        );
-      }
-      logger.info(`[Storage] CORS prod origins: ${allowedOrigins.join(', ')}`);
-    }
+  try {
+    const configuredOrigins = getStorageAllowedOrigins(false);
+    const allowedOrigins = configuredOrigins.length > 0
+      ? configuredOrigins
+      : ['http://localhost:5173', 'http://localhost:3000'];
+    logger.info(`[Storage] CORS dev origins: ${allowedOrigins.join(', ')}`);
 
     const corsCommand = new PutBucketCorsCommand({
       Bucket: R2_BUCKET_NAME,
@@ -231,11 +224,6 @@ export async function ensureBucket(): Promise<void> {
     await s3Client.send(corsCommand);
     logger.info(`✅ CORS configuration applied to bucket "${R2_BUCKET_NAME}"`);
   } catch (corsErr) {
-    // In production, a missing origin config is a hard error — re-throw.
-    if (!isDevelopment) {
-      logger.error(`❌ Failed to apply storage CORS configuration (production):`, corsErr);
-      throw corsErr;
-    }
     logger.warn(`⚠️ Failed to apply CORS configuration (dev, non-fatal):`, corsErr);
   }
 }

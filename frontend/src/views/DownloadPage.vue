@@ -74,7 +74,7 @@ function getOsIconPath(osId: string): string {
                 Beta Bilgilendirmesi
               </h3>
               <ul class="text-sm text-gray-600 dark:text-slate-400 space-y-3">
-                <li>• Desktop build dosyaları hazır olduğunda bu sayfadaki butonlar config üzerinden aktif hale getirilecektir.</li>
+                <li>• Kurulum dosyaları desktop build sürecinden sonra bu sayfadaki indirme linklerine yayınlanır.</li>
                 <li>• Gerçek ödeme veya kart bilgisi alınmaz; platform teknik demo/beta test kapsamındadır.</li>
               </ul>
             </div>
