@@ -34,10 +34,16 @@ const releaseBaseUrl = (import.meta.env.VITE_DESKTOP_RELEASE_BASE_URL || "").rep
 const githubReleaseAsset = (fileName: string): string | null =>
   releaseBaseUrl ? `${releaseBaseUrl}/${fileName}` : null;
 
+const windowsX64InstallerFileName = `LabelGun-Desktop-${version}-windows-x64-setup.exe`;
+const windowsX64InstallerHref = githubReleaseAsset(windowsX64InstallerFileName);
+const hasWindowsX64Release = Boolean(windowsX64InstallerHref);
+
 export const downloadsConfig: DownloadsConfig = {
   appName: "LabelGun Desktop",
   currentVersion: version,
-  releaseStatus: "LabelGun Desktop beta kurulum dosyaları hazırlanıyor. İlk yayın Windows x64 için GitHub Releases üzerinden paylaşılacak.",
+  releaseStatus: hasWindowsX64Release
+    ? "LabelGun Desktop Windows x64 beta sürümü GitHub Releases üzerinden indirilebilir. macOS ve Linux sürümleri yakında eklenecektir."
+    : "LabelGun Desktop beta kurulum dosyaları hazırlanıyor. İlk yayın Windows x64 için GitHub Releases üzerinden paylaşılacak.",
   releaseBaseUrl,
   platforms: [
     {
@@ -69,9 +75,9 @@ export const downloadsConfig: DownloadsConfig = {
         {
           id: "win-x64",
           label: "Windows x64",
-          enabled: false,
-          href: githubReleaseAsset(`LabelGun-Desktop-${version}-windows-x64-setup.exe`),
-          badge: "Hazırlanıyor"
+          enabled: hasWindowsX64Release,
+          href: windowsX64InstallerHref,
+          badge: hasWindowsX64Release ? "Beta" : "Hazırlanıyor"
         },
         {
           id: "win-arm64",

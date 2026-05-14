@@ -352,7 +352,10 @@ npm run test:coverage
 
 ```env
 VITE_API_URL=http://localhost:3000/api/v1
+VITE_DESKTOP_RELEASE_BASE_URL=https://github.com/BoundlessJuniors/data-labeling-platform-web/releases/download/desktop-v1.0.0
 ```
+
+- `VITE_DESKTOP_RELEASE_BASE_URL` GitHub Releases asset base URL'sidir. Installer dosyaları `frontend/public` içine konulmamalıdır. Download linkleri GitHub Releases üzerinden çalışır.
 
 ## 📝 Kod Standartları
 
