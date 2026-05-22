@@ -53,6 +53,7 @@ npm run dev
 - **Desktop/Web Auth Ayrımı:** Web tarafı cookie + CSRF modeliyle korunurken Electron desktop istemcisi ayrı `/api/v1/desktop/auth/*` endpointleri ve `Authorization: Bearer` token modeliyle çalışacak şekilde ayrıldı.
 - **Admin Operasyonel Güvenlik İyileştirmeleri:** BigInt (Prisma özel tipleri) API response serialization sızıntıları kapatıldı. Queue state'leri (BullMQ) timestamp türetmesinden kurtarılıp gerçek BullMQ listeleriyle etiketlendi. Retry Normalize sadece `submitted` durumu ve kontrollü senaryolara kilitlendi. Süresi dolan lease (stale lease) temizliği görev durumlarını bozmayacak şekilde güvenli hale getirildi ve admin route'larında UUID param doğrulaması (idParamSchema) sağlandı.
 - **Redis/BullMQ Free Tier Optimizasyonu:** Upstash Free Tier command kotasını korumak amacıyla BullMQ repeatable job sıklıkları düşürüldü. `deadline-processing` scan default değeri 12 saate, `storage-cleanup` scan default değeri 24 saate çıkarıldı. `DEADLINE_SCAN_INTERVAL_MS` ve `STORAGE_CLEANUP_SCAN_INTERVAL_MS` env değişkenleriyle override mümkündür. Deployment sonrası eski BullMQ repeatable kayıtları yeni schedule uygulanmadan önce otomatik temizlenir (`getRepeatableJobs` + `removeRepeatableByKey`). Ayrıca `/api/v1/assets` endpointleri `cacheMiddleware` kullanmadığı için tüm kod tabanındaki gereksiz `invalidateApiCache('/api/v1/assets')` çağrıları kaldırıldı; dataset cache invalidation korundu.
+- **BullMQ Worker Idle Polling Optimizasyonu:** Worker'lar kapatılmadan Redis command tüketimi azaltıldı. `drainDelay` (saniye) ve `stalledInterval` (ms) değerleri tüm worker'lara eklendi; `ASSET_WORKER_CONCURRENCY` ve `NORMALIZE_WORKER_CONCURRENCY` env üzerinden yönetilebilir hale getirildi. Ortak helper'lar `src/config/bullmq.ts` içinde toplandı.
 
 ## 📁 Proje Yapısı
 
@@ -66,6 +67,7 @@ backend/
 ├── src/
 │   ├── config/            # YENİ
 │   │   ├── beta-limits.ts     # Beta güvenlik limitleri helper
+│   │   ├── bullmq.ts          # BullMQ worker tuning helpers (drainDelay, stalledInterval, concurrency)
 │   │   ├── security.ts        # Merkezi güvenlik ve cookie konfigürasyonu
 │   │   └── upload-security.ts # İzin verilen MIME türleri, uzantı haritası, Sharp format listesi
 │   ├── controllers/       # 11 API endpoint handler
@@ -488,6 +490,19 @@ STORAGE_CLEANUP_SCAN_INTERVAL_MS=86400000
 # Logging
 # Boş deadline scan loglarını kapatmak için false önerilir.
 LOG_DEADLINE_SCANS=false
+
+# BullMQ Worker Idle Polling Tuning
+# Reduces Redis command consumption when workers are idle — critical for Upstash Free Tier.
+# BULLMQ_DRAIN_DELAY_SECONDS: seconds a worker long-polls before re-checking an empty queue.
+#   Higher = fewer Redis commands when idle. Default: 300 (5 min).
+# BULLMQ_STALLED_INTERVAL_MS: how often (ms) workers check for stalled jobs.
+#   Default: 300000 (5 min).
+# ASSET_WORKER_CONCURRENCY: parallel jobs for the asset-processing worker. Default: 1.
+# NORMALIZE_WORKER_CONCURRENCY: parallel jobs for the normalize-processing worker. Default: 1.
+BULLMQ_DRAIN_DELAY_SECONDS=300
+BULLMQ_STALLED_INTERVAL_MS=300000
+ASSET_WORKER_CONCURRENCY=1
+NORMALIZE_WORKER_CONCURRENCY=1
 ```
 
 ## 🔐 Authentication

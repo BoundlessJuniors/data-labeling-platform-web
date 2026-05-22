@@ -10,6 +10,11 @@ import logger from '../lib/logger';
 import { Readable } from 'stream';
 import { getBetaLimits } from '../config/beta-limits';
 import { ALLOWED_SHARP_FORMATS, MIME_TO_SHARP_FORMAT } from '../config/upload-security';
+import {
+  getAssetWorkerConcurrency,
+  getBullMqDrainDelaySeconds,
+  getBullMqStalledIntervalMs,
+} from '../config/bullmq';
 
 const WORKER_NAME = 'asset-processing';
 
@@ -281,7 +286,9 @@ export function startAssetWorker() {
     },
     {
       connection: getBullMqRedisConnection(),
-      concurrency: 5, // Process 5 images concurrently
+      concurrency: getAssetWorkerConcurrency(),
+      drainDelay: getBullMqDrainDelaySeconds(),
+      stalledInterval: getBullMqStalledIntervalMs(),
     }
   );
 
@@ -293,6 +300,11 @@ export function startAssetWorker() {
     logger.error(`[AssetWorker] Job ${job?.id} failed with ${err.message}`);
   });
 
-  logger.info(`🚀 Worker "${WORKER_NAME}" started`);
+  const concurrency = getAssetWorkerConcurrency();
+  const drainDelay = getBullMqDrainDelaySeconds();
+  const stalledInterval = getBullMqStalledIntervalMs();
+  logger.info(
+    `🚀 Worker "${WORKER_NAME}" started — concurrency=${concurrency}, drainDelay=${drainDelay}s, stalledInterval=${stalledInterval}ms`
+  );
   return worker;
 }

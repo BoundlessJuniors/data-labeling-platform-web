@@ -2,6 +2,10 @@ import { Worker } from 'bullmq';
 import { getBullMqRedisConnection } from '../lib/redis';
 import logger from '../lib/logger';
 import { storageLifecycleService } from '../services/storage-lifecycle.service';
+import {
+  getBullMqDrainDelaySeconds,
+  getBullMqStalledIntervalMs,
+} from '../config/bullmq';
 
 let storageCleanupWorker: Worker | null = null;
 
@@ -32,6 +36,8 @@ export function startStorageCleanupWorker() {
       connection: getBullMqRedisConnection(),
       // Concurrency 1: avoid concurrent purge state conflicts
       concurrency: 1,
+      drainDelay: getBullMqDrainDelaySeconds(),
+      stalledInterval: getBullMqStalledIntervalMs(),
     }
   );
 
@@ -47,5 +53,9 @@ export function startStorageCleanupWorker() {
     logger.error('[StorageCleanupWorker] Worker error:', err);
   });
 
-  logger.info('🚀 Storage Cleanup Worker started');
+  const drainDelay = getBullMqDrainDelaySeconds();
+  const stalledInterval = getBullMqStalledIntervalMs();
+  logger.info(
+    `🚀 Storage Cleanup Worker started — concurrency=1, drainDelay=${drainDelay}s, stalledInterval=${stalledInterval}ms`
+  );
 }

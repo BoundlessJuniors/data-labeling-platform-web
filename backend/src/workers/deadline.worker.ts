@@ -2,6 +2,10 @@ import { Worker } from 'bullmq';
 import { getBullMqRedisConnection } from '../lib/redis';
 import logger from '../lib/logger';
 import { deadlineService } from '../services/deadline.service';
+import {
+  getBullMqDrainDelaySeconds,
+  getBullMqStalledIntervalMs,
+} from '../config/bullmq';
 
 let deadlineWorker: Worker | null = null;
 const logDeadlineScans = process.env.LOG_DEADLINE_SCANS === 'true';
@@ -27,6 +31,8 @@ export function startDeadlineWorker() {
     {
       connection: getBullMqRedisConnection(),
       concurrency: 1,
+      drainDelay: getBullMqDrainDelaySeconds(),
+      stalledInterval: getBullMqStalledIntervalMs(),
     }
   );
 
@@ -44,5 +50,9 @@ export function startDeadlineWorker() {
     logger.error('[DeadlineWorker] Worker error:', err);
   });
 
-  logger.info('🚀 Deadline Worker started');
+  const drainDelay = getBullMqDrainDelaySeconds();
+  const stalledInterval = getBullMqStalledIntervalMs();
+  logger.info(
+    `🚀 Deadline Worker started — concurrency=1, drainDelay=${drainDelay}s, stalledInterval=${stalledInterval}ms`
+  );
 }

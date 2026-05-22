@@ -5,6 +5,11 @@ import logger from '../lib/logger';
 import { normalizeRawPayload } from '../utils/normalize.util';
 import { Prisma } from '@prisma/client';
 import pLimit from 'p-limit';
+import {
+  getNormalizeWorkerConcurrency,
+  getBullMqDrainDelaySeconds,
+  getBullMqStalledIntervalMs,
+} from '../config/bullmq';
 
 const WORKER_NAME = 'normalize-processing';
 const UPSERT_CONCURRENCY = 10; // Max parallel upserts per job
@@ -142,7 +147,9 @@ export function startNormalizeWorker() {
     },
     {
       connection: getBullMqRedisConnection(),
-      concurrency: 2, // Low concurrency to avoid DB pressure
+      concurrency: getNormalizeWorkerConcurrency(),
+      drainDelay: getBullMqDrainDelaySeconds(),
+      stalledInterval: getBullMqStalledIntervalMs(),
     }
   );
 
@@ -154,6 +161,11 @@ export function startNormalizeWorker() {
     logger.error(`[NormalizeWorker] Job ${job?.id} failed with ${err.message}`);
   });
 
-  logger.info(` Worker "${WORKER_NAME}" started`);
+  const concurrency = getNormalizeWorkerConcurrency();
+  const drainDelay = getBullMqDrainDelaySeconds();
+  const stalledInterval = getBullMqStalledIntervalMs();
+  logger.info(
+    `🚀 Worker "${WORKER_NAME}" started — concurrency=${concurrency}, drainDelay=${drainDelay}s, stalledInterval=${stalledInterval}ms`
+  );
   return worker;
 }
