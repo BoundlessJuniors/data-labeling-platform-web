@@ -394,11 +394,10 @@ export class StorageLifecycleService {
       }
     }
 
-    // Invalidate caches so clients see updated storageState
-    // (both user-aware and anonymous keys are covered by the wildcard pattern).
+    // Invalidate dataset cache so clients see updated storageState.
+    // Asset routes do not use cacheMiddleware, so no asset cache invalidation needed.
     try {
       await invalidateApiCache('/api/v1/datasets');
-      await invalidateApiCache('/api/v1/assets');
     } catch (cacheErr) {
       logger.warn(`[StorageLifecycle] Cache invalidation failed for dataset ${datasetId}:`, cacheErr);
     }

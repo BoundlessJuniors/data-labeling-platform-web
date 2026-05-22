@@ -52,6 +52,7 @@ npm run dev
 - **CSRF, CORS ve Production Security Hardening:** httpOnly cookie tabanlı auth yapısı için signed CSRF token koruması, strict CORS whitelist, JSON-only unsafe request kontrolü ve production ortamında fail-fast güvenlik konfigürasyonu eklendi.
 - **Desktop/Web Auth Ayrımı:** Web tarafı cookie + CSRF modeliyle korunurken Electron desktop istemcisi ayrı `/api/v1/desktop/auth/*` endpointleri ve `Authorization: Bearer` token modeliyle çalışacak şekilde ayrıldı.
 - **Admin Operasyonel Güvenlik İyileştirmeleri:** BigInt (Prisma özel tipleri) API response serialization sızıntıları kapatıldı. Queue state'leri (BullMQ) timestamp türetmesinden kurtarılıp gerçek BullMQ listeleriyle etiketlendi. Retry Normalize sadece `submitted` durumu ve kontrollü senaryolara kilitlendi. Süresi dolan lease (stale lease) temizliği görev durumlarını bozmayacak şekilde güvenli hale getirildi ve admin route'larında UUID param doğrulaması (idParamSchema) sağlandı.
+- **Redis/BullMQ Free Tier Optimizasyonu:** Upstash Free Tier command kotasını korumak amacıyla BullMQ repeatable job sıklıkları düşürüldü. `deadline-processing` scan default değeri 12 saate, `storage-cleanup` scan default değeri 24 saate çıkarıldı. `DEADLINE_SCAN_INTERVAL_MS` ve `STORAGE_CLEANUP_SCAN_INTERVAL_MS` env değişkenleriyle override mümkündür. Deployment sonrası eski BullMQ repeatable kayıtları yeni schedule uygulanmadan önce otomatik temizlenir (`getRepeatableJobs` + `removeRepeatableByKey`). Ayrıca `/api/v1/assets` endpointleri `cacheMiddleware` kullanmadığı için tüm kod tabanındaki gereksiz `invalidateApiCache('/api/v1/assets')` çağrıları kaldırıldı; dataset cache invalidation korundu.
 
 ## 📁 Proje Yapısı
 
@@ -163,7 +164,9 @@ Proje **Service Layer Pattern** kullanılarak geliştirilmiştir:
 
 - **Controllers:** Sadece HTTP istek/cevap döngüsünden ve validasyondan sorumludur.
 - **Services:** Tüm iş mantığını (business logic) ve veritabanı etkileşimlerini barındırır.
-- **Workers:** Uzun süren işlemleri (görsel işleme vb.) arka planda asenkron olarak yürütür.
+- **Workers:** Uzun süren işlemleri arka planda asenkron olarak yürütür.
+  - `asset-processing` ve `normalize-processing`: event-driven çalışır, iş geldiğinde tetiklenir.
+  - `deadline-processing` ve `storage-cleanup`: repeatable job tabanlıdır; beta/demo ortamında Redis command tüketimini azaltmak için düşük frekanslı interval'larla çalışır. Deployment sonrası eski repeatable kayıtlar otomatik temizlenip yeni schedule uygulanır.
 - **Routes:** Endpoint tanımlamalarını ve middleware zincirlerini içerir.
 
 Bu yapı sayesinde iş mantığı controller'lardan ayrıştırılmış, test edilebilir ve yeniden kullanılabilir hale getirilmiştir.
@@ -475,6 +478,16 @@ ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
 # Storage CORS — Production'da frontend domain'i yaz:
 # STORAGE_ALLOWED_ORIGINS="https://your-frontend-domain.com"
 STORAGE_ALLOWED_ORIGINS="http://localhost:5173"
+
+# BullMQ Repeatable Job Interval'ları (ms)
+# Beta/demo ortamında Redis command tüketimini azaltmak için yüksek tutulabilir.
+# Env yoksa queue.ts içindeki default değerler kullanılır (12h / 24h).
+DEADLINE_SCAN_INTERVAL_MS=43200000
+STORAGE_CLEANUP_SCAN_INTERVAL_MS=86400000
+
+# Logging
+# Boş deadline scan loglarını kapatmak için false önerilir.
+LOG_DEADLINE_SCANS=false
 ```
 
 ## 🔐 Authentication
@@ -571,3 +584,9 @@ Aşağıdaki endpointler dinamik yapıları veya içerdikleri veriler sebebiyle 
 - Dataset'in `storageState`'i (örneğin purged veya purge_scheduled) değiştiğinde dataset cache'i invalidate edilir.
 - `purge_scheduled`, `purging`, `purged` veya `purge_failed` gibi durumların frontend'e stale gitmesi engellenir.
 - DB state değiştikten sonra R2, S3 veya BullMQ gibi dış servislerde hata oluşsa bile, kritik yerlerde `try/finally` blokları kullanılarak cache invalidation'ın mutlaka çalışması garanti altına alınmıştır.
+
+### 7. Assets Cache Invalidation
+- `assets` endpointleri `cacheMiddleware` kapsamında değildir (signed URL güvenliği).
+- Bu nedenle `invalidateApiCache('/api/v1/assets')` çağrısı hiçbir yerde bulunmaz; böyle bir çağrı yalnızca gereksiz Redis `SCAN/DEL` komutu üretir.
+- Dataset cache invalidation, asset upload/confirm/worker finalization sonrasında korunur: asset sayısı veya dataset statüsü değiştiğinde dataset list/detail response'ları stale olabileceğinden `invalidateApiCache('/api/v1/datasets')` çağrıları ilgili servis ve worker katmanlarında bulunmaya devam eder.
+- `initiateUpload` yalnızca pending pre-upload kaydı oluşturduğu için bu aşamada dataset cache invalidation yapılmaz; asıl invalidation `completeUpload` ve worker finalization aşamalarında gerçekleşir.

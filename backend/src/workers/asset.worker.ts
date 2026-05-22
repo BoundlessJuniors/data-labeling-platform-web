@@ -61,9 +61,9 @@ async function rejectUploadedObject(params: {
 
   logger.warn(`[AssetWorker] Validation rejection: ${processingError}`);
 
+  // Asset routes do not use cacheMiddleware; only dataset cache needs invalidation.
   try {
     await invalidateApiCache('/api/v1/datasets');
-    await invalidateApiCache('/api/v1/assets');
   } catch (cacheErr) {
     logger.warn('[AssetWorker] Cache invalidation failed after rejected object:', cacheErr);
   }

@@ -253,9 +253,9 @@ export class DatasetService {
       prisma.dataset.delete({ where: { id: datasetId } }),
     ]);
 
-    // Invalidate dataset and asset caches (cascade asset deletion happened above)
+    // Invalidate dataset cache (cascade asset deletion happened above).
+    // Asset routes do not use cacheMiddleware, so no asset cache invalidation needed.
     await invalidateApiCache('/api/v1/datasets');
-    await invalidateApiCache('/api/v1/assets');
 
     logger.info(`Dataset deleted: ${datasetId} (${assets.length} assets cleaned up)`);
   }

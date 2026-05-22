@@ -58,19 +58,33 @@ deadlineQueue.on('error', (err) => {
   logger.error('Deadline Queue Error:', err);
 });
 
-export const addDeadlineScanJob = async () => {
+export const addDeadlineScanJob = async (): Promise<void> => {
+  // Default raised to 12 hours (43 200 000 ms); env var overrides this.
+  const intervalMs = Number(process.env.DEADLINE_SCAN_INTERVAL_MS || 43200000);
+
+  // Remove any stale repeatable job records so the new schedule takes effect.
+  const existingJobs = await deadlineQueue.getRepeatableJobs();
+  for (const job of existingJobs) {
+    if (job.name === 'scan-deadlines' || job.id === 'deadline-scan') {
+      await deadlineQueue.removeRepeatableByKey(job.key);
+      logger.info(`[DeadlineQueue] Removed stale repeatable job key: ${job.key}`);
+    }
+  }
+
   await deadlineQueue.add(
     'scan-deadlines',
     {},
     {
       jobId: 'deadline-scan',
       repeat: {
-        every: Number(process.env.DEADLINE_SCAN_INTERVAL_MS || 60000),
+        every: intervalMs,
       },
       removeOnComplete: true,
       removeOnFail: 100,
     }
   );
+
+  logger.info(`[DeadlineQueue] Registered scan-deadlines repeatable job with interval ${intervalMs} ms`);
 };
 
 // ---------- Storage Cleanup Queue ----------
@@ -137,16 +151,30 @@ export const addStoragePurgeJob = async (datasetId: string, runAt: Date): Promis
  * Uses a fixed jobId so it is idempotent across restarts.
  */
 export const addStorageCleanupScanJob = async (): Promise<void> => {
+  // Default raised to 24 hours (86 400 000 ms); env var overrides this.
+  const intervalMs = Number(process.env.STORAGE_CLEANUP_SCAN_INTERVAL_MS || 86400000);
+
+  // Remove any stale repeatable job records so the new schedule takes effect.
+  const existingJobs = await storageCleanupQueue.getRepeatableJobs();
+  for (const job of existingJobs) {
+    if (job.name === 'scan-storage-cleanup' || job.id === 'storage-cleanup-scan') {
+      await storageCleanupQueue.removeRepeatableByKey(job.key);
+      logger.info(`[StorageCleanupQueue] Removed stale repeatable job key: ${job.key}`);
+    }
+  }
+
   await storageCleanupQueue.add(
     'scan-storage-cleanup',
     {},
     {
       jobId: 'storage-cleanup-scan',
       repeat: {
-        every: Number(process.env.STORAGE_CLEANUP_SCAN_INTERVAL_MS || 3600000),
+        every: intervalMs,
       },
       removeOnComplete: true,
       removeOnFail: 100,
     }
   );
+
+  logger.info(`[StorageCleanupQueue] Registered scan-storage-cleanup repeatable job with interval ${intervalMs} ms`);
 };

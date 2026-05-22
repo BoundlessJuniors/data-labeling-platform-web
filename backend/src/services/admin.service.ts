@@ -225,10 +225,10 @@ export class AdminService {
     // Invalidate all major resource caches.
     // deleteUser removes a user whose data may be embedded in listing/dataset/labelset
     // responses as owner info (email, displayName, ratingAvg).
+    // Asset routes do not use cacheMiddleware, so no asset cache invalidation needed.
     await invalidateApiCache('/api/v1/listings');
     await invalidateApiCache('/api/v1/datasets');
     await invalidateApiCache('/api/v1/labelsets');
-    await invalidateApiCache('/api/v1/assets');
   }
 
   // ========================================================================

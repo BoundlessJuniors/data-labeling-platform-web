@@ -18,14 +18,6 @@ import logger from "../lib/logger";
 import { getBetaLimits } from '../config/beta-limits';
 import { getExtensionForMimeType, isAllowedImageMimeType } from '../config/upload-security';
 
-// Interface for Multer file (since we don't import 'express' here)
-interface UploadedFile {
-  originalname: string;
-  mimetype: string;
-  size: number;
-  buffer: Buffer;
-}
-
 export class AssetService {
   /**
    * Helper: Attach a signed URL to a single asset record.
@@ -144,16 +136,9 @@ export class AssetService {
       });
     });
 
-    let signedUrl: string;
-
-    try {
-      // Generate Presigned PUT URL
-      signedUrl = await getPresignedPutUrl(asset.objectKey, contentType);
-    } finally {
-      await invalidateApiCache('/api/v1/datasets').catch((cacheErr) => {
-        logger.warn('[AssetService] Cache invalidation failed after initiateUpload:', cacheErr);
-      });
-    }
+    // Dataset cache is invalidated on confirm/worker finalization;
+    // initiateUpload only creates a pending pre-upload record.
+    const signedUrl = await getPresignedPutUrl(asset.objectKey, contentType);
 
     return {
       signedUrl,
@@ -249,9 +234,9 @@ export class AssetService {
       }).catch((dbErr) =>
         logger.warn(`[AssetService] Failed to mark asset ${asset.id} as error:`, dbErr)
       );
-      // Invalidate caches so quota counts are immediately consistent.
+      // Invalidate dataset cache so quota counts are immediately consistent.
+      // Asset routes do not use cacheMiddleware, so no asset cache invalidation needed.
       await invalidateApiCache('/api/v1/datasets').catch(() => {});
-      await invalidateApiCache('/api/v1/assets').catch(() => {});
       throw new BadRequestError(reason);
     };
 
@@ -541,8 +526,8 @@ export class AssetService {
 
     logger.info(`Asset updated: ${asset.id}`);
 
+    // Asset routes do not use cacheMiddleware — only dataset cache needs invalidation.
     await invalidateApiCache('/api/v1/datasets');
-    await invalidateApiCache('/api/v1/assets');
 
     return this.attachSignedUrl(asset);
   }
@@ -594,7 +579,7 @@ export class AssetService {
 
     logger.info(`Asset deleted: ${assetId}`);
 
+    // Asset routes do not use cacheMiddleware — only dataset cache needs invalidation.
     await invalidateApiCache('/api/v1/datasets');
-    await invalidateApiCache('/api/v1/assets');
   }
 }
