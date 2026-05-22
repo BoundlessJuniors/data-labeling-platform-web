@@ -54,6 +54,7 @@ npm run dev
 - **Admin Operasyonel Güvenlik İyileştirmeleri:** BigInt (Prisma özel tipleri) API response serialization sızıntıları kapatıldı. Queue state'leri (BullMQ) timestamp türetmesinden kurtarılıp gerçek BullMQ listeleriyle etiketlendi. Retry Normalize sadece `submitted` durumu ve kontrollü senaryolara kilitlendi. Süresi dolan lease (stale lease) temizliği görev durumlarını bozmayacak şekilde güvenli hale getirildi ve admin route'larında UUID param doğrulaması (idParamSchema) sağlandı.
 - **Redis/BullMQ Free Tier Optimizasyonu:** Upstash Free Tier command kotasını korumak amacıyla BullMQ repeatable job sıklıkları düşürüldü. `deadline-processing` scan default değeri 12 saate, `storage-cleanup` scan default değeri 24 saate çıkarıldı. `DEADLINE_SCAN_INTERVAL_MS` ve `STORAGE_CLEANUP_SCAN_INTERVAL_MS` env değişkenleriyle override mümkündür. Deployment sonrası eski BullMQ repeatable kayıtları yeni schedule uygulanmadan önce otomatik temizlenir (`getRepeatableJobs` + `removeRepeatableByKey`). Ayrıca `/api/v1/assets` endpointleri `cacheMiddleware` kullanmadığı için tüm kod tabanındaki gereksiz `invalidateApiCache('/api/v1/assets')` çağrıları kaldırıldı; dataset cache invalidation korundu.
 - **BullMQ Worker Idle Polling Optimizasyonu:** Worker'lar kapatılmadan Redis command tüketimi azaltıldı. `drainDelay` (saniye) ve `stalledInterval` (ms) değerleri tüm worker'lara eklendi; `ASSET_WORKER_CONCURRENCY` ve `NORMALIZE_WORKER_CONCURRENCY` env üzerinden yönetilebilir hale getirildi. Ortak helper'lar `src/config/bullmq.ts` içinde toplandı.
+- **BullMQ Worker Toggle (`RUN_WORKERS`):** Redis kotası dolduğunda veya demo ortamında worker tüketimini tamamen durdurmak için `RUN_WORKERS=false` env değişkeni eklendi. Backend API/web servisi çalışmaya devam eder; yalnızca `startAssetWorker`, `startNormalizeWorker`, `startDeadlineWorker`, `startStorageCleanupWorker` ve repeatable job register işlemleri atlanır. Varsayılan `true`'dur (env yoksa da worker'lar çalışır).
 
 ## 📁 Proje Yapısı
 
@@ -503,6 +504,15 @@ BULLMQ_DRAIN_DELAY_SECONDS=300
 BULLMQ_STALLED_INTERVAL_MS=300000
 ASSET_WORKER_CONCURRENCY=1
 NORMALIZE_WORKER_CONCURRENCY=1
+
+# BullMQ Worker Toggle
+# true (default): tüm worker'lar ve repeatable job register işlemleri çalışır.
+# false: BullMQ worker'ları geçici olarak devre dışı bırakır.
+#   - Redis kotası dolduğunda (ör. Upstash Free Tier) EVALSHA spam'ini durdurur.
+#   - Demo/staging ortamında asset processing, normalize processing,
+#     deadline automation ve storage cleanup çalışmaz.
+#   - Backend API/web servisi etkilenmez; yalnızca arka plan iş tüketimi durur.
+RUN_WORKERS=true
 ```
 
 ## 🔐 Authentication

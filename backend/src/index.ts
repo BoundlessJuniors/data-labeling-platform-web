@@ -91,17 +91,25 @@ const startServer = async () => {
       logger.warn('Redis connection failed, caching disabled:', error.message);
     });
 
-    // Start background workers
-    startAssetWorker();
-    startNormalizeWorker();
-    startDeadlineWorker();
-    startStorageCleanupWorker();
-    await addDeadlineScanJob().catch((err) =>
-      logger.warn('Failed to add deadline scan job:', err),
-    );
-    await addStorageCleanupScanJob().catch((err) =>
-      logger.warn('Failed to add storage cleanup scan job:', err),
-    );
+    // Start background workers (disabled when RUN_WORKERS=false)
+    const runWorkers = process.env.RUN_WORKERS !== 'false';
+
+    if (runWorkers) {
+      startAssetWorker();
+      startNormalizeWorker();
+      startDeadlineWorker();
+      startStorageCleanupWorker();
+      await addDeadlineScanJob().catch((err) =>
+        logger.warn('Failed to add deadline scan job:', err),
+      );
+      await addStorageCleanupScanJob().catch((err) =>
+        logger.warn('Failed to add storage cleanup scan job:', err),
+      );
+    } else {
+      logger.warn(
+        'Background workers are disabled because RUN_WORKERS=false. BullMQ jobs will not be processed.',
+      );
+    }
 
     // Ensure the storage bucket exists (creates it on MinIO if missing)
     await ensureBucket();
